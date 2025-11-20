@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:kltn_sharing_app/core/constants/app_text_styles.dart';
 import '../../core/theme/app_colors.dart';
 
 class CustomTextField extends StatelessWidget {
@@ -53,33 +54,31 @@ class CustomTextField extends StatelessWidget {
           maxLines: maxLines,
           enabled: enabled,
           onChanged: onChanged,
-          style: const TextStyle(
-            fontSize: 16,
+          style: AppTextStyles.body16M.copyWith(
             color: AppColors.textPrimary,
           ),
           decoration: InputDecoration(
             hintText: hint,
-            hintStyle: const TextStyle(
+            hintStyle: AppTextStyles.body16R.copyWith(
               color: AppColors.textHint,
-              fontSize: 16,
             ),
             prefixIcon: prefixIcon,
             suffixIcon: suffixIcon,
             filled: true,
-            fillColor: AppColors.lightGray,
+            fillColor: Color.fromRGBO(255, 255, 255, 1),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide.none,
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide.none,
+              borderSide: BorderSide(color: AppColors.borderGray, width: 1),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: const BorderSide(
-                color: AppColors.primaryTeal,
-                width: 2,
+                color: AppColors.primaryGreen,
+                width: 1,
               ),
             ),
             errorBorder: OutlineInputBorder(
@@ -93,7 +92,7 @@ class CustomTextField extends StatelessWidget {
               borderRadius: BorderRadius.circular(12),
               borderSide: const BorderSide(
                 color: Colors.red,
-                width: 2,
+                width: 1,
               ),
             ),
             contentPadding: const EdgeInsets.symmetric(

@@ -4,6 +4,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/constants/app_routes.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/gradient_button.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -14,8 +15,8 @@ class RegisterScreen extends StatefulWidget {
 
 class _RegisterScreenState extends State<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController();
-  final _emailController = TextEditingController();
+  final _fullNameController = TextEditingController();
+  final _userNameController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   bool _obscurePassword = true;
@@ -25,29 +26,28 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   void dispose() {
-    _nameController.dispose();
-    _emailController.dispose();
+    _fullNameController.dispose();
+    _userNameController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
   }
 
   Future<void> _handleRegister() async {
-    if (_formKey.currentState!.validate()) {
-      if (!_agreeToTerms) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Vui lòng đồng ý với điều khoản sử dụng')),
-        );
-        return;
-      }
-      setState(() => _isLoading = true);
-      // TODO: Implement register logic
-      await Future.delayed(const Duration(seconds: 1));
-      setState(() => _isLoading = false);
-      if (mounted) {
-        context.go(AppRoutes.emailInput);
-      }
+    // if (_formKey.currentState!.validate()) {
+    //   if (!_agreeToTerms) {
+    //     ScaffoldMessenger.of(context).showSnackBar(
+    //       const SnackBar(
+    //           content: Text('Vui lòng đồng ý với điều khoản sử dụng')),
+    //     );
+    //     return;
+    //   }
+    setState(() => _isLoading = true);
+    // TODO: Implement register logic
+    await Future.delayed(const Duration(seconds: 1));
+    setState(() => _isLoading = false);
+    if (mounted) {
+      context.go(AppRoutes.terms);
     }
   }
 
@@ -63,37 +63,42 @@ class _RegisterScreenState extends State<RegisterScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const SizedBox(height: 20),
-                IconButton(
-                  icon: const Icon(Icons.arrow_back,
-                      color: AppColors.textPrimary),
-                  onPressed: () => context.pop(),
-                  alignment: Alignment.centerLeft,
+                const SizedBox(height: 40),
+                Container(
+                  width: 100,
+                  height: 100,
+                  decoration: BoxDecoration(
+                    gradient: AppColors.primaryGradient,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Center(
+                    child: SvgPicture.asset(
+                      'assets/svgs/logo/name.svg',
+                    ),
+                  ),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 40),
                 const Text(
-                  'Đăng ký',
+                  'Tạo tài khoản',
                   style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
                     color: AppColors.textPrimary,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
                 const SizedBox(height: 8),
-                Text(
-                  'Tạo tài khoản mới để bắt đầu',
+                const Text(
+                  'Đăng ký nhanh bằng username và mật khẩu',
                   style: TextStyle(
                     fontSize: 16,
                     color: AppColors.textSecondary,
                   ),
                 ),
-                const SizedBox(height: 32),
+                const SizedBox(height: 24),
                 CustomTextField(
                   label: 'Họ và tên',
                   hint: 'Nhập họ và tên',
-                  controller: _nameController,
-                  prefixIcon: const Icon(Icons.person_outline,
-                      color: AppColors.textSecondary),
+                  controller: _fullNameController,
                   validator: (value) {
                     if (value == null || value.isEmpty) {
                       return 'Vui lòng nhập họ và tên';
@@ -103,18 +108,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 const SizedBox(height: 20),
                 CustomTextField(
-                  label: 'Email',
-                  hint: 'Nhập email của bạn',
-                  controller: _emailController,
-                  keyboardType: TextInputType.emailAddress,
-                  prefixIcon: const Icon(Icons.email_outlined,
-                      color: AppColors.textSecondary),
+                  label: 'Tên đăng nhập',
+                  hint: 'Chọn username của bạn',
+                  controller: _userNameController,
+                  keyboardType: TextInputType.name,
                   validator: (value) {
                     if (value == null || value.isEmpty) {
-                      return 'Vui lòng nhập email';
+                      return 'Vui lòng nhập username';
                     }
-                    if (!value.contains('@')) {
-                      return 'Email không hợp lệ';
+                    if (value.length < 4) {
+                      return 'Username phải có ít nhất 4 ký tự';
+                    }
+                    final usernameRegex = RegExp(r'^[a-zA-Z0-9_\\.]+$');
+                    if (!usernameRegex.hasMatch(value)) {
+                      return 'Chỉ dùng chữ, số, dấu chấm hoặc gạch dưới';
                     }
                     return null;
                   },
@@ -125,8 +132,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   hint: 'Nhập mật khẩu',
                   controller: _passwordController,
                   obscureText: _obscurePassword,
-                  prefixIcon: const Icon(Icons.lock_outline,
-                      color: AppColors.textSecondary),
                   suffixIcon: IconButton(
                     icon: Icon(
                       _obscurePassword
@@ -154,8 +159,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   hint: 'Nhập lại mật khẩu',
                   controller: _confirmPasswordController,
                   obscureText: _obscureConfirmPassword,
-                  prefixIcon: const Icon(Icons.lock_outline,
-                      color: AppColors.textSecondary),
                   suffixIcon: IconButton(
                     icon: Icon(
                       _obscureConfirmPassword
@@ -179,41 +182,41 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   },
                 ),
                 const SizedBox(height: 20),
-                Row(
-                  children: [
-                    Checkbox(
-                      value: _agreeToTerms,
-                      onChanged: (value) {
-                        setState(() => _agreeToTerms = value ?? false);
-                      },
-                      activeColor: AppColors.primaryTeal,
-                    ),
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: () => context.go(AppRoutes.terms),
-                        child: RichText(
-                          text: const TextSpan(
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: AppColors.textSecondary,
-                            ),
-                            children: [
-                              TextSpan(text: 'Tôi đồng ý với '),
-                              TextSpan(
-                                text: 'Điều khoản sử dụng',
-                                style: TextStyle(
-                                  color: AppColors.primaryTeal,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 32),
+                // Row(
+                //   children: [
+                //     Checkbox(
+                //       value: _agreeToTerms,
+                //       onChanged: (value) {
+                //         setState(() => _agreeToTerms = value ?? false);
+                //       },
+                //       activeColor: AppColors.primaryTeal,
+                //     ),
+                //     Expanded(
+                //       child: GestureDetector(
+                //         onTap: () => context.go(AppRoutes.terms),
+                //         child: RichText(
+                //           text: const TextSpan(
+                //             style: TextStyle(
+                //               fontSize: 14,
+                //               color: AppColors.textSecondary,
+                //             ),
+                //             children: [
+                //               TextSpan(text: 'Tôi đồng ý với '),
+                //               TextSpan(
+                //                 text: 'Điều khoản sử dụng',
+                //                 style: TextStyle(
+                //                   color: AppColors.primaryTeal,
+                //                   fontWeight: FontWeight.w600,
+                //                 ),
+                //               ),
+                //             ],
+                //           ),
+                //         ),
+                //       ),
+                //     ),
+                //   ],
+                // ),
+                // const SizedBox(height: 24),
                 GradientButton(
                   text: 'Đăng ký',
                   onPressed: _handleRegister,
@@ -235,7 +238,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       child: const Text(
                         'Đăng nhập',
                         style: TextStyle(
-                          color: AppColors.primaryTeal,
+                          color: AppColors.primaryGreen,
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
                         ),

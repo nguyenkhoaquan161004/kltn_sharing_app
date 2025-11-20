@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/constants/app_routes.dart';
@@ -21,8 +22,15 @@ class TermsScreen extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     IconButton(
-                      icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
-                      onPressed: () => context.pop(),
+                      icon: const Icon(Icons.arrow_back,
+                          color: AppColors.textPrimary),
+                      onPressed: () {
+                        if (context.canPop()) {
+                          context.pop();
+                        } else {
+                          context.go(AppRoutes.register);
+                        }
+                      },
                       alignment: Alignment.centerLeft,
                     ),
                     const SizedBox(height: 20),
@@ -30,14 +38,23 @@ class TermsScreen extends StatelessWidget {
                       width: 80,
                       height: 80,
                       decoration: BoxDecoration(
-                        gradient: AppColors.primaryGradient,
+                        gradient: LinearGradient(
+                          colors: [
+                            AppColors.primaryYellow.withOpacity(0.6),
+                            AppColors.primaryGreen.withOpacity(0.4),
+                          ],
+                        ),
                         borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            blurRadius: 10,
+                            offset: Offset(0, 4),
+                          ),
+                        ],
                       ),
-                      child: const Icon(
-                        Icons.description,
-                        color: AppColors.white,
-                        size: 40,
-                      ),
+                      child: Center(
+                          child: SvgPicture.asset('assets/svgs/logo/icon.svg')),
                     ),
                     const SizedBox(height: 24),
                     const Text(
@@ -137,7 +154,7 @@ class TermsScreen extends StatelessWidget {
               padding: const EdgeInsets.all(24),
               child: GradientButton(
                 text: 'Tôi đồng ý',
-                onPressed: () => context.go(AppRoutes.emailInput),
+                onPressed: () => context.push(AppRoutes.emailInput),
               ),
             ),
           ],
@@ -146,4 +163,3 @@ class TermsScreen extends StatelessWidget {
     );
   }
 }
-

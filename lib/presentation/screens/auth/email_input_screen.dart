@@ -4,6 +4,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/constants/app_routes.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/gradient_button.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 class EmailInputScreen extends StatefulWidget {
   const EmailInputScreen({super.key});
@@ -45,13 +46,19 @@ class _EmailInputScreenState extends State<EmailInputScreen> {
           child: Form(
             key: _formKey,
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: 20),
                 IconButton(
                   icon: const Icon(Icons.arrow_back,
                       color: AppColors.textPrimary),
-                  onPressed: () => context.pop(),
+                  onPressed: () {
+                    if (context.canPop()) {
+                      context.pop();
+                    } else {
+                      context.go(AppRoutes.terms);
+                    }
+                  },
                   alignment: Alignment.centerLeft,
                 ),
                 const SizedBox(height: 40),
@@ -59,14 +66,23 @@ class _EmailInputScreenState extends State<EmailInputScreen> {
                   width: 80,
                   height: 80,
                   decoration: BoxDecoration(
-                    gradient: AppColors.primaryGradient,
+                    gradient: LinearGradient(
+                      colors: [
+                        AppColors.primaryYellow.withOpacity(0.6),
+                        AppColors.primaryGreen.withOpacity(0.4),
+                      ],
+                    ),
                     borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 10,
+                        offset: Offset(0, 4),
+                      ),
+                    ],
                   ),
-                  child: const Icon(
-                    Icons.email_outlined,
-                    color: AppColors.white,
-                    size: 40,
-                  ),
+                  child: Center(
+                      child: SvgPicture.asset('assets/svgs/logo/icon.svg')),
                 ),
                 const SizedBox(height: 32),
                 const Text(
@@ -92,7 +108,7 @@ class _EmailInputScreenState extends State<EmailInputScreen> {
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
                   prefixIcon: const Icon(Icons.email_outlined,
-                      color: AppColors.textSecondary),
+                      color: AppColors.textHint),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
                       return 'Vui lòng nhập email';

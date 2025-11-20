@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../presentation/screens/welcome_screen.dart';
 import '../presentation/screens/onboarding/onboarding_screen.dart';
@@ -24,134 +25,210 @@ import '../presentation/screens/sharing/sharing_screen.dart';
 import '../core/constants/app_routes.dart';
 
 class AppRouter {
+  // Helper function để tạo smooth page transition
+  static CustomTransitionPage<T> _buildPageWithTransition<T>({
+    required Widget child,
+    required GoRouterState state,
+    String? name,
+  }) {
+    return CustomTransitionPage<T>(
+      key: state.pageKey,
+      name: name,
+      child: child,
+      transitionsBuilder: (context, animation, secondaryAnimation, child) {
+        // Slide transition từ phải sang trái
+        const begin = Offset(1.0, 0.0);
+        const end = Offset.zero;
+        const curve = Curves.easeInOutCubic;
+
+        var tween = Tween(begin: begin, end: end).chain(
+          CurveTween(curve: curve),
+        );
+
+        return SlideTransition(
+          position: animation.drive(tween),
+          child: FadeTransition(
+            opacity: animation,
+            child: child,
+          ),
+        );
+      },
+      transitionDuration: const Duration(milliseconds: 300),
+    );
+  }
+
   static final GoRouter router = GoRouter(
     initialLocation: AppRoutes.splash,
     routes: [
       // Auth routes
       GoRoute(
         path: AppRoutes.splash,
-        builder: (context, state) => const WelcomeScreen(),
+        pageBuilder: (context, state) => _buildPageWithTransition(
+            child: const WelcomeScreen(), state: state, name: 'welcome'),
         name: 'welcome',
       ),
       GoRoute(
         path: AppRoutes.onboarding,
-        builder: (context, state) => const OnboardingScreen(),
+        pageBuilder: (context, state) => _buildPageWithTransition(
+            child: const OnboardingScreen(), state: state, name: 'onboarding'),
         name: 'onboarding',
       ),
       GoRoute(
         path: AppRoutes.login,
-        builder: (context, state) => const LoginScreen(),
+        pageBuilder: (context, state) => _buildPageWithTransition(
+            child: const LoginScreen(), state: state, name: 'login'),
         name: 'login',
       ),
       GoRoute(
         path: AppRoutes.register,
-        builder: (context, state) => const RegisterScreen(),
+        pageBuilder: (context, state) => _buildPageWithTransition(
+            child: const RegisterScreen(), state: state, name: 'register'),
         name: 'register',
       ),
       GoRoute(
         path: AppRoutes.terms,
-        builder: (context, state) => const TermsScreen(),
+        pageBuilder: (context, state) => _buildPageWithTransition(
+            child: const TermsScreen(), state: state, name: 'terms'),
         name: 'terms',
       ),
       GoRoute(
         path: AppRoutes.emailInput,
-        builder: (context, state) => const EmailInputScreen(),
+        pageBuilder: (context, state) => _buildPageWithTransition(
+            child: const EmailInputScreen(), state: state, name: 'email-input'),
         name: 'email-input',
       ),
       GoRoute(
         path: AppRoutes.emailVerification,
-        builder: (context, state) => const EmailVerificationScreen(),
+        pageBuilder: (context, state) => _buildPageWithTransition(
+            child: const EmailVerificationScreen(),
+            state: state,
+            name: 'email-verification'),
         name: 'email-verification',
       ),
       GoRoute(
         path: '/otp',
-        builder: (context, state) => const OtpScreen(),
+        pageBuilder: (context, state) => _buildPageWithTransition(
+            child: const OtpScreen(), state: state, name: 'otp'),
         name: 'otp',
       ),
 
       // Main routes
       GoRoute(
         path: AppRoutes.home,
-        builder: (context, state) => const HomeScreen(),
+        pageBuilder: (context, state) => _buildPageWithTransition(
+            child: const HomeScreen(), state: state, name: 'home'),
         name: 'home',
       ),
       GoRoute(
         path: AppRoutes.search,
-        builder: (context, state) => const SearchScreen(),
+        pageBuilder: (context, state) => _buildPageWithTransition(
+            child: const SearchScreen(), state: state, name: 'search'),
         name: 'search',
       ),
       GoRoute(
         path: AppRoutes.searchResults,
-        builder: (context, state) => const SearchResultsScreen(),
+        pageBuilder: (context, state) => _buildPageWithTransition(
+            child: const SearchResultsScreen(),
+            state: state,
+            name: 'search-results'),
         name: 'search-results',
       ),
       GoRoute(
         path: '/filter',
-        builder: (context, state) => const FilterScreen(),
+        pageBuilder: (context, state) => _buildPageWithTransition(
+            child: const FilterScreen(), state: state, name: 'filter'),
         name: 'filter',
       ),
 
       // Product routes
       GoRoute(
         path: AppRoutes.productDetail,
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           // final productId = state.pathParameters['id'] ?? '';
-          return const ProductDetailScreen();
+          return _buildPageWithTransition(
+            child: const ProductDetailScreen(),
+            state: state,
+            name: 'product-detail',
+          );
         },
         name: 'product-detail',
       ),
       GoRoute(
         path: '/product-variant',
-        builder: (context, state) => const ProductVariantScreen(),
+        pageBuilder: (context, state) => _buildPageWithTransition(
+            child: const ProductVariantScreen(),
+            state: state,
+            name: 'product-variant'),
         name: 'product-variant',
       ),
 
       // Order routes
       GoRoute(
         path: AppRoutes.orders,
-        builder: (context, state) => const CartAllScreen(),
+        pageBuilder: (context, state) => _buildPageWithTransition(
+            child: const CartAllScreen(), state: state, name: 'orders'),
         name: 'orders',
       ),
       GoRoute(
         path: '/cart-processing',
-        builder: (context, state) => const CartProcessingScreen(),
+        pageBuilder: (context, state) => _buildPageWithTransition(
+            child: const CartProcessingScreen(),
+            state: state,
+            name: 'cart-processing'),
         name: 'cart-processing',
       ),
       GoRoute(
         path: '/cart-done',
-        builder: (context, state) => const CartDoneScreen(),
+        pageBuilder: (context, state) => _buildPageWithTransition(
+            child: const CartDoneScreen(), state: state, name: 'cart-done'),
         name: 'cart-done',
       ),
       GoRoute(
         path: AppRoutes.orderDetail,
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           // final orderId = state.pathParameters['id'] ?? '';
           // TODO: Implement OrderDetailScreen
-          return const CartAllScreen();
+          return _buildPageWithTransition(
+            child: const CartAllScreen(),
+            state: state,
+            name: 'order-detail',
+          );
         },
         name: 'order-detail',
       ),
       GoRoute(
         path: '/order-detail-processing/:id',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final orderId = state.pathParameters['id'] ?? '';
-          return OrderDetailProcessingScreen(orderId: orderId);
+          return _buildPageWithTransition(
+            child: OrderDetailProcessingScreen(orderId: orderId),
+            state: state,
+            name: 'order-detail-processing',
+          );
         },
         name: 'order-detail-processing',
       ),
       GoRoute(
         path: '/order-detail-done/:id',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final orderId = state.pathParameters['id'] ?? '';
-          return OrderDetailDoneScreen(orderId: orderId);
+          return _buildPageWithTransition(
+            child: OrderDetailDoneScreen(orderId: orderId),
+            state: state,
+            name: 'order-detail-done',
+          );
         },
         name: 'order-detail-done',
       ),
       GoRoute(
         path: '/proof-of-payment/:orderId',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final orderId = state.pathParameters['orderId'] ?? '';
-          return ProofOfPaymentScreen(orderId: orderId);
+          return _buildPageWithTransition(
+            child: ProofOfPaymentScreen(orderId: orderId),
+            state: state,
+            name: 'proof-of-payment',
+          );
         },
         name: 'proof-of-payment',
       ),
@@ -159,46 +236,66 @@ class AppRouter {
       // Profile routes
       GoRoute(
         path: AppRoutes.profile,
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           // TODO: Implement ProfileScreen
-          return const StoreInformationScreen();
+          return _buildPageWithTransition(
+            child: const StoreInformationScreen(),
+            state: state,
+            name: 'profile',
+          );
         },
         name: 'profile',
       ),
       GoRoute(
         path: '/store-information',
-        builder: (context, state) => const StoreInformationScreen(),
+        pageBuilder: (context, state) => _buildPageWithTransition(
+            child: const StoreInformationScreen(),
+            state: state,
+            name: 'store-information'),
         name: 'store-information',
       ),
       GoRoute(
         path: '/sharing',
-        builder: (context, state) => const SharingScreen(),
+        pageBuilder: (context, state) => _buildPageWithTransition(
+            child: const SharingScreen(), state: state, name: 'sharing'),
         name: 'sharing',
       ),
 
       // Social routes
       GoRoute(
         path: AppRoutes.messages,
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           // TODO: Implement MessagesListScreen
-          return const HomeScreen();
+          return _buildPageWithTransition(
+            child: const HomeScreen(),
+            state: state,
+            name: 'messages',
+          );
         },
         name: 'messages',
       ),
       GoRoute(
         path: AppRoutes.chat,
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           // final userId = state.pathParameters['userId'] ?? '';
           // TODO: Implement ChatScreen
-          return const HomeScreen();
+          return _buildPageWithTransition(
+            child: const HomeScreen(),
+            state: state,
+            name: 'chat',
+          );
         },
         name: 'chat',
       ),
       GoRoute(
         path: AppRoutes.achievements,
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           // TODO: Implement AchievementsScreen
-          return const HomeScreen();
+          return _buildPageWithTransition(
+            child: const HomeScreen(),
+            state: state,
+            name: 'achievements',
+          );
         },
         name: 'achievements',
       ),

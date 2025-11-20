@@ -19,13 +19,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   final List<OnboardingData> _pages = [
     OnboardingData(
       title: 'Chia sẻ đồ dùng không còn là\nchuyện riêng lẻ',
-      description: 'Mỗi món đồ bạn trao đi đều có thể giúp ích\ncho cộng đồng',
-      illustration: 'assets/images/onboarding_1.png',
+      description: 'Mỗi món đồ bạn trao đi đều có thể giúp ích cho cộng đồng',
+      illustration: 'assets/svgs/onboarding/pic1.svg',
     ),
     OnboardingData(
       title: 'Hãy đến với cộng đồng của\nchúng ta',
-      description: 'Kết nối với những người cùng tinh thần\nvới bạn',
-      illustration: 'assets/images/onboarding_2.png',
+      description: 'Kết nối với những người cùng tinh thần với bạn',
+      illustration: 'assets/svgs/onboarding/pic2.svg',
     ),
   ];
 

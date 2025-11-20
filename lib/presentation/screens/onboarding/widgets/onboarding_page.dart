@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../onboarding_screen.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 class OnboardingPage extends StatelessWidget {
   final OnboardingData data;
@@ -21,25 +22,22 @@ class OnboardingPage extends StatelessWidget {
           Container(
             height: MediaQuery.of(context).size.height * 0.4,
             padding: const EdgeInsets.all(32),
-            child: Image.asset(
+            child: SvgPicture.asset(
               data.illustration,
               fit: BoxFit.contain,
-              // Fallback if image not found
-              errorBuilder: (context, error, stackTrace) {
-                return Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(20),
+              placeholderBuilder: (context) => Container(
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Center(
+                  child: Icon(
+                    Icons.image,
+                    size: 80,
+                    color: Colors.white,
                   ),
-                  child: const Center(
-                    child: Icon(
-                      Icons.image,
-                      size: 80,
-                      color: Colors.white,
-                    ),
-                  ),
-                );
-              },
+                ),
+              ),
             ),
           ),
 
@@ -61,9 +59,9 @@ class OnboardingPage extends StatelessWidget {
           Text(
             data.description,
             textAlign: TextAlign.center,
-            style: AppTextStyles.bodyLarge.copyWith(
-              color: Colors.white.withOpacity(0.9),
-              height: 1.5,
+            style: AppTextStyles.note12M.copyWith(
+              color: Colors.white.withOpacity(0.75),
+              // height: 1.5,
             ),
           ),
         ],

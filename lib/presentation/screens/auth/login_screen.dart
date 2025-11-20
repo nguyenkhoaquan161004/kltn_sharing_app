@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:kltn_sharing_app/core/constants/app_text_styles.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/constants/app_routes.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/gradient_button.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -14,14 +16,14 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController();
+  final _userNameController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
   bool _isLoading = false;
 
   @override
   void dispose() {
-    _emailController.dispose();
+    _userNameController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
@@ -59,28 +61,21 @@ class _LoginScreenState extends State<LoginScreen> {
                     gradient: AppColors.primaryGradient,
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: const Center(
-                    child: Text(
-                      'N',
-                      style: TextStyle(
-                        fontSize: 50,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.white,
-                      ),
+                  child: Center(
+                    child: SvgPicture.asset(
+                      'assets/svgs/logo/name.svg',
                     ),
                   ),
                 ),
                 const SizedBox(height: 40),
-                const Text(
-                  'Đăng nhập',
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
+                Text(
+                  'Thông tin đăng nhập',
+                  style: AppTextStyles.h2.copyWith(
                     color: AppColors.textPrimary,
                   ),
                 ),
                 const SizedBox(height: 8),
-                Text(
+                const Text(
                   'Chào mừng bạn trở lại!',
                   style: TextStyle(
                     fontSize: 16,
@@ -89,18 +84,20 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 32),
                 CustomTextField(
-                  label: 'Email',
-                  hint: 'Nhập email của bạn',
-                  controller: _emailController,
-                  keyboardType: TextInputType.emailAddress,
-                  prefixIcon: const Icon(Icons.email_outlined,
-                      color: AppColors.textSecondary),
+                  label: 'Tên đăng nhập',
+                  hint: 'Nhập username của bạn',
+                  controller: _userNameController,
+                  keyboardType: TextInputType.name,
                   validator: (value) {
                     if (value == null || value.isEmpty) {
-                      return 'Vui lòng nhập email';
+                      return 'Vui lòng nhập username';
                     }
-                    if (!value.contains('@')) {
-                      return 'Email không hợp lệ';
+                    if (value.length < 4) {
+                      return 'Username phải có ít nhất 4 ký tự';
+                    }
+                    final usernameRegex = RegExp(r'^[a-zA-Z0-9_\\.]+$');
+                    if (!usernameRegex.hasMatch(value)) {
+                      return 'Chỉ dùng chữ, số, dấu chấm hoặc gạch dưới';
                     }
                     return null;
                   },
@@ -111,8 +108,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   hint: 'Nhập mật khẩu',
                   controller: _passwordController,
                   obscureText: _obscurePassword,
-                  prefixIcon: const Icon(Icons.lock_outline,
-                      color: AppColors.textSecondary),
+                  // prefixIcon: const Icon(Icons.lock_outline,
+                  //     color: AppColors.textSecondary),
                   suffixIcon: IconButton(
                     icon: Icon(
                       _obscurePassword
