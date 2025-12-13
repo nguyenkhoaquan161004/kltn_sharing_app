@@ -18,10 +18,15 @@ import '../presentation/screens/orders/cart_all_screen.dart';
 import '../presentation/screens/orders/cart_processing_screen.dart';
 import '../presentation/screens/orders/cart_done_screen.dart';
 import '../presentation/screens/orders/order_detail_processing_screen.dart';
+import '../presentation/screens/messages/messages_list_screen.dart';
 import '../presentation/screens/orders/order_detail_done_screen.dart';
 import '../presentation/screens/orders/proof_of_payment_screen.dart';
 import '../presentation/screens/profile/store_information_screen.dart';
 import '../presentation/screens/sharing/sharing_screen.dart';
+import '../presentation/screens/profile/profile_screen.dart';
+import '../presentation/screens/profile/user_profile_screen.dart';
+import '../presentation/screens/leaderboard/leaderboard_screen.dart';
+import '../presentation/screens/error/error_404_screen.dart';
 import '../core/constants/app_routes.dart';
 
 class AppRouter {
@@ -59,6 +64,7 @@ class AppRouter {
 
   static final GoRouter router = GoRouter(
     initialLocation: AppRoutes.splash,
+    errorBuilder: (context, state) => const Error404Screen(),
     routes: [
       // Auth routes
       GoRoute(
@@ -142,16 +148,28 @@ class AppRouter {
 
       // Product routes
       GoRoute(
-        path: AppRoutes.productDetail,
+        path: '/item/:id',
+        name: 'item-detail',
         pageBuilder: (context, state) {
-          // final productId = state.pathParameters['id'] ?? '';
+          final itemId = state.pathParameters['id'] ?? '';
           return _buildPageWithTransition(
-            child: const ProductDetailScreen(),
+            child: ProductDetailScreen(productId: itemId),
+            state: state,
+            name: 'item-detail',
+          );
+        },
+      ),
+      GoRoute(
+        path: '/product/:id',
+        name: 'product-detail',
+        pageBuilder: (context, state) {
+          final productId = state.pathParameters['id'] ?? '';
+          return _buildPageWithTransition(
+            child: ProductDetailScreen(productId: productId),
             state: state,
             name: 'product-detail',
           );
         },
-        name: 'product-detail',
       ),
       GoRoute(
         path: '/product-variant',
@@ -237,14 +255,25 @@ class AppRouter {
       GoRoute(
         path: AppRoutes.profile,
         pageBuilder: (context, state) {
-          // TODO: Implement ProfileScreen
           return _buildPageWithTransition(
-            child: const StoreInformationScreen(),
+            child: const ProfileScreen(),
             state: state,
             name: 'profile',
           );
         },
         name: 'profile',
+      ),
+      GoRoute(
+        path: '/user/:userId',
+        pageBuilder: (context, state) {
+          final userId = state.pathParameters['userId'] ?? '';
+          return _buildPageWithTransition(
+            child: UserProfileScreen(userId: userId),
+            state: state,
+            name: 'user-profile',
+          );
+        },
+        name: 'user-profile',
       ),
       GoRoute(
         path: '/store-information',
@@ -265,9 +294,8 @@ class AppRouter {
       GoRoute(
         path: AppRoutes.messages,
         pageBuilder: (context, state) {
-          // TODO: Implement MessagesListScreen
           return _buildPageWithTransition(
-            child: const HomeScreen(),
+            child: const MessagesListScreen(),
             state: state,
             name: 'messages',
           );
@@ -298,6 +326,18 @@ class AppRouter {
           );
         },
         name: 'achievements',
+      ),
+      GoRoute(
+        path: AppRoutes.leaderboard,
+        pageBuilder: (context, state) {
+          // TODO: Implement LeaderboardScreen
+          return _buildPageWithTransition(
+            child: const LeaderboardScreen(),
+            state: state,
+            name: 'leaderboard',
+          );
+        },
+        name: 'leaderboard',
       ),
     ],
   );

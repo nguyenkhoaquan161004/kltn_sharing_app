@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 
 class FilterScreen extends StatefulWidget {
@@ -54,7 +55,7 @@ class _FilterScreenState extends State<FilterScreen> {
                       ),
                     ),
                     GestureDetector(
-                      onTap: () => Navigator.pop(context),
+                      onTap: () => context.pop(),
                       child: const Icon(Icons.close, size: 28),
                     ),
                   ],

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/gradient_button.dart';
@@ -34,7 +35,7 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
       await Future.delayed(const Duration(seconds: 1));
       setState(() => _isLoading = false);
       if (mounted) {
-        Navigator.pop(context);
+        context.pop();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Đã lưu thông tin cửa hàng')),
         );
@@ -51,7 +52,7 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => context.pop(),
         ),
         title: const Text(
           'Thông tin cửa hàng',

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 
 class SharingScreen extends StatefulWidget {
@@ -20,7 +21,7 @@ class _SharingScreenState extends State<SharingScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => context.pop(),
         ),
         title: const Text(
           'Chia sẻ',

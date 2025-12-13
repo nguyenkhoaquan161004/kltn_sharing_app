@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import '../../../core/theme/app_colors.dart';
@@ -6,7 +7,7 @@ import '../../widgets/gradient_button.dart';
 
 class ProofOfPaymentScreen extends StatefulWidget {
   final String orderId;
-  
+
   const ProofOfPaymentScreen({
     super.key,
     required this.orderId,
@@ -77,9 +78,9 @@ class _ProofOfPaymentScreenState extends State<ProofOfPaymentScreen> {
     // TODO: Upload proof of payment
     await Future.delayed(const Duration(seconds: 2));
     setState(() => _isLoading = false);
-    
+
     if (mounted) {
-      Navigator.pop(context);
+      context.pop();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Đã gửi chứng từ thanh toán thành công')),
       );
@@ -95,7 +96,7 @@ class _ProofOfPaymentScreenState extends State<ProofOfPaymentScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => context.pop(),
         ),
         title: const Text(
           'Chứng từ thanh toán',
@@ -264,4 +265,3 @@ class _ProofOfPaymentScreenState extends State<ProofOfPaymentScreen> {
     );
   }
 }
-

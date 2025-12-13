@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/constants/app_routes.dart';
+import '../../../data/services/mock_data_service.dart';
+import '../../../data/models/item_model.dart';
+import '../../widgets/item_card.dart';
 
 class SearchResultsScreen extends StatefulWidget {
   const SearchResultsScreen({super.key});
@@ -12,6 +14,7 @@ class SearchResultsScreen extends StatefulWidget {
 
 class _SearchResultsScreenState extends State<SearchResultsScreen> {
   bool _showFilters = false;
+  final MockDataService _mockDataService = MockDataService();
 
   @override
   Widget build(BuildContext context) {
@@ -22,7 +25,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => context.pop(),
         ),
         title: const Text(
           'Kết quả tìm kiếm',
@@ -59,64 +62,41 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
               ),
             ),
           Expanded(
-            child: GridView.builder(
-              padding: const EdgeInsets.all(16),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                childAspectRatio: 0.8,
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 12,
-              ),
-              itemCount: 10,
-              itemBuilder: (context, index) {
-                return GestureDetector(
-                  onTap: () => context.go('/product/1'), // TODO: Use actual product ID
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: AppColors.lightGray,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          height: 120,
-                          decoration: BoxDecoration(
-                            color: Colors.grey[300],
-                            borderRadius: const BorderRadius.only(
-                              topLeft: Radius.circular(12),
-                              topRight: Radius.circular(12),
-                            ),
-                          ),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Product ${index + 1}',
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppColors.textPrimary,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                '${100 + (index * 15)}.000đ',
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.primaryTeal,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
+            child: FutureBuilder<List<ItemModel>>(
+              future: _mockDataService.getAvailableItems(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                if (snapshot.hasError) {
+                  return Center(child: Text('Error: ${snapshot.error}'));
+                }
+
+                final items = snapshot.data ?? [];
+
+                if (items.isEmpty) {
+                  return const Center(
+                    child: Text('Không tìm thấy sản phẩm nào'),
+                  );
+                }
+
+                return GridView.builder(
+                  padding: const EdgeInsets.all(16),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    childAspectRatio: 0.65,
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 12,
                   ),
+                  itemCount: items.length,
+                  itemBuilder: (context, index) {
+                    final item = items[index];
+                    return ItemCard(
+                      item: item,
+                      showTimeRemaining: true,
+                    );
+                  },
                 );
               },
             ),

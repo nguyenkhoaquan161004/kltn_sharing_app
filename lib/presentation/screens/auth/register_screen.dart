@@ -22,7 +22,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool _isLoading = false;
-  bool _agreeToTerms = false;
 
   @override
   void dispose() {

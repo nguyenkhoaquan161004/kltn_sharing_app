@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 
 class ProductVariantScreen extends StatefulWidget {
@@ -30,7 +31,7 @@ class _ProductVariantScreenState extends State<ProductVariantScreen> {
       backgroundColor: Colors.white.withOpacity(0.5),
       body: Column(
         children: [
-          Expanded(child: GestureDetector(onTap: () => Navigator.pop(context))),
+          Expanded(child: GestureDetector(onTap: () => context.pop())),
           Container(
             decoration: const BoxDecoration(
               color: AppColors.white,
@@ -74,7 +75,7 @@ class _ProductVariantScreenState extends State<ProductVariantScreen> {
                                   ),
                                 ),
                                 GestureDetector(
-                                  onTap: () => Navigator.pop(context),
+                                  onTap: () => context.pop(),
                                   child: const Icon(Icons.close, size: 24),
                                 ),
                               ],

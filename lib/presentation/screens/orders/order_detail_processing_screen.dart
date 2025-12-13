@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import 'widgets/order_progress_tracker.dart';
-import 'proof_of_payment_screen.dart';
 
 class OrderDetailProcessingScreen extends StatelessWidget {
   final String orderId;
-  
+
   const OrderDetailProcessingScreen({
     super.key,
     required this.orderId,
@@ -20,7 +20,7 @@ class OrderDetailProcessingScreen extends StatelessWidget {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => context.pop(),
         ),
         title: const Text(
           'Chi tiết đơn hàng',
@@ -99,12 +99,7 @@ class OrderDetailProcessingScreen extends StatelessWidget {
             // Actions
             ElevatedButton.icon(
               onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => ProofOfPaymentScreen(orderId: orderId),
-                  ),
-                );
+                context.push('/proof-of-payment/$orderId');
               },
               icon: const Icon(Icons.receipt_long),
               label: const Text('Tải lên chứng từ thanh toán'),
@@ -228,4 +223,3 @@ class OrderDetailProcessingScreen extends StatelessWidget {
     );
   }
 }
-

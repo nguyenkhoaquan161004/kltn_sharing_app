@@ -43,6 +43,10 @@ class AppRoutes {
     return '/order/$orderId';
   }
 
+  static String getUserProfileRoute(String userId) {
+    return '/user/$userId';
+  }
+
   static String getChatRoute(String userId) {
     return '/chat/$userId';
   }

@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/constants/app_routes.dart';
+import '../../../data/services/mock_data_service.dart';
+import '../../../data/models/item_model.dart';
+import '../../widgets/item_card.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -12,6 +15,7 @@ class SearchScreen extends StatefulWidget {
 
 class _SearchScreenState extends State<SearchScreen> {
   late TextEditingController _searchController;
+  final MockDataService _mockDataService = MockDataService();
 
   final List<Map<String, dynamic>> recentSearches = [
     {'term': 'Áo thun nam', 'time': '2 giờ trước'},
@@ -40,7 +44,7 @@ class _SearchScreenState extends State<SearchScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => context.pop(),
         ),
         title: TextField(
           controller: _searchController,
@@ -147,65 +151,43 @@ class _SearchScreenState extends State<SearchScreen> {
                 ),
               ),
               const SizedBox(height: 12),
-              GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  childAspectRatio: 0.8,
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 12,
-                ),
-                itemCount: 6,
-                itemBuilder: (context, index) {
-                  return GestureDetector(
-                    onTap: () => context.go('/product/1'), // TODO: Use actual product ID
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: AppColors.lightGray,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            height: 120,
-                            decoration: BoxDecoration(
-                              color: Colors.grey[300],
-                              borderRadius: const BorderRadius.only(
-                                topLeft: Radius.circular(12),
-                                topRight: Radius.circular(12),
-                              ),
-                            ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.all(12),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Product ${index + 1}',
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                    color: AppColors.textPrimary,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  '${100 + (index * 10)}.000đ',
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppColors.primaryTeal,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
+              FutureBuilder<List<ItemModel>>(
+                future: _mockDataService.getAvailableItems(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+
+                  if (snapshot.hasError) {
+                    return Center(child: Text('Error: ${snapshot.error}'));
+                  }
+
+                  final items = snapshot.data ?? [];
+
+                  if (items.isEmpty) {
+                    return const Center(
+                      child: Text('Không tìm thấy sản phẩm nào'),
+                    );
+                  }
+
+                  return GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      childAspectRatio: 0.65,
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 12,
                     ),
+                    itemCount: items.length,
+                    itemBuilder: (context, index) {
+                      final item = items[index];
+                      return ItemCard(
+                        item: item,
+                        showTimeRemaining: true,
+                      );
+                    },
                   );
                 },
               ),
