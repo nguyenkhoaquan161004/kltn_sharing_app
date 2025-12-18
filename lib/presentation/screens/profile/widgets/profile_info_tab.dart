@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import '../../../../core/constants/app_colors.dart';
+import '../../../../core/theme/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../../../../data/mock_data.dart';
+import '../../../widgets/item_card.dart';
 import 'profile_stats.dart';
 import 'scoring_mechanism_modal.dart';
 
@@ -184,12 +185,15 @@ class ProfileInfoTab extends StatelessWidget {
               crossAxisCount: 2,
               crossAxisSpacing: 12,
               mainAxisSpacing: 12,
-              childAspectRatio: 0.75,
+              childAspectRatio: 0.6,
             ),
             itemCount: freeProducts.length > 3 ? 3 : freeProducts.length,
             itemBuilder: (context, index) {
               final product = freeProducts[index];
-              return _buildProductCard(product);
+              return ItemCard(
+                item: product,
+                showTimeRemaining: true,
+              );
             },
           ),
           const SizedBox(height: 32),
@@ -228,13 +232,16 @@ class ProfileInfoTab extends StatelessWidget {
               crossAxisCount: 2,
               crossAxisSpacing: 12,
               mainAxisSpacing: 12,
-              childAspectRatio: 0.75,
+              childAspectRatio: 0.6,
             ),
             itemCount:
                 suggestedProducts.length > 3 ? 3 : suggestedProducts.length,
             itemBuilder: (context, index) {
               final product = suggestedProducts[index];
-              return _buildProductCard(product);
+              return ItemCard(
+                item: product,
+                showTimeRemaining: true,
+              );
             },
           ),
         ],
@@ -253,81 +260,6 @@ class ProfileInfoTab extends StatelessWidget {
             ),
           ),
       ],
-    );
-  }
-
-  Widget _buildProductCard(dynamic product) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.backgroundWhite,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 5,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Product image
-          Container(
-            width: double.infinity,
-            height: 100,
-            decoration: BoxDecoration(
-              color: AppColors.backgroundGray,
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(12),
-                topRight: Radius.circular(12),
-              ),
-            ),
-            child: const Icon(
-              Icons.image,
-              color: AppColors.textSecondary,
-              size: 32,
-            ),
-          ),
-          const SizedBox(height: 8),
-          // Product name
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8.0),
-            child: Text(
-              product.name,
-              style: AppTextStyles.caption.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          const SizedBox(height: 4),
-          // Price
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8.0),
-            child: Text(
-              product.price == 0 ? '0 đồng' : '${product.price} VND',
-              style: AppTextStyles.caption.copyWith(
-                color: AppColors.primaryTeal,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          const SizedBox(height: 4),
-          // Quantity
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8.0),
-            child: Text(
-              'Còn ${product.quantity} sản phẩm',
-              style: AppTextStyles.caption.copyWith(
-                color: AppColors.textSecondary,
-                fontSize: 11,
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 

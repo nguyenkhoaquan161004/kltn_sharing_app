@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../../../../core/constants/app_colors.dart';
+import '../../../../core/theme/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../../widgets/bottom_navigation_widget.dart';
+import '../../widgets/app_header_bar.dart';
 import 'widgets/profile_header.dart';
 import 'widgets/profile_info_tab.dart';
 import 'widgets/profile_products_tab.dart';
@@ -51,76 +52,15 @@ class _ProfileScreenState extends State<ProfileScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.backgroundWhite,
+      appBar: AppHeaderBar(
+        orderCount: 8,
+        onSearchTap: () => context.push('/search'),
+        onSettingsTap: () {},
+        showSettingsButton: widget.isOwnProfile,
+      ),
       body: NestedScrollView(
         headerSliverBuilder: (context, innerBoxIsScrolled) {
           return [
-            // App bar
-            SliverAppBar(
-              backgroundColor: Colors.transparent,
-              elevation: 0,
-              pinned: true,
-              expandedHeight: 0,
-              leading: widget.isOwnProfile
-                  ? IconButton(
-                      icon: const Icon(Icons.search,
-                          color: AppColors.textPrimary),
-                      onPressed: () {},
-                    )
-                  : IconButton(
-                      icon: const Icon(Icons.arrow_back,
-                          color: AppColors.textPrimary),
-                      onPressed: () => context.pop(),
-                    ),
-              actions: [
-                // Order badge
-                if (widget.isOwnProfile) ...[
-                  Row(
-                    children: [
-                      const Text('Đơn hàng', style: AppTextStyles.bodyMedium),
-                      const SizedBox(width: 4),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: AppColors.badgePink,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Text(
-                          '8',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.mail_outline,
-                        color: AppColors.textPrimary),
-                    onPressed: () {},
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.settings,
-                        color: AppColors.textPrimary),
-                    onPressed: () {},
-                  ),
-                ] else ...[
-                  IconButton(
-                    icon: const Icon(Icons.mail_outline,
-                        color: AppColors.textPrimary),
-                    onPressed: () {},
-                  ),
-                  IconButton(
-                    icon:
-                        const Icon(Icons.search, color: AppColors.textPrimary),
-                    onPressed: () {},
-                  ),
-                ],
-              ],
-            ),
-
             // Profile header
             SliverToBoxAdapter(
               child: ProfileHeader(
@@ -164,8 +104,7 @@ class _ProfileScreenState extends State<ProfileScreen>
             // Tab 2: Sản phẩm
             ProfileProductsTab(
               isOwnProfile: widget.isOwnProfile,
-              userId:
-                  0, // Current user ID (would be from auth/state management in real app)
+              userId: 1, // Current user ID (for own profile)
             ),
 
             // Tab 3: Thành tựu

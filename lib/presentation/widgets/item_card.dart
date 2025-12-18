@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../../core/constants/app_colors.dart';
+import '../../core/theme/app_colors.dart';
 import '../../data/models/item_model.dart';
 import '../../data/mock_data.dart';
 
@@ -88,7 +88,7 @@ class _ItemCardState extends State<ItemCard> {
               children: [
                 // Image placeholder
                 Container(
-                  height: 140,
+                  height: 120,
                   decoration: BoxDecoration(
                     borderRadius: const BorderRadius.vertical(
                       top: Radius.circular(12),
@@ -98,7 +98,7 @@ class _ItemCardState extends State<ItemCard> {
                   child: Center(
                     child: Icon(
                       Icons.image,
-                      size: 48,
+                      size: 40,
                       color: Colors.grey[400],
                     ),
                   ),
@@ -167,7 +167,7 @@ class _ItemCardState extends State<ItemCard> {
             // Content
             Expanded(
               child: Padding(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(10),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -177,33 +177,33 @@ class _ItemCardState extends State<ItemCard> {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        fontSize: 13,
+                        fontSize: 12,
                         fontWeight: FontWeight.w600,
                         color: AppColors.textPrimary,
                       ),
                     ),
 
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 3),
 
                     // Category
                     Text(
                       MockData.getCategoryById(widget.item.categoryId)?.name ??
                           'Khác',
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: 10,
                         color: Colors.grey[600],
                       ),
                     ),
 
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 6),
 
                     // Price
                     Text(
                       widget.item.price == 0
-                          ? '0 VNĐ'
+                          ? 'Miễn phí'
                           : '${widget.item.price.toStringAsFixed(0)} VNĐ',
                       style: const TextStyle(
-                        fontSize: 13,
+                        fontSize: 12,
                         fontWeight: FontWeight.w600,
                         color: AppColors.primaryTeal,
                       ),
@@ -216,14 +216,14 @@ class _ItemCardState extends State<ItemCard> {
                       children: [
                         Icon(
                           Icons.inventory_2_outlined,
-                          size: 14,
+                          size: 12,
                           color: Colors.grey[600],
                         ),
-                        const SizedBox(width: 4),
+                        const SizedBox(width: 3),
                         Text(
                           'Còn ${widget.item.quantity}',
                           style: TextStyle(
-                            fontSize: 11,
+                            fontSize: 10,
                             fontWeight: FontWeight.w500,
                             color: Colors.grey[700],
                           ),

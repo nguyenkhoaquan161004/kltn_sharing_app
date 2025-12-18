@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../../../core/constants/app_colors.dart';
+import 'package:go_router/go_router.dart';
+import '../../../../core/theme/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
 
 class ProfileAchievementsTab extends StatelessWidget {
@@ -94,7 +95,7 @@ class ProfileAchievementsTab extends StatelessWidget {
           _buildSection(
             title: 'Thành tựu đạt được',
             onViewAll: () {
-              // TODO: Navigate to achievements list
+              context.push('/achievements/list');
             },
             child: Column(
               children:
@@ -107,10 +108,10 @@ class ProfileAchievementsTab extends StatelessWidget {
           _buildSection(
             title: 'Bộ sưu tập danh hiệu',
             onViewAll: () {
-              // TODO: Navigate to badges collection
+              context.push('/badges/list');
             },
             child: SizedBox(
-              height: 120,
+              height: 132,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 itemCount: _badges.length,

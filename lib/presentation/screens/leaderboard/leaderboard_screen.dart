@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../../../core/constants/app_colors.dart';
+import '../../../../core/theme/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../../../../data/mock_data.dart';
 import '../../widgets/bottom_navigation_widget.dart';
@@ -32,61 +32,54 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
   }
 
   void _initializeLeaderboardData() {
-    // Top 3 users from MockData
-    _topUsers = [
-      LeaderboardUser(
-        id: MockData.users[0].userId.toString(),
-        name: MockData.users[0].name,
-        avatar: MockData.users[0].avatar ?? 'https://i.pravatar.cc/150?img=1',
-        points: MockData.users[0].trustScore * 100,
-        rank: 1,
-        change: 0,
-      ),
-      LeaderboardUser(
-        id: MockData.users[1].userId.toString(),
-        name: MockData.users[1].name,
-        avatar: MockData.users[1].avatar ?? 'https://i.pravatar.cc/150?img=2',
-        points: MockData.users[1].trustScore * 100,
-        rank: 2,
-        change: 2,
-      ),
-      LeaderboardUser(
-        id: MockData.users[4].userId.toString(),
-        name: MockData.users[4].name,
-        avatar: MockData.users[4].avatar ?? 'https://i.pravatar.cc/150?img=5',
-        points: MockData.users[4].trustScore * 100,
-        rank: 3,
-        change: -1,
-      ),
-    ];
+    // Create list of all users with their scores
+    List<Map<String, dynamic>> allUsersData = [];
 
-    // Other users from MockData
-    _otherUsers = [
-      LeaderboardUser(
-        id: MockData.users[2].userId.toString(),
-        name: MockData.users[2].name,
-        avatar: MockData.users[2].avatar ?? 'https://i.pravatar.cc/150?img=3',
-        points: MockData.users[2].trustScore * 100,
-        rank: 4,
-        change: 2,
-      ),
-      LeaderboardUser(
-        id: MockData.users[3].userId.toString(),
-        name: MockData.users[3].name,
-        avatar: MockData.users[3].avatar ?? 'https://i.pravatar.cc/150?img=4',
-        points: MockData.users[3].trustScore * 100,
-        rank: 5,
-        change: 1,
-      ),
-      LeaderboardUser(
-        id: MockData.users[5].userId.toString(),
-        name: MockData.users[5].name,
-        avatar: MockData.users[5].avatar ?? 'https://i.pravatar.cc/150?img=6',
-        points: MockData.users[5].trustScore * 100,
-        rank: 6,
-        change: -2,
-      ),
-    ];
+    for (int i = 0; i < MockData.users.length; i++) {
+      final user = MockData.users[i];
+      allUsersData.add({
+        'user': user,
+        'index': i,
+        'score': user.trustScore,
+      });
+    }
+
+    // Sort by trust score (descending)
+    allUsersData.sort((a, b) => b['score'].compareTo(a['score']));
+
+    // Top 3 users
+    _topUsers = [];
+    for (int i = 0; i < 3 && i < allUsersData.length; i++) {
+      final userData = allUsersData[i];
+      final user = userData['user'];
+      _topUsers.add(
+        LeaderboardUser(
+          id: user.userId.toString(),
+          name: user.name,
+          avatar: user.avatar ?? 'https://i.pravatar.cc/150?img=${user.userId}',
+          points: user.trustScore * 100,
+          rank: i + 1,
+          change: 0,
+        ),
+      );
+    }
+
+    // Other users (rank 4-10+)
+    _otherUsers = [];
+    for (int i = 3; i < allUsersData.length; i++) {
+      final userData = allUsersData[i];
+      final user = userData['user'];
+      _otherUsers.add(
+        LeaderboardUser(
+          id: user.userId.toString(),
+          name: user.name,
+          avatar: user.avatar ?? 'https://i.pravatar.cc/150?img=${user.userId}',
+          points: user.trustScore * 100,
+          rank: i + 1,
+          change: 0,
+        ),
+      );
+    }
 
     // Current user
     _currentUser = LeaderboardUser(
@@ -188,6 +181,8 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
               children: [
                 const Text('Top 10', style: AppTextStyles.h3),
                 const SizedBox(height: 16),
+                // Show all users from top to bottom
+                ..._topUsers.map((user) => LeaderboardItem(user: user)),
                 ..._otherUsers.map((user) => LeaderboardItem(user: user)),
               ],
             ),

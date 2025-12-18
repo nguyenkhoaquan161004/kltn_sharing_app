@@ -2,21 +2,24 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
-import '../../../../data/models/product_model.dart';
+import '../../../../data/models/item_model.dart';
+import '../../../../data/models/user_model.dart';
 
-class OrderRequestModal extends StatefulWidget {
-  final ProductModel product;
+class ItemRequestModal extends StatefulWidget {
+  final ItemModel item;
+  final UserModel seller;
 
-  const OrderRequestModal({
+  const ItemRequestModal({
     super.key,
-    required this.product,
+    required this.item,
+    required this.seller,
   });
 
   @override
-  State<OrderRequestModal> createState() => _OrderRequestModalState();
+  State<ItemRequestModal> createState() => _ItemRequestModalState();
 }
 
-class _OrderRequestModalState extends State<OrderRequestModal> {
+class _ItemRequestModalState extends State<ItemRequestModal> {
   int _quantity = 1;
   final TextEditingController _reasonController = TextEditingController();
   bool _isLoading = false;
@@ -28,7 +31,7 @@ class _OrderRequestModalState extends State<OrderRequestModal> {
   }
 
   void _increaseQuantity() {
-    if (_quantity < widget.product.quantity) {
+    if (_quantity < widget.item.quantity) {
       setState(() => _quantity++);
     }
   }
@@ -39,26 +42,17 @@ class _OrderRequestModalState extends State<OrderRequestModal> {
     }
   }
 
-  void _addToCart() async {
-    setState(() => _isLoading = true);
-
-    // Simulate API call
-    await Future.delayed(const Duration(seconds: 1));
-
-    setState(() => _isLoading = false);
-
-    if (mounted) {
-      context.pop();
+  void _requestNow() async {
+    if (_reasonController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Đã thêm vào giỏ hàng'),
-          backgroundColor: AppColors.success,
+          content: Text('Vui lòng nhập lý do'),
+          backgroundColor: Colors.red,
         ),
       );
+      return;
     }
-  }
 
-  void _requestNow() async {
     setState(() => _isLoading = true);
 
     // Simulate API call
@@ -100,12 +94,12 @@ class _OrderRequestModalState extends State<OrderRequestModal> {
               ),
               const SizedBox(height: 24),
               const Text(
-                'Purchase Successful',
+                'Yêu cầu đã gửi',
                 style: AppTextStyles.h3,
               ),
               const SizedBox(height: 12),
               Text(
-                'The seller has been notified to ship your item and we will only release the payment after you have received it.',
+                'Người cho "${widget.seller.name}" đã được thông báo. Vui lòng chờ xác nhận từ họ.',
                 style: AppTextStyles.bodyMedium,
                 textAlign: TextAlign.center,
               ),
@@ -163,15 +157,8 @@ class _OrderRequestModalState extends State<OrderRequestModal> {
                     color: AppColors.backgroundGray,
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: widget.product.images.isNotEmpty
-                      ? ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: Image.network(
-                            widget.product.images.first,
-                            fit: BoxFit.cover,
-                          ),
-                        )
-                      : const Icon(Icons.image, color: AppColors.textSecondary),
+                  child:
+                      const Icon(Icons.image, color: AppColors.textSecondary),
                 ),
                 const SizedBox(width: 16),
 
@@ -181,7 +168,7 @@ class _OrderRequestModalState extends State<OrderRequestModal> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        widget.product.name,
+                        widget.item.name,
                         style: AppTextStyles.bodyLarge.copyWith(
                           fontWeight: FontWeight.w600,
                         ),
@@ -190,7 +177,7 @@ class _OrderRequestModalState extends State<OrderRequestModal> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        widget.product.formattedPrice,
+                        '${widget.item.price} VND',
                         style: AppTextStyles.price,
                       ),
                     ],
@@ -216,7 +203,7 @@ class _OrderRequestModalState extends State<OrderRequestModal> {
                     const Text('Số lượng', style: AppTextStyles.label),
                     const SizedBox(height: 4),
                     Text(
-                      'Còn ${widget.product.quantity} sản phẩm',
+                      'Còn ${widget.item.quantity} sản phẩm',
                       style: AppTextStyles.caption,
                     ),
                   ],
@@ -239,7 +226,7 @@ class _OrderRequestModalState extends State<OrderRequestModal> {
                     _buildQuantityButton(
                       icon: Icons.add,
                       onTap: _increaseQuantity,
-                      enabled: _quantity < widget.product.quantity,
+                      enabled: _quantity < widget.item.quantity,
                     ),
                   ],
                 ),
@@ -271,10 +258,10 @@ class _OrderRequestModalState extends State<OrderRequestModal> {
             // Action buttons
             Row(
               children: [
-                // Add to cart
+                // Send message
                 Expanded(
                   child: OutlinedButton(
-                    onPressed: _isLoading ? null : _addToCart,
+                    onPressed: _isLoading ? null : () => context.pop(),
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       side: const BorderSide(color: AppColors.primaryTeal),
@@ -283,7 +270,7 @@ class _OrderRequestModalState extends State<OrderRequestModal> {
                       ),
                     ),
                     child: Text(
-                      'Thêm vào giỏ hàng',
+                      'Nhắn ngay',
                       style: AppTextStyles.button.copyWith(
                         color: AppColors.primaryTeal,
                       ),
@@ -319,7 +306,7 @@ class _OrderRequestModalState extends State<OrderRequestModal> {
                                   ),
                                 )
                               : const Text(
-                                  'Tôi muốn nhận',
+                                  'Gửi yêu cầu',
                                   style: AppTextStyles.button,
                                 ),
                         ),

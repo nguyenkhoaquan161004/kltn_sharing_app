@@ -17,15 +17,20 @@ import '../presentation/screens/product/product_variant_screen.dart';
 import '../presentation/screens/orders/cart_all_screen.dart';
 import '../presentation/screens/orders/cart_processing_screen.dart';
 import '../presentation/screens/orders/cart_done_screen.dart';
+import '../presentation/screens/orders/cart_item_detail_screen.dart';
 import '../presentation/screens/orders/order_detail_processing_screen.dart';
 import '../presentation/screens/messages/messages_list_screen.dart';
+import '../presentation/screens/messages/chat_screen.dart';
 import '../presentation/screens/orders/order_detail_done_screen.dart';
 import '../presentation/screens/orders/proof_of_payment_screen.dart';
 import '../presentation/screens/profile/store_information_screen.dart';
 import '../presentation/screens/sharing/sharing_screen.dart';
 import '../presentation/screens/profile/profile_screen.dart';
 import '../presentation/screens/profile/user_profile_screen.dart';
+import '../presentation/screens/achievements/achievements_list_screen.dart';
+import '../presentation/screens/achievements/badges_list_screen.dart';
 import '../presentation/screens/leaderboard/leaderboard_screen.dart';
+import '../presentation/screens/notifications/notifications_screen.dart';
 import '../presentation/screens/error/error_404_screen.dart';
 import '../core/constants/app_routes.dart';
 
@@ -130,14 +135,20 @@ class AppRouter {
         pageBuilder: (context, state) => _buildPageWithTransition(
             child: const SearchScreen(), state: state, name: 'search'),
         name: 'search',
-      ),
-      GoRoute(
-        path: AppRoutes.searchResults,
-        pageBuilder: (context, state) => _buildPageWithTransition(
-            child: const SearchResultsScreen(),
-            state: state,
-            name: 'search-results'),
-        name: 'search-results',
+        routes: [
+          GoRoute(
+            path: AppRoutes.searchResults,
+            pageBuilder: (context, state) {
+              final keyword = state.uri.queryParameters['keyword'] ?? '';
+              return _buildPageWithTransition(
+                child: SearchResultsScreen(keyword: keyword),
+                state: state,
+                name: 'search-results',
+              );
+            },
+            name: 'search-results',
+          ),
+        ],
       ),
       GoRoute(
         path: '/filter',
@@ -204,15 +215,26 @@ class AppRouter {
       GoRoute(
         path: AppRoutes.orderDetail,
         pageBuilder: (context, state) {
-          // final orderId = state.pathParameters['id'] ?? '';
-          // TODO: Implement OrderDetailScreen
+          final orderId = state.pathParameters['id'] ?? '';
           return _buildPageWithTransition(
-            child: const CartAllScreen(),
+            child: OrderDetailProcessingScreen(orderId: orderId),
             state: state,
             name: 'order-detail',
           );
         },
         name: 'order-detail',
+      ),
+      GoRoute(
+        path: AppRoutes.cartItemDetail,
+        pageBuilder: (context, state) {
+          final itemId = state.pathParameters['id'] ?? '';
+          return _buildPageWithTransition(
+            child: CartItemDetailScreen(itemId: itemId),
+            state: state,
+            name: 'cart-item-detail',
+          );
+        },
+        name: 'cart-item-detail',
       ),
       GoRoute(
         path: '/order-detail-processing/:id',
@@ -305,10 +327,9 @@ class AppRouter {
       GoRoute(
         path: AppRoutes.chat,
         pageBuilder: (context, state) {
-          // final userId = state.pathParameters['userId'] ?? '';
-          // TODO: Implement ChatScreen
+          final userId = state.pathParameters['userId'] ?? '';
           return _buildPageWithTransition(
-            child: const HomeScreen(),
+            child: ChatScreen(userId: userId),
             state: state,
             name: 'chat',
           );
@@ -328,6 +349,28 @@ class AppRouter {
         name: 'achievements',
       ),
       GoRoute(
+        path: '/achievements/list',
+        pageBuilder: (context, state) {
+          return _buildPageWithTransition(
+            child: const AchievementsListScreen(),
+            state: state,
+            name: 'achievements-list',
+          );
+        },
+        name: 'achievements-list',
+      ),
+      GoRoute(
+        path: '/badges/list',
+        pageBuilder: (context, state) {
+          return _buildPageWithTransition(
+            child: const BadgesListScreen(),
+            state: state,
+            name: 'badges-list',
+          );
+        },
+        name: 'badges-list',
+      ),
+      GoRoute(
         path: AppRoutes.leaderboard,
         pageBuilder: (context, state) {
           // TODO: Implement LeaderboardScreen
@@ -338,6 +381,17 @@ class AppRouter {
           );
         },
         name: 'leaderboard',
+      ),
+      GoRoute(
+        path: AppRoutes.notifications,
+        pageBuilder: (context, state) {
+          return _buildPageWithTransition(
+            child: const NotificationsScreen(),
+            state: state,
+            name: 'notifications',
+          );
+        },
+        name: 'notifications',
       ),
     ],
   );

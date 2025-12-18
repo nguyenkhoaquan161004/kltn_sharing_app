@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../../../core/constants/app_colors.dart';
+import '../../../core/theme/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/constants/app_routes.dart';
 import '../../../data/models/product_model.dart';
@@ -9,6 +9,8 @@ import '../../../data/models/item_model.dart';
 import '../../../data/mock_data.dart';
 import 'widgets/product_image_carousel.dart';
 import 'widgets/order_request_modal.dart';
+import 'widgets/expandable_description.dart';
+import '../../widgets/item_card.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   final String productId;
@@ -34,7 +36,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   late ProductModel _product;
 
   // Mock related products
-  late List<ProductModel> _relatedProducts;
+  late List<ItemModel> _relatedProducts;
 
   @override
   void initState() {
@@ -60,7 +62,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           name: mockItem.name,
           description: mockItem.description,
           price: mockItem.price,
-          images: [],
+          images: [
+            'https://via.placeholder.com/500x500?text=Product+Image+1',
+            'https://via.placeholder.com/500x500?text=Product+Image+2',
+            'https://via.placeholder.com/500x500?text=Product+Image+3',
+          ],
           category:
               MockData.getCategoryById(mockItem.categoryId)?.name ?? 'Khác',
           quantity: mockItem.quantity,
@@ -81,13 +87,46 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         final defaultUser = MockData.users[0];
         _product = ProductModel(
           id: widget.productId,
-          name: 'Giày Nike',
+          name: 'Giày Nike Air Max',
           description:
-              '''Lorem ipsum dolor sit amet consectetur adipiscing elit. Quisque faucibus ex sapien vitae pellentesque sem placerat. In id cursus mi pretium tellus duis convallis. Tempus leo eu aenean sed diam urna tempor. Pulvinar vivamus fringilla lacus nec metus bibendum egestas. Iaculis massa nisl malesuada lacinia integer nunc posuere. Ut hendrerit semper vel class aptent taciti sociosqu. Ad litora torquent per conubia nostra inceptos himenaeos...''',
+              '''Giày Nike Air Max 90 chính hãng 100%, tình trạng như mới, mới mua được 2 tháng, chỉ mang 2 lần. Chất liệu cao cấp, đế bền, thoáng khí tốt. Phù hợp cho những ai yêu thích thể thao hoặc đi casual hàng ngày.
+
+Thông tin chi tiết sản phẩm:
+• Hãng: Nike chính hãng từ shop official
+• Model: Air Max 90
+• Kích cỡ: 42 (US 8.5)
+• Màu sắc: Trắng xám, bóng bẩy
+• Tình trạng: Như mới, 99% không có lỗi
+• Số lần mang: Chỉ 2 lần
+• Đế: Bền chắc, không trầy xước
+• Chất liệu: Canvas + Leather cao cấp
+• Thoáng khí: Cực tốt, thích hợp đi quanh năm
+• Đi kèm: Hộp nguyên bản, túi bụi, giấy tờ đầy đủ
+
+Lý do chia sẻ:
+Giày được tặng nhân dịp sinh nhật nhưng mình không có nhu cầu sử dụng nhiều vì công việc thường xuyên phải mang giày tây chính thức. Do vậy mình muốn chia sẻ để bạn nào thích sneaker có cơ hội sử dụng.
+
+Tình trạng chi tiết:
+- Mặt giày không bị bẩn hay dơ
+- Sợi chỉ không bị lỏng hay nát
+- Đế ngoài vẫn cứng chắc, không mềm
+- Lót giày sạch sẽ, mùi hương tự nhiên
+- Dây giày không bị sờn
+
+Hướng dẫn bảo quản:
+Để giữ giày lâu bền, nên rửa bằng nước lạnh với xà phòng nhẹ, không nên giặt máy hoặc ngâm nước lâu. Sau khi rửa, phơi khô tự nhiên ở nơi thoáng mát.
+
+Liên hệ:
+Bạn nào quan tâm có thể liên hệ để xem thực tế hoặc chat hỏi thêm thông tin. Mình ở quận 1, TP.HCM, có thể gặp trực tiếp hoặc giao hàng gần đây. Giờ làm việc từ 8h-17h hàng ngày.''',
           price: 0,
-          images: [],
+          images: [
+            'https://via.placeholder.com/500x500?text=Giay+Nike+1',
+            'https://via.placeholder.com/500x500?text=Giay+Nike+2',
+            'https://via.placeholder.com/500x500?text=Giay+Nike+3',
+            'https://via.placeholder.com/500x500?text=Giay+Nike+4',
+          ],
           category: 'Thể thao',
-          quantity: 63,
+          quantity: 1,
           interestedCount: 12,
           expiryDate: DateTime.now()
               .add(const Duration(hours: 12, minutes: 32, seconds: 34)),
@@ -108,12 +147,46 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       final defaultUser = MockData.users[0];
       _product = ProductModel(
         id: widget.productId,
-        name: 'Giày Nike',
-        description: 'Mô tả sản phẩm',
+        name: 'Giày Nike Air Max',
+        description:
+            '''Giày Nike Air Max 90 chính hãng 100%, tình trạng như mới, mới mua được 2 tháng, chỉ mang 2 lần. Chất liệu cao cấp, đế bền, thoáng khí tốt. Phù hợp cho những ai yêu thích thể thao hoặc đi casual hàng ngày.
+
+Thông tin chi tiết sản phẩm:
+• Hãng: Nike chính hãng từ shop official
+• Model: Air Max 90
+• Kích cỡ: 42 (US 8.5)
+• Màu sắc: Trắng xám, bóng bẩy
+• Tình trạng: Như mới, 99% không có lỗi
+• Số lần mang: Chỉ 2 lần
+• Đế: Bền chắc, không trầy xước
+• Chất liệu: Canvas + Leather cao cấp
+• Thoáng khí: Cực tốt, thích hợp đi quanh năm
+• Đi kèm: Hộp nguyên bản, túi bụi, giấy tờ đầy đủ
+
+Lý do chia sẻ:
+Giày được tặng nhân dịp sinh nhật nhưng mình không có nhu cầu sử dụng nhiều vì công việc thường xuyên phải mang giày tây chính thức. Do vậy mình muốn chia sẻ để bạn nào thích sneaker có cơ hội sử dụng.
+
+Tình trạng chi tiết:
+- Mặt giày không bị bẩn hay dơ
+- Sợi chỉ không bị lỏng hay nát
+- Đế ngoài vẫn cứng chắc, không mềm
+- Lót giày sạch sẽ, mùi hương tự nhiên
+- Dây giày không bị sờn
+
+Hướng dẫn bảo quản:
+Để giữ giày lâu bền, nên rửa bằng nước lạnh với xà phòng nhẹ, không nên giặt máy hoặc ngâm nước lâu. Sau khi rửa, phơi khô tự nhiên ở nơi thoáng mát.
+
+Liên hệ:
+Bạn nào quan tâm có thể liên hệ để xem thực tế hoặc chat hỏi thêm thông tin. Mình ở quận 1, TP.HCM, có thể gặp trực tiếp hoặc giao hàng gần đây. Giờ làm việc từ 8h-17h hàng ngày.''',
         price: 0,
-        images: [],
+        images: [
+          'https://via.placeholder.com/500x500?text=Giay+Nike+1',
+          'https://via.placeholder.com/500x500?text=Giay+Nike+2',
+          'https://via.placeholder.com/500x500?text=Giay+Nike+3',
+          'https://via.placeholder.com/500x500?text=Giay+Nike+4',
+        ],
         category: 'Thể thao',
-        quantity: 63,
+        quantity: 1,
         interestedCount: 12,
         expiryDate: DateTime.now()
             .add(const Duration(hours: 12, minutes: 32, seconds: 34)),
@@ -131,23 +204,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     _remainingTime = _product.remainingTime;
     _startTimer();
 
-    _relatedProducts = List.generate(
-      6,
-      (index) => ProductModel(
-        id: 'related_$index',
-        name: 'Giày Nike aaaaaaaaaaaaaaaaaaaaaa',
-        description: '',
-        price: 12000,
-        images: [],
-        category: 'Thể thao',
-        quantity: 3,
-        interestedCount: 32,
-        expiryDate: DateTime.now().add(const Duration(hours: 12)),
-        createdAt: DateTime.now(),
-        owner: _product.owner,
-        isFree: index % 2 == 0,
-      ),
-    );
+    // Get 6 related products from MockData (items from same category or just first 6)
+    _relatedProducts = MockData.items
+        .where((item) => item.itemId.toString() != widget.productId)
+        .take(6)
+        .toList();
   }
 
   void _startTimer() {
@@ -262,11 +323,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   Widget _buildStatsRow() {
     return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildStatItem('${_product.quantity}', 'Số lượng'),
-        const SizedBox(width: 24),
         _buildStatItem('${_product.interestedCount}', 'Số người muốn nhận'),
-        const SizedBox(width: 24),
         _buildStatItem(_formattedTime, 'Thời gian còn lại'),
       ],
     );
@@ -274,12 +335,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   Widget _buildStatItem(String value, String label) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Text(
           value,
           style: AppTextStyles.h4.copyWith(fontWeight: FontWeight.bold),
         ),
+        const SizedBox(height: 4),
         Text(label, style: AppTextStyles.caption),
       ],
     );
@@ -370,16 +432,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   Widget _buildDescriptionSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('Mô tả sản phẩm', style: AppTextStyles.h4),
-        const SizedBox(height: 12),
-        Text(
-          _product.description,
-          style: AppTextStyles.bodyMedium.copyWith(height: 1.6),
-        ),
-      ],
+    return ExpandableDescription(
+      text: _product.description,
+      maxLines: 3,
     );
   }
 
@@ -389,72 +444,25 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       children: [
         const Text('Sản phẩm liên quan', style: AppTextStyles.h4),
         const SizedBox(height: 16),
-        SizedBox(
-          height: 220,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: _relatedProducts.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 12),
-            itemBuilder: (context, index) {
-              return SizedBox(
-                width: 160,
-                child: _buildMiniProductCard(_relatedProducts[index]),
-              );
-            },
+        GridView.builder(
+          shrinkWrap: true,
+          padding: EdgeInsets.zero,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            childAspectRatio: 0.65,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
           ),
+          itemCount: _relatedProducts.length,
+          itemBuilder: (context, index) {
+            return ItemCard(
+              item: _relatedProducts[index],
+              showTimeRemaining: true,
+            );
+          },
         ),
       ],
-    );
-  }
-
-  Widget _buildMiniProductCard(ProductModel product) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.backgroundWhite,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            height: 100,
-            decoration: BoxDecoration(
-              color: AppColors.backgroundGray,
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(12)),
-            ),
-            child: const Center(
-                child: Icon(Icons.image, color: AppColors.textSecondary)),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(8),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  product.name,
-                  style: AppTextStyles.bodySmall
-                      .copyWith(fontWeight: FontWeight.w600),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 4),
-                Text(product.formattedPrice,
-                    style: AppTextStyles.price.copyWith(fontSize: 14)),
-                Text('Còn ${product.quantity} sản phẩm',
-                    style: AppTextStyles.caption),
-              ],
-            ),
-          ),
-        ],
-      ),
     );
   }
 

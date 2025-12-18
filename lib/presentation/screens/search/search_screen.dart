@@ -2,9 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/constants/app_routes.dart';
-import '../../../data/services/mock_data_service.dart';
-import '../../../data/models/item_model.dart';
-import '../../widgets/item_card.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -14,8 +11,21 @@ class SearchScreen extends StatefulWidget {
 }
 
 class _SearchScreenState extends State<SearchScreen> {
-  late TextEditingController _searchController;
-  final MockDataService _mockDataService = MockDataService();
+  final TextEditingController _searchController = TextEditingController();
+
+  // Sample suggested keywords
+  final List<String> allSuggestedKeywords = [
+    'Áo thun nam',
+    'Giày thể thao',
+    'Mũ lưỡi trai',
+    'Quần jean',
+    'Áo khoác',
+    'Túi xách',
+    'Dép',
+    'Tất lưỡi',
+    'Áo sơ mi',
+    'Quần short',
+  ];
 
   final List<Map<String, dynamic>> recentSearches = [
     {'term': 'Áo thun nam', 'time': '2 giờ trước'},
@@ -26,13 +36,30 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   void initState() {
     super.initState();
-    _searchController = TextEditingController();
   }
 
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  List<String> _getSuggestedKeywords() {
+    if (_searchController.text.isEmpty) {
+      return [];
+    }
+
+    final query = _searchController.text.toLowerCase();
+    return allSuggestedKeywords
+        .where((keyword) => keyword.toLowerCase().contains(query))
+        .toList();
+  }
+
+  void _navigateToResults(String keyword) {
+    if (keyword.isNotEmpty) {
+      context.pushNamed(AppRoutes.searchResultsName,
+          queryParameters: {'keyword': keyword});
+    }
   }
 
   @override
@@ -43,9 +70,13 @@ class _SearchScreenState extends State<SearchScreen> {
         backgroundColor: AppColors.white,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
-          onPressed: () => context.pop(),
-        ),
+            icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
+            onPressed: () => {
+                  if (context.canPop())
+                    {context.pop()}
+                  else
+                    {context.go(AppRoutes.home)}
+                }),
         title: TextField(
           controller: _searchController,
           autofocus: true,
@@ -73,9 +104,7 @@ class _SearchScreenState extends State<SearchScreen> {
           ),
           onChanged: (value) => setState(() {}),
           onSubmitted: (value) {
-            if (value.isNotEmpty) {
-              context.go(AppRoutes.searchResults);
-            }
+            _navigateToResults(value);
           },
         ),
       ),
@@ -102,48 +131,51 @@ class _SearchScreenState extends State<SearchScreen> {
                   final search = recentSearches[index];
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 12),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.history,
-                            color: AppColors.textSecondary, size: 20),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                search['term'],
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  color: AppColors.textPrimary,
+                    child: GestureDetector(
+                      onTap: () => _navigateToResults(search['term']),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.history,
+                              color: AppColors.textSecondary, size: 20),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  search['term'],
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    color: AppColors.textPrimary,
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                search['time'],
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  color: AppColors.textSecondary,
+                                const SizedBox(height: 4),
+                                Text(
+                                  search['time'],
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: AppColors.textSecondary,
+                                  ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.close,
-                              color: AppColors.textSecondary, size: 18),
-                          onPressed: () {
-                            setState(() => recentSearches.removeAt(index));
-                          },
-                        ),
-                      ],
+                          IconButton(
+                            icon: const Icon(Icons.close,
+                                color: AppColors.textSecondary, size: 18),
+                            onPressed: () {
+                              setState(() => recentSearches.removeAt(index));
+                            },
+                          ),
+                        ],
+                      ),
                     ),
                   );
                 },
               ),
             ] else ...[
               const Text(
-                'Kết quả tìm kiếm',
+                'Gợi ý tìm kiếm',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
@@ -151,46 +183,43 @@ class _SearchScreenState extends State<SearchScreen> {
                 ),
               ),
               const SizedBox(height: 12),
-              FutureBuilder<List<ItemModel>>(
-                future: _mockDataService.getAvailableItems(),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-
-                  if (snapshot.hasError) {
-                    return Center(child: Text('Error: ${snapshot.error}'));
-                  }
-
-                  final items = snapshot.data ?? [];
-
-                  if (items.isEmpty) {
-                    return const Center(
-                      child: Text('Không tìm thấy sản phẩm nào'),
+              if (_getSuggestedKeywords().isEmpty)
+                const Center(
+                  child: Text('Không tìm thấy gợi ý nào'),
+                )
+              else
+                ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: _getSuggestedKeywords().length,
+                  itemBuilder: (context, index) {
+                    final keyword = _getSuggestedKeywords()[index];
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: GestureDetector(
+                        onTap: () => _navigateToResults(keyword),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.search,
+                                color: AppColors.textSecondary, size: 20),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                keyword,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                            ),
+                            const Icon(Icons.arrow_outward,
+                                color: AppColors.textSecondary, size: 18),
+                          ],
+                        ),
+                      ),
                     );
-                  }
-
-                  return GridView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      childAspectRatio: 0.65,
-                      crossAxisSpacing: 12,
-                      mainAxisSpacing: 12,
-                    ),
-                    itemCount: items.length,
-                    itemBuilder: (context, index) {
-                      final item = items[index];
-                      return ItemCard(
-                        item: item,
-                        showTimeRemaining: true,
-                      );
-                    },
-                  );
-                },
-              ),
+                  },
+                ),
             ],
           ],
         ),

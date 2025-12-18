@@ -201,6 +201,54 @@ class MockData {
       avatar: 'https://i.pravatar.cc/150?img=6',
       address: 'Quận 1, TP.HCM',
     ),
+    UserModel(
+      userId: 7,
+      name: 'Ngô Thị Thu Hà',
+      email: 'thu.ha@example.com',
+      phone: '0901234567',
+      passwordHash: '\$2b\$12\$K1.hQ5b7Zs8G9X4Q2K1Z0eVqQ2K1Z0e',
+      role: 'seller',
+      trustScore: 81,
+      createdAt: DateTime(2023, 12, 3),
+      avatar: 'https://i.pravatar.cc/150?img=7',
+      address: 'Quận 2, TP.HCM',
+    ),
+    UserModel(
+      userId: 8,
+      name: 'Hoàng Minh Hải',
+      email: 'minh.hai@example.com',
+      phone: '0912567890',
+      passwordHash: '\$2b\$12\$K1.hQ5b7Zs8G9X4Q2K1Z0eVqQ2K1Z0e',
+      role: 'user',
+      trustScore: 76,
+      createdAt: DateTime(2024, 1, 10),
+      avatar: 'https://i.pravatar.cc/150?img=8',
+      address: 'Quận 11, TP.HCM',
+    ),
+    UserModel(
+      userId: 9,
+      name: 'Phan Quốc Anh',
+      email: 'quoc.anh@example.com',
+      phone: '0923456789',
+      passwordHash: '\$2b\$12\$K1.hQ5b7Zs8G9X4Q2K1Z0eVqQ2K1Z0e',
+      role: 'premium',
+      trustScore: 89,
+      createdAt: DateTime(2024, 1, 15),
+      avatar: 'https://i.pravatar.cc/150?img=9',
+      address: 'Quận 4, TP.HCM',
+    ),
+    UserModel(
+      userId: 10,
+      name: 'Tạ Minh Tuấn',
+      email: 'minh.tuan@example.com',
+      phone: '0934567890',
+      passwordHash: '\$2b\$12\$K1.hQ5b7Zs8G9X4Q2K1Z0eVqQ2K1Z0e',
+      role: 'seller',
+      trustScore: 79,
+      createdAt: DateTime(2024, 2, 1),
+      avatar: 'https://i.pravatar.cc/150?img=10',
+      address: 'Quận 9, TP.HCM',
+    ),
   ];
 
   // ==================== ITEMS ====================
@@ -210,7 +258,20 @@ class MockData {
       userId: 1,
       name: 'Giày Nike Air Max mới',
       description:
-          'Giày Nike Air Max 90 chính hãng, tình trạng như mới, chỉ mang 2 lần',
+          '''Giày Nike Air Max 90 chính hãng 100%, tình trạng như mới, mới mua được 3 tháng, chỉ mang 2 lần trong nhà. Chất liệu cao cấp, đế bền, thoáng khí tốt. Phù hợp cho những ai yêu thích thể thao hoặc đi casual hàng ngày.
+
+Thông tin chi tiết:
+• Hãng: Nike chính hãng
+• Model: Air Max 90
+• Kích cỡ: 42 (Size US 8.5)
+• Màu sắc: Trắng xám
+• Tình trạng: Như mới
+• Lần mang: 2 lần
+• Đế: Bền chắc, không trầy xước
+• Chất liệu: Canvas + Leather, thoáng khí
+• Đi kèm: Hộp nguyên bản, túi bụi, giấy tờ đầy đủ
+
+Sản phẩm rất bền, phù hợp cho những ai yêu thích style sneaker. Mình không còn nhu cầu sử dụng nên chia sẻ để bạn khác có cơ hội sử dụng. Bạn nào quan tâm có thể liên hệ để xem thực tế hoặc chat hỏi thêm thông tin. Mình ở quận 1, có thể gặp trực tiếp hoặc giao hàng gần đây.''',
       quantity: 1,
       status: 'available',
       categoryId: 2,
@@ -223,7 +284,18 @@ class MockData {
       itemId: 2,
       userId: 2,
       name: 'Áo thun cotton',
-      description: 'Áo thun cotton chất lượng cao, màu đen, size M, mất size',
+      description:
+          '''Áo thun cotton chất lượng cao, 100% cotton tự nhiên, màu đen, size M, mất size nhưng rất đẹp. Mua ở shop lên tới 300k, giờ muốn chia sẻ để bạn khác có cơ hội dùng.
+
+Chi tiết sản phẩm:
+• Chất liệu: 100% Cotton organic
+• Màu: Đen sâu
+• Size: M (phù hợp cho người cao từ 1m55-1m70)
+• Tình trạng: 95% - Như mới, chỉ mang 1 lần
+• Đặc tính: Thoáng mát, mềm mại, thấm mồ hôi tốt
+• Phù hợp: Mặc thường ngày, thể thao, ngủ
+
+Áo không bị xù, không bị xấy, không bị phai màu. Giặt đúng cách sẽ bền lâu. Nếu quan tâm hãy liên hệ ngay.''',
       quantity: 3,
       status: 'available',
       categoryId: 1,
@@ -237,7 +309,23 @@ class MockData {
       userId: 3,
       name: 'Sách "Cách dạy con thông minh"',
       description:
-          'Sách hay về giáo dục trẻ em, tình trạng tốt, có chữ ký tác giả',
+          '''Sách hay về giáo dục trẻ em, tình trạng tốt, có chữ ký tác giả ghi tặng. Cuốn sách này được các chuyên gia đánh giá cao về kỹ năng dạy dỗ trẻ em hiệu quả.
+
+Thông tin chi tiết:
+• Tác giả: Nguyễn Văn Dũng
+• Năm xuất bản: 2022
+• Số trang: 350 trang
+• Kích thước: A5
+• Tình trạng: Rất tốt
+• Đặc biệt: Có chữ ký tác giả ghi tặng
+
+Nội dung sách bao gồm:
+- Những bí quyết dạy con thông minh
+- Phương pháp giáo dục hiện đại
+- Cách xử lý hành vi trẻ em
+- Phát triển kỹ năng cho trẻ
+
+Sách không bị dơ, không bị nát góc, trang sạch. Nếu bạn quan tâm đến giáo dục trẻ em, đây là cuốn sách không nên bỏ qua.''',
       quantity: 2,
       status: 'available',
       categoryId: 4,
@@ -251,7 +339,19 @@ class MockData {
       userId: 4,
       name: 'Ghế gỗ ăn cơm',
       description:
-          'Ghế gỗ ăn cơm, bộ 4 cái, màu nâu sẫm, hơi cũ nhưng còn chắc chỉ',
+          '''Ghế gỗ ăn cơm, bộ 4 cái, màu nâu sâu, hơi cũ nhưng còn chắc chỉ, tất cả 4 cái đều nguyên vẹn. Phù hợp cho gia đình hoặc nhà hàng nhỏ.
+
+Thông tin chi tiết:
+• Số lượng: 4 ghế
+• Chất liệu: Gỗ tự nhiên
+• Màu: Nâu sâu
+• Kích thước: 40cm x 45cm (cao)
+• Tình trạng: Còn bền, hơi cũ nhưng vẫn sử dụng tốt
+• Đặc tính: Chắc chỉ, không cưa cứng
+
+Tất cả các ghế đều còn 4 chân chắc chắn, không bị xiêu. Mặt ghế không bị bỏng hay trầy xước lớn. Ghế có thể sử dụng ngay mà không cần sửa chữa.
+
+Lý do chia sẻ: Gia đình mình mua bộ bàn ghế mới nên không còn cần dùng bộ này nữa.''',
       quantity: 4,
       status: 'available',
       categoryId: 6,
@@ -315,6 +415,602 @@ class MockData {
       createdAt: DateTime.now().subtract(Duration(days: 4)),
       price: 150000,
     ),
+    ItemModel(
+      itemId: 9,
+      userId: 7,
+      name: 'Túi xách nữ da thật',
+      description: 'Túi xách nữ da thật Italy, màu đen, tình trạng như mới',
+      quantity: 1,
+      status: 'available',
+      categoryId: 1,
+      locationId: 2,
+      expirationDate: DateTime.now().add(Duration(days: 50)),
+      createdAt: DateTime.now().subtract(Duration(days: 6)),
+      price: 0,
+    ),
+    ItemModel(
+      itemId: 10,
+      userId: 8,
+      name: 'Xe đạp Touring',
+      description:
+          'Xe đạp Touring chuyên dụng, 21 tốc độ, khung nhôm, bao chất',
+      quantity: 1,
+      status: 'available',
+      categoryId: 7,
+      locationId: 3,
+      expirationDate: DateTime.now().add(Duration(days: 80)),
+      createdAt: DateTime.now().subtract(Duration(days: 9)),
+      price: 0,
+    ),
+    ItemModel(
+      itemId: 11,
+      userId: 9,
+      name: 'Camera DSLR Canon',
+      description:
+          'Camera Canon EOS 700D, tặng kèm 2 ống kính, máy quay video rất tốt',
+      quantity: 1,
+      status: 'available',
+      categoryId: 3,
+      locationId: 4,
+      expirationDate: DateTime.now().add(Duration(days: 120)),
+      createdAt: DateTime.now().subtract(Duration(days: 11)),
+      price: 300000,
+    ),
+    ItemModel(
+      itemId: 12,
+      userId: 10,
+      name: 'Giường tầng gỗ',
+      description: 'Giường tầng gỗ công nghiệp, 2 chiều ngủ, có tủ, bao chắc',
+      quantity: 1,
+      status: 'available',
+      categoryId: 6,
+      locationId: 5,
+      expirationDate: DateTime.now().add(Duration(days: 90)),
+      createdAt: DateTime.now().subtract(Duration(days: 15)),
+      price: 0,
+    ),
+    ItemModel(
+      itemId: 13,
+      userId: 1,
+      name: 'Tai nghe Sony WH-1000XM4',
+      description: 'Tai nghe chống ồn cao cấp, pin 30h, âm thanh cực tốt',
+      quantity: 1,
+      status: 'available',
+      categoryId: 3,
+      locationId: 1,
+      expirationDate: DateTime.now().add(Duration(days: 60)),
+      createdAt: DateTime.now().subtract(Duration(days: 3)),
+      price: 0,
+    ),
+    ItemModel(
+      itemId: 14,
+      userId: 4,
+      name: 'Bộ bàn ghế sofa',
+      description: 'Bộ sofa phòng khách 3 chỗ + 2 ghế đơn, da bò tây',
+      quantity: 1,
+      status: 'pending',
+      categoryId: 6,
+      locationId: 4,
+      expirationDate: DateTime.now().add(Duration(days: 110)),
+      createdAt: DateTime.now().subtract(Duration(days: 7)),
+      price: 400000,
+    ),
+    ItemModel(
+      itemId: 15,
+      userId: 3,
+      name: 'Sách tiếng Anh chuyên ngành',
+      description:
+          'Bộ 5 quyển sách tiếng Anh, kỹ thuật phần mềm, xuất bản từ 2022',
+      quantity: 5,
+      status: 'available',
+      categoryId: 4,
+      locationId: 3,
+      expirationDate: DateTime.now().add(Duration(days: 70)),
+      createdAt: DateTime.now().subtract(Duration(days: 8)),
+      price: 0,
+    ),
+    ItemModel(
+      itemId: 16,
+      userId: 1,
+      name: 'Laptop Dell XPS 15',
+      description:
+          'Laptop Dell XPS 15 inch, Intel i7, RAM 16GB, SSD 512GB, RTX 3050, pin 8h, bảo hành đến tháng 6/2025. Máy rất bền và mạnh, phù hợp cho lập trình và đồ họa.',
+      quantity: 1,
+      status: 'available',
+      categoryId: 3,
+      locationId: 1,
+      expirationDate: DateTime.now().add(Duration(days: 90)),
+      createdAt: DateTime.now().subtract(Duration(days: 12)),
+      price: 800000,
+    ),
+    ItemModel(
+      itemId: 17,
+      userId: 1,
+      name: 'Giá sách gỗ 5 tầng',
+      description:
+          'Giá sách gỗ công nghiệp 5 tầng, kích thước 180x80cm, chắc chắn, có thể đặt ở phòng ngủ hoặc phòng khách. Không lỗi, chỉ cần di chuyển.',
+      quantity: 1,
+      status: 'available',
+      categoryId: 6,
+      locationId: 1,
+      expirationDate: DateTime.now().add(Duration(days: 60)),
+      createdAt: DateTime.now().subtract(Duration(days: 20)),
+      price: 0,
+    ),
+    ItemModel(
+      itemId: 18,
+      userId: 1,
+      name: 'Đèn bàn LED thông minh',
+      description:
+          'Đèn bàn LED thông minh có điều chỉnh nhiệt độ màu và độ sáng, tiết kiệm điện, không phát sinh nhiệt, phù hợp cho học tập và làm việc.',
+      quantity: 2,
+      status: 'available',
+      categoryId: 3,
+      locationId: 1,
+      expirationDate: DateTime.now().add(Duration(days: 45)),
+      createdAt: DateTime.now().subtract(Duration(days: 18)),
+      price: 150000,
+    ),
+    ItemModel(
+      itemId: 19,
+      userId: 1,
+      name: 'Bộ bàn ghế học tập trẻ em',
+      description:
+          'Bộ bàn ghế học tập cho trẻ em, có thể điều chỉnh chiều cao, ghế thoải mái, thiết kế an toàn. Màu xanh, tình trạng 98%.',
+      quantity: 1,
+      status: 'available',
+      categoryId: 6,
+      locationId: 1,
+      expirationDate: DateTime.now().add(Duration(days: 30)),
+      createdAt: DateTime.now().subtract(Duration(days: 25)),
+      price: 0,
+    ),
+    ItemModel(
+      itemId: 20,
+      userId: 1,
+      name: 'Bộ quốc tế tờ rơi',
+      description:
+          'Bộ quốc tế tờ rơi tiếng Anh và Pháp, có giá trị tham khảo cao, tình trạng như mới, có túi đựng, có bản đồ chi tiết.',
+      quantity: 1,
+      status: 'available',
+      categoryId: 4,
+      locationId: 1,
+      expirationDate: DateTime.now().add(Duration(days: 120)),
+      createdAt: DateTime.now().subtract(Duration(days: 35)),
+      price: 0,
+    ),
+    ItemModel(
+      itemId: 21,
+      userId: 1,
+      name: 'Dây cáp sạc nhanh Type-C',
+      description:
+          'Bộ 3 dây sạc nhanh Type-C, dài 2m, hỗ trợ sạc nhanh 65W, tương thích với mọi điện thoại và laptop Type-C, bền bỉ, chứng chỉ an toàn.',
+      quantity: 3,
+      status: 'available',
+      categoryId: 3,
+      locationId: 1,
+      expirationDate: DateTime.now().add(Duration(days: 90)),
+      createdAt: DateTime.now().subtract(Duration(days: 40)),
+      price: 0,
+    ),
+    ItemModel(
+      itemId: 22,
+      userId: 2,
+      name: 'Áo khoác nam',
+      description:
+          'Áo khoác nam chế độ, chất liệu vải dù, size M, màu xanh navy, chống nước, tình trạng như mới',
+      quantity: 1,
+      status: 'available',
+      categoryId: 1,
+      locationId: 2,
+      expirationDate: DateTime.now().add(Duration(days: 45)),
+      createdAt: DateTime.now().subtract(Duration(days: 2)),
+      price: 0,
+    ),
+    ItemModel(
+      itemId: 23,
+      userId: 3,
+      name: 'Giày sneaker Adidas',
+      description:
+          'Giày sneaker Adidas Ultraboost, size 42, màu trắng đen, tình trạng 90%',
+      quantity: 1,
+      status: 'available',
+      categoryId: 2,
+      locationId: 3,
+      expirationDate: DateTime.now().add(Duration(days: 60)),
+      createdAt: DateTime.now().subtract(Duration(days: 5)),
+      price: 250000,
+    ),
+    ItemModel(
+      itemId: 24,
+      userId: 4,
+      name: 'Bàn gỗ màu trắng',
+      description:
+          'Bàn gỗ công nghiệp màu trắng, kích thước 120x60cm, chắc chắn, phù hợp làm bàn học hoặc bàn làm việc',
+      quantity: 1,
+      status: 'available',
+      categoryId: 6,
+      locationId: 4,
+      expirationDate: DateTime.now().add(Duration(days: 75)),
+      createdAt: DateTime.now().subtract(Duration(days: 8)),
+      price: 300000,
+    ),
+    ItemModel(
+      itemId: 25,
+      userId: 5,
+      name: 'Sách lập trình Python',
+      description:
+          'Sách lập trình Python, tác giả Guido Van Rossum, 500+ trang, tình trạng mới 98%',
+      quantity: 1,
+      status: 'available',
+      categoryId: 4,
+      locationId: 5,
+      expirationDate: DateTime.now().add(Duration(days: 90)),
+      createdAt: DateTime.now().subtract(Duration(days: 3)),
+      price: 0,
+    ),
+    ItemModel(
+      itemId: 26,
+      userId: 1,
+      name: 'Điện thoại iPhone 12',
+      description:
+          'iPhone 12 màu đen, bộ nhớ 128GB, pin đủ, chỉ có 1 vết nhỏ trên mặt sau, hoạt động 100%',
+      quantity: 1,
+      status: 'available',
+      categoryId: 3,
+      locationId: 1,
+      expirationDate: DateTime.now().add(Duration(days: 60)),
+      createdAt: DateTime.now().subtract(Duration(days: 10)),
+      price: 500000,
+    ),
+    ItemModel(
+      itemId: 27,
+      userId: 6,
+      name: 'Ghế xoay văn phòng',
+      description:
+          'Ghế xoay văn phòng, đệm mỏng, tay để, có bánh xe, màu đen, tình trạng tốt',
+      quantity: 1,
+      status: 'available',
+      categoryId: 6,
+      locationId: 1,
+      expirationDate: DateTime.now().add(Duration(days: 50)),
+      createdAt: DateTime.now().subtract(Duration(days: 12)),
+      price: 150000,
+    ),
+    ItemModel(
+      itemId: 28,
+      userId: 2,
+      name: 'Quần short nữ',
+      description:
+          'Quần short nữ cotton, size S, màu trắng, ôm nhẹ, thoáng mát, perfect cho mùa hè',
+      quantity: 2,
+      status: 'available',
+      categoryId: 1,
+      locationId: 2,
+      expirationDate: DateTime.now().add(Duration(days: 40)),
+      createdAt: DateTime.now().subtract(Duration(days: 1)),
+      price: 0,
+    ),
+    ItemModel(
+      itemId: 29,
+      userId: 7,
+      name: 'Dép sandal nam',
+      description:
+          'Dép sandal nam chất liệu da, size 42, màu nâu, êm chân, bền chắc',
+      quantity: 1,
+      status: 'available',
+      categoryId: 2,
+      locationId: 1,
+      expirationDate: DateTime.now().add(Duration(days: 55)),
+      createdAt: DateTime.now().subtract(Duration(days: 4)),
+      price: 100000,
+    ),
+    ItemModel(
+      itemId: 30,
+      userId: 8,
+      name: 'Tủ lạnh mini',
+      description:
+          'Tủ lạnh mini 50L, điều chỉnh nhiệt độ, tiêu thụ điện thấp, phù hợp cho phòng trọ',
+      quantity: 1,
+      status: 'pending',
+      categoryId: 3,
+      locationId: 3,
+      expirationDate: DateTime.now().add(Duration(days: 100)),
+      createdAt: DateTime.now().subtract(Duration(days: 15)),
+      price: 400000,
+    ),
+    ItemModel(
+      itemId: 31,
+      userId: 9,
+      name: 'Đồ chơi robot',
+      description:
+          'Robot điều khiển từ xa, pin 2h, tính năng lập trình cơ bản, phù hợp từ 8 tuổi',
+      quantity: 1,
+      status: 'available',
+      categoryId: 5,
+      locationId: 4,
+      expirationDate: DateTime.now().add(Duration(days: 80)),
+      createdAt: DateTime.now().subtract(Duration(days: 6)),
+      price: 200000,
+    ),
+    ItemModel(
+      itemId: 32,
+      userId: 10,
+      name: 'Máy tập thể dục',
+      description:
+          'Máy tập gym mini, 6 chế độ, chân có cao su chống trượt, phù hợp cho gia đình',
+      quantity: 1,
+      status: 'available',
+      categoryId: 7,
+      locationId: 5,
+      expirationDate: DateTime.now().add(Duration(days: 120)),
+      createdAt: DateTime.now().subtract(Duration(days: 20)),
+      price: 350000,
+    ),
+    ItemModel(
+      itemId: 33,
+      userId: 1,
+      name: 'Bộ cốc sứ 6 chiếc',
+      description:
+          'Bộ 6 cốc sứ trắng, dung tích 350ml mỗi cốc, chất lượng cao, không độc hại',
+      quantity: 1,
+      status: 'available',
+      categoryId: 6,
+      locationId: 1,
+      expirationDate: DateTime.now().add(Duration(days: 70)),
+      createdAt: DateTime.now().subtract(Duration(days: 7)),
+      price: 0,
+    ),
+    ItemModel(
+      itemId: 34,
+      userId: 3,
+      name: 'Giáo trình tiếng Trung',
+      description:
+          'Giáo trình tiếng Trung HSK 4, 300 trang, kèm CD, tình trạng 95%',
+      quantity: 1,
+      status: 'available',
+      categoryId: 4,
+      locationId: 2,
+      expirationDate: DateTime.now().add(Duration(days: 85)),
+      createdAt: DateTime.now().subtract(Duration(days: 9)),
+      price: 0,
+    ),
+    ItemModel(
+      itemId: 35,
+      userId: 4,
+      name: 'Nước hoa nam',
+      description:
+          'Nước hoa nam hiệu Dior, 100ml, mùi fresh, chỉ dùng 3 lần, còn như mới',
+      quantity: 1,
+      status: 'available',
+      categoryId: 8,
+      locationId: 3,
+      expirationDate: DateTime.now().add(Duration(days: 200)),
+      createdAt: DateTime.now().subtract(Duration(days: 11)),
+      price: 0,
+    ),
+    ItemModel(
+      itemId: 36,
+      userId: 5,
+      name: 'Kiếng mát nam nữ',
+      description:
+          'Kính mát UV 400, chống lóa, phù hợp nam nữ, tình trạng mới 98%',
+      quantity: 2,
+      status: 'available',
+      categoryId: 8,
+      locationId: 4,
+      expirationDate: DateTime.now().add(Duration(days: 150)),
+      createdAt: DateTime.now().subtract(Duration(days: 5)),
+      price: 50000,
+    ),
+    ItemModel(
+      itemId: 37,
+      userId: 6,
+      name: 'Chuột không dây Logitech',
+      description:
+          'Chuột không dây Logitech, pin AA, độ nhạy 1000DPI, màu xám, hoạt động tốt',
+      quantity: 1,
+      status: 'available',
+      categoryId: 3,
+      locationId: 5,
+      expirationDate: DateTime.now().add(Duration(days: 60)),
+      createdAt: DateTime.now().subtract(Duration(days: 8)),
+      price: 80000,
+    ),
+    ItemModel(
+      itemId: 38,
+      userId: 7,
+      name: 'Bàn phím cơ RGB',
+      description:
+          'Bàn phím cơ RGB, 104 phím, switch mechanical, đèn nền 7 màu',
+      quantity: 1,
+      status: 'available',
+      categoryId: 3,
+      locationId: 1,
+      expirationDate: DateTime.now().add(Duration(days: 90)),
+      createdAt: DateTime.now().subtract(Duration(days: 14)),
+      price: 300000,
+    ),
+    ItemModel(
+      itemId: 39,
+      userId: 8,
+      name: 'Chăn lông cừu',
+      description:
+          'Chăn lông cừu kích thước 200x150cm, màu kem, ấm áp, dễ vệ sinh',
+      quantity: 2,
+      status: 'available',
+      categoryId: 6,
+      locationId: 2,
+      expirationDate: DateTime.now().add(Duration(days: 120)),
+      createdAt: DateTime.now().subtract(Duration(days: 3)),
+      price: 0,
+    ),
+    ItemModel(
+      itemId: 40,
+      userId: 9,
+      name: 'Gối công thái học',
+      description:
+          'Gối công thái học cao su non, giúp giảm đau cổ, tình trạng mới',
+      quantity: 3,
+      status: 'available',
+      categoryId: 6,
+      locationId: 3,
+      expirationDate: DateTime.now().add(Duration(days: 80)),
+      createdAt: DateTime.now().subtract(Duration(days: 6)),
+      price: 120000,
+    ),
+    ItemModel(
+      itemId: 41,
+      userId: 10,
+      name: 'Dầu gội đầu',
+      description:
+          'Dầu gội đầu thiên nhiên 500ml, không silicone, cho tóc dầu, hàng mới',
+      quantity: 4,
+      status: 'available',
+      categoryId: 8,
+      locationId: 4,
+      expirationDate: DateTime.now().add(Duration(days: 200)),
+      createdAt: DateTime.now().subtract(Duration(days: 2)),
+      price: 0,
+    ),
+    ItemModel(
+      itemId: 42,
+      userId: 1,
+      name: 'Áo tanktop nam',
+      description:
+          'Áo tanktop nam thun cotton, size L, màu xám, phù hợp tập gym',
+      quantity: 3,
+      status: 'available',
+      categoryId: 1,
+      locationId: 1,
+      expirationDate: DateTime.now().add(Duration(days: 35)),
+      createdAt: DateTime.now().subtract(Duration(days: 1)),
+      price: 0,
+    ),
+    ItemModel(
+      itemId: 43,
+      userId: 2,
+      name: 'Mũ lưỡi trai',
+      description:
+          'Mũ lưỡi trai thể thao, chất liệu cotton, màu đen, chống nắng tốt',
+      quantity: 5,
+      status: 'available',
+      categoryId: 1,
+      locationId: 2,
+      expirationDate: DateTime.now().add(Duration(days: 90)),
+      createdAt: DateTime.now().subtract(Duration(days: 4)),
+      price: 50000,
+    ),
+    ItemModel(
+      itemId: 44,
+      userId: 3,
+      name: 'Đôi tất thể thao',
+      description:
+          'Đôi tất thể thao, tập hợp 10 đôi, chất cotton, hỗ trợ cổ chân',
+      quantity: 1,
+      status: 'available',
+      categoryId: 1,
+      locationId: 3,
+      expirationDate: DateTime.now().add(Duration(days: 120)),
+      createdAt: DateTime.now().subtract(Duration(days: 10)),
+      price: 0,
+    ),
+    ItemModel(
+      itemId: 45,
+      userId: 4,
+      name: 'Giầy tập gym',
+      description: 'Giầy tập gym, đế bọt, hỗ trợ cổ chân, màu xám, size 41',
+      quantity: 1,
+      status: 'available',
+      categoryId: 2,
+      locationId: 4,
+      expirationDate: DateTime.now().add(Duration(days: 70)),
+      createdAt: DateTime.now().subtract(Duration(days: 7)),
+      price: 150000,
+    ),
+    ItemModel(
+      itemId: 46,
+      userId: 5,
+      name: 'Quần yoga nữ',
+      description:
+          'Quần yoga nữ cao cấp, size M, màu tím, co giãn tốt, thoáng mát',
+      quantity: 1,
+      status: 'available',
+      categoryId: 1,
+      locationId: 5,
+      expirationDate: DateTime.now().add(Duration(days: 50)),
+      createdAt: DateTime.now().subtract(Duration(days: 3)),
+      price: 0,
+    ),
+    ItemModel(
+      itemId: 47,
+      userId: 6,
+      name: 'Thảm yoga 5mm',
+      description:
+          'Thảm yoga 5mm, kích thước 173x61cm, chất liệu TPE, chống trượt',
+      quantity: 2,
+      status: 'available',
+      categoryId: 7,
+      locationId: 1,
+      expirationDate: DateTime.now().add(Duration(days: 100)),
+      createdAt: DateTime.now().subtract(Duration(days: 9)),
+      price: 180000,
+    ),
+    ItemModel(
+      itemId: 48,
+      userId: 7,
+      name: 'Túi xách công sở',
+      description:
+          'Túi xách công sở da PU, màu đen, kích thước lớn, ngăn nhiều, chất lượng tốt',
+      quantity: 1,
+      status: 'available',
+      categoryId: 1,
+      locationId: 2,
+      expirationDate: DateTime.now().add(Duration(days: 80)),
+      createdAt: DateTime.now().subtract(Duration(days: 12)),
+      price: 200000,
+    ),
+    ItemModel(
+      itemId: 49,
+      userId: 8,
+      name: 'Ví da nam',
+      description:
+          'Ví da nam chính hãng, da bò đỏ, giấu RFID, tình trạng như mới',
+      quantity: 1,
+      status: 'available',
+      categoryId: 1,
+      locationId: 3,
+      expirationDate: DateTime.now().add(Duration(days: 150)),
+      createdAt: DateTime.now().subtract(Duration(days: 20)),
+      price: 0,
+    ),
+    ItemModel(
+      itemId: 50,
+      userId: 9,
+      name: 'Dây đeo điện thoại',
+      description:
+          'Dây đeo điện thoại cotton, có móc kim loại, phù hợp cho mọi điện thoại',
+      quantity: 5,
+      status: 'available',
+      categoryId: 3,
+      locationId: 4,
+      expirationDate: DateTime.now().add(Duration(days: 90)),
+      createdAt: DateTime.now().subtract(Duration(days: 5)),
+      price: 0,
+    ),
+    ItemModel(
+      itemId: 51,
+      userId: 10,
+      name: 'Bộ tai nghe Bluetooth',
+      description: 'Tai nghe Bluetooth TWS, pin 6h, chống nước IPX5, bass sâu',
+      quantity: 1,
+      status: 'available',
+      categoryId: 3,
+      locationId: 5,
+      expirationDate: DateTime.now().add(Duration(days: 75)),
+      createdAt: DateTime.now().subtract(Duration(days: 8)),
+      price: 250000,
+    ),
   ];
 
   // ==================== MESSAGES ====================
@@ -367,6 +1063,38 @@ class MockData {
       content: 'Ừ, cái gì tôi giúp bạn được không?',
       createdAt: DateTime.now().subtract(Duration(hours: 5)),
     ),
+    MessageModel(
+      messageId: 7,
+      senderId: 7,
+      receiverId: 6,
+      itemId: 8,
+      content: 'Bộ Lego này còn không ạ? Giá bao nhiêu?',
+      createdAt: DateTime.now().subtract(Duration(hours: 18)),
+    ),
+    MessageModel(
+      messageId: 8,
+      senderId: 6,
+      receiverId: 7,
+      itemId: 8,
+      content: 'Còn chứ! Giá mình tính 150k, chất lượng tốt lắm.',
+      createdAt: DateTime.now().subtract(Duration(hours: 17)),
+    ),
+    MessageModel(
+      messageId: 9,
+      senderId: 8,
+      receiverId: 9,
+      itemId: 11,
+      content: 'Camera này giá bao nhiêu? Có demo không?',
+      createdAt: DateTime.now().subtract(Duration(hours: 10)),
+    ),
+    MessageModel(
+      messageId: 10,
+      senderId: 9,
+      receiverId: 8,
+      itemId: 11,
+      content: 'Giá 300k, mình có thể cho bạn xem và test trước.',
+      createdAt: DateTime.now().subtract(Duration(hours: 9)),
+    ),
   ];
 
   // ==================== GAMIFICATION ====================
@@ -402,15 +1130,43 @@ class MockData {
     GamificationModel(
       gamificationId: 5,
       userId: 5,
-      points: 890,
-      level: 5,
+      points: 1280,
+      level: 7,
       updatedAt: DateTime.now(),
     ),
     GamificationModel(
       gamificationId: 6,
       userId: 6,
-      points: 3200,
+      points: 3150,
       level: 14,
+      updatedAt: DateTime.now(),
+    ),
+    GamificationModel(
+      gamificationId: 7,
+      userId: 7,
+      points: 2340,
+      level: 10,
+      updatedAt: DateTime.now(),
+    ),
+    GamificationModel(
+      gamificationId: 8,
+      userId: 8,
+      points: 1890,
+      level: 9,
+      updatedAt: DateTime.now(),
+    ),
+    GamificationModel(
+      gamificationId: 9,
+      userId: 9,
+      points: 2965,
+      level: 13,
+      updatedAt: DateTime.now(),
+    ),
+    GamificationModel(
+      gamificationId: 10,
+      userId: 10,
+      points: 2120,
+      level: 10,
       updatedAt: DateTime.now(),
     ),
   ];
@@ -526,50 +1282,116 @@ class MockData {
 
   // ==================== NOTIFICATIONS ====================
   static final List<NotificationModel> notifications = [
+    // Thông báo xác nhận được chọn nhận hàng
     NotificationModel(
       notificationId: 1,
       userId: 1,
-      itemId: 1,
-      type: 'item_shared',
-      message: 'Bạn vừa chia sẻ "Giày Nike Air Max mới"',
-      readStatus: true,
-      createdAt: DateTime.now().subtract(Duration(days: 5)),
+      title: '🎉 Bạn được chọn!',
+      message: 'Bạn đã được chọn nhận "Giày Nike Air Max" từ Hồng Anh',
+      type: 'selection',
+      relatedItemName: 'Giày Nike Air Max',
+      relatedUserName: 'Hồng Anh',
+      createdAt: DateTime.now().subtract(const Duration(hours: 2)),
+      isRead: false,
     ),
+    // Thông báo nhận hàng
     NotificationModel(
       notificationId: 2,
       userId: 1,
-      itemId: 1,
-      type: 'interest_received',
-      message: 'Có 2 người quan tâm đến sản phẩm của bạn',
-      readStatus: true,
-      createdAt: DateTime.now().subtract(Duration(days: 2)),
+      title: '📦 Nhận hàng thành công!',
+      message:
+          'Bạn đã nhận "Áo thun cotton" từ Bảo Lâm. Cảm ơn bạn đã chia sẻ!',
+      type: 'receipt',
+      relatedItemName: 'Áo thun cotton',
+      relatedUserName: 'Bảo Lâm',
+      createdAt: DateTime.now().subtract(const Duration(days: 1)),
+      isRead: true,
     ),
+    // Thông báo đạt được thành tích
     NotificationModel(
       notificationId: 3,
       userId: 1,
-      itemId: null,
-      type: 'transaction_completed',
-      message: 'Giao dịch "Giày Nike Air Max mới" đã hoàn thành',
-      readStatus: false,
-      createdAt: DateTime.now().subtract(Duration(hours: 2)),
+      title: '⭐ Thành tích mới!',
+      message: 'Chúc mừng! Bạn đã đạt thành tích "Chia sẻ 10 sản phẩm"',
+      type: 'achievement',
+      createdAt: DateTime.now().subtract(const Duration(days: 2)),
+      isRead: true,
     ),
+    // Thông báo tin nhắn từ người khác
     NotificationModel(
       notificationId: 4,
-      userId: 2,
-      itemId: 2,
-      type: 'item_shared',
-      message: 'Bạn vừa chia sẻ "Áo thun cotton"',
-      readStatus: true,
-      createdAt: DateTime.now().subtract(Duration(days: 3)),
+      userId: 1,
+      title: '💬 Tin nhắn mới',
+      message: 'Minh Châu: Sản phẩm này còn không ạ? Bao nhiêu tiền?',
+      type: 'message',
+      relatedUserName: 'Minh Châu',
+      createdAt: DateTime.now().subtract(const Duration(hours: 3)),
+      isRead: false,
     ),
+    // Thông báo nhận hàng thành công
     NotificationModel(
       notificationId: 5,
-      userId: 3,
-      itemId: 4,
-      type: 'interest_received',
-      message: 'Có 1 người quan tâm đến sản phẩm của bạn',
-      readStatus: false,
-      createdAt: DateTime.now().subtract(Duration(hours: 6)),
+      userId: 1,
+      title: '✅ Giao dịch hoàn tất',
+      message: '"Sách Tôi tài giỏi" từ Phương Thảo đã được giao. Cảm ơn!',
+      type: 'receipt',
+      relatedItemName: 'Sách Tôi tài giỏi',
+      relatedUserName: 'Phương Thảo',
+      createdAt: DateTime.now().subtract(const Duration(days: 3)),
+      isRead: true,
+    ),
+    // Thông báo hệ thống
+    NotificationModel(
+      notificationId: 6,
+      userId: 1,
+      title: '🔔 Thông báo hệ thống',
+      message: 'Cập nhật sản phẩm mới! Có 5 sản phẩm vừa được chia sẻ gần bạn.',
+      type: 'system',
+      createdAt: DateTime.now().subtract(const Duration(days: 4)),
+      isRead: true,
+    ),
+    // Thành tích Huy chương Vàng
+    NotificationModel(
+      notificationId: 7,
+      userId: 1,
+      title: '🥇 Huy chương Vàng!',
+      message: 'Bạn đã nhận được huy chương Vàng vì chia sẻ 50 sản phẩm',
+      type: 'achievement',
+      createdAt: DateTime.now().subtract(const Duration(days: 5)),
+      isRead: true,
+    ),
+    // Thông báo được chọn nhận hàng
+    NotificationModel(
+      notificationId: 8,
+      userId: 1,
+      title: '🎊 Bạn được chọn!',
+      message: 'Bạn đã được chọn nhận "Đồ chơi Lego" từ Tuấn Hưng',
+      type: 'selection',
+      relatedItemName: 'Đồ chơi Lego',
+      relatedUserName: 'Tuấn Hưng',
+      createdAt: DateTime.now().subtract(const Duration(days: 6)),
+      isRead: true,
+    ),
+    // Thông báo tin nhắn
+    NotificationModel(
+      notificationId: 9,
+      userId: 1,
+      title: '💬 Tin nhắn mới',
+      message: 'Hằng Nga: Vâng, em nhận được rồi ạ! Cảm ơn chị!',
+      type: 'message',
+      relatedUserName: 'Hằng Nga',
+      createdAt: DateTime.now().subtract(const Duration(days: 1, hours: 5)),
+      isRead: true,
+    ),
+    // Thống báo thành tích khác
+    NotificationModel(
+      notificationId: 10,
+      userId: 1,
+      title: '🌟 Người chia sẻ tích cực',
+      message: 'Bạn đã được xếp hạng "Người chia sẻ tích cực" tháng này!',
+      type: 'achievement',
+      createdAt: DateTime.now().subtract(const Duration(days: 7)),
+      isRead: true,
     ),
   ];
 
@@ -708,8 +1530,6 @@ class MockData {
 
   /// Hàm trợ giúp: Đếm unread notifications
   static int getUnreadNotificationCount(int userId) {
-    return notifications
-        .where((n) => n.userId == userId && !n.readStatus)
-        .length;
+    return notifications.where((n) => n.userId == userId && !n.isRead).length;
   }
 }

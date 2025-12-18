@@ -23,7 +23,7 @@ class BottomNavigationWidget extends StatelessWidget {
             context.go(AppRoutes.leaderboard);
             break;
           case 2:
-            // context.go(AppRoutes.orders);
+            context.go(AppRoutes.notifications);
             break;
           case 3:
             context.go(AppRoutes.profile);

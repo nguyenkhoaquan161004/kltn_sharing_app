@@ -12,7 +12,7 @@ class AppRoutes {
   static const String home = '/home';
   static const String category = '/category';
   static const String search = '/search';
-  static const String searchResults = '/search-results';
+  static const String searchResults = 'results'; // Child route of /search
 
   // Product routes
   static const String productDetail = '/product/:id';
@@ -21,6 +21,12 @@ class AppRoutes {
   // Order routes
   static const String orders = '/orders';
   static const String orderDetail = '/order/:id';
+  static const String cartItemDetail = '/cart-item/:id';
+
+  // Route names for pushNamed
+  static const String orderDetailName = 'order-detail';
+  static const String cartItemDetailName = 'cart-item-detail';
+  static const String searchResultsName = 'search-results';
 
   // Profile routes
   static const String profile = '/profile';
@@ -33,6 +39,7 @@ class AppRoutes {
   static const String leaderboard = '/leaderboard';
   static const String achievements = '/achievements';
   static const String achievementDetail = '/achievement/:id';
+  static const String notifications = '/notifications';
 
   // Helper methods
   static String getProductDetailRoute(String productId) {
@@ -41,6 +48,10 @@ class AppRoutes {
 
   static String getOrderDetailRoute(String orderId) {
     return '/order/$orderId';
+  }
+
+  static String getCartItemDetailRoute(String itemId) {
+    return '/cart-item/$itemId';
   }
 
   static String getUserProfileRoute(String userId) {
