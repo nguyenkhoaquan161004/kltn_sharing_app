@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../../core/constants/app_colors.dart';
+import '../../core/theme/app_colors.dart';
 import '../../data/models/item_model.dart';
 import '../../data/mock_data.dart';
 
@@ -65,7 +65,10 @@ class _ItemCardState extends State<ItemCard> {
     return GestureDetector(
       onTap: widget.onTap ??
           () {
-            context.push('/item/${widget.item.itemId}');
+            // Use UUID string (itemId_str) if available, otherwise fallback to itemId
+            final itemId =
+                widget.item.itemId_str ?? widget.item.itemId.toString();
+            context.push('/item/$itemId');
           },
       child: Container(
         decoration: BoxDecoration(
@@ -86,22 +89,50 @@ class _ItemCardState extends State<ItemCard> {
             // Image with tags overlay
             Stack(
               children: [
-                // Image placeholder
+                // Image placeholder or actual image
                 Container(
-                  height: 140,
+                  height: 120,
+                  width: double.infinity,
                   decoration: BoxDecoration(
                     borderRadius: const BorderRadius.vertical(
                       top: Radius.circular(12),
                     ),
                     color: Colors.grey[200],
                   ),
-                  child: Center(
-                    child: Icon(
-                      Icons.image,
-                      size: 48,
-                      color: Colors.grey[400],
-                    ),
-                  ),
+                  child: widget.item.image != null &&
+                          widget.item.image!.isNotEmpty
+                      ? Image.network(
+                          widget.item.image!,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Center(
+                              child: Icon(
+                                Icons.image_not_supported,
+                                size: 40,
+                                color: Colors.grey[400],
+                              ),
+                            );
+                          },
+                          loadingBuilder: (context, child, loadingProgress) {
+                            if (loadingProgress == null) return child;
+                            return Center(
+                              child: CircularProgressIndicator(
+                                value: loadingProgress.expectedTotalBytes !=
+                                        null
+                                    ? loadingProgress.cumulativeBytesLoaded /
+                                        loadingProgress.expectedTotalBytes!
+                                    : null,
+                              ),
+                            );
+                          },
+                        )
+                      : Center(
+                          child: Icon(
+                            Icons.image,
+                            size: 40,
+                            color: Colors.grey[400],
+                          ),
+                        ),
                 ),
 
                 // Free tag at top left (if price is 0) and Time remaining at top right
@@ -167,7 +198,7 @@ class _ItemCardState extends State<ItemCard> {
             // Content
             Expanded(
               child: Padding(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(10),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -177,33 +208,36 @@ class _ItemCardState extends State<ItemCard> {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        fontSize: 13,
+                        fontSize: 12,
                         fontWeight: FontWeight.w600,
                         color: AppColors.textPrimary,
                       ),
                     ),
 
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 3),
 
                     // Category
                     Text(
-                      MockData.getCategoryById(widget.item.categoryId)?.name ??
+                      widget.item.categoryName ??
+                          MockData.getCategoryById(
+                                  widget.item.categoryId.hashCode)
+                              ?.name ??
                           'Khác',
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: 10,
                         color: Colors.grey[600],
                       ),
                     ),
 
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 6),
 
                     // Price
                     Text(
                       widget.item.price == 0
-                          ? '0 VNĐ'
+                          ? 'Miễn phí'
                           : '${widget.item.price.toStringAsFixed(0)} VNĐ',
                       style: const TextStyle(
-                        fontSize: 13,
+                        fontSize: 12,
                         fontWeight: FontWeight.w600,
                         color: AppColors.primaryTeal,
                       ),
@@ -216,14 +250,14 @@ class _ItemCardState extends State<ItemCard> {
                       children: [
                         Icon(
                           Icons.inventory_2_outlined,
-                          size: 14,
+                          size: 12,
                           color: Colors.grey[600],
                         ),
-                        const SizedBox(width: 4),
+                        const SizedBox(width: 3),
                         Text(
                           'Còn ${widget.item.quantity}',
                           style: TextStyle(
-                            fontSize: 11,
+                            fontSize: 10,
                             fontWeight: FontWeight.w500,
                             color: Colors.grey[700],
                           ),

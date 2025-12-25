@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
-import 'widgets/order_progress_tracker.dart';
+import '../../../core/constants/app_text_styles.dart';
+import '../../../core/constants/app_routes.dart';
+import '../../../data/mock_data.dart';
+import 'widgets/item_request_modal.dart';
 
 class OrderDetailDoneScreen extends StatelessWidget {
   final String orderId;
@@ -13,6 +16,21 @@ class OrderDetailDoneScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Get item from mock data using orderId
+    final item = MockData.items.firstWhere(
+      (i) => i.itemId.toString() == orderId,
+      orElse: () => MockData.items.first,
+    );
+
+    // Get seller from mock data
+    final seller = MockData.users.firstWhere(
+      (u) => u.userId == item.userId,
+      orElse: () => MockData.users.first,
+    );
+
+    // Check if product is available
+    final isAvailable = item.status == 'shared' || item.status == 'available';
+
     return Scaffold(
       backgroundColor: AppColors.white,
       appBar: AppBar(
@@ -36,6 +54,33 @@ class OrderDetailDoneScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // Unavailable notification
+            if (!isAvailable)
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.red.withOpacity(0.1),
+                  border: Border.all(color: Colors.red),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.info_outline, color: Colors.red),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Sản phẩm không khả dụng',
+                        style: AppTextStyles.bodySmall.copyWith(
+                          color: Colors.red,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            if (!isAvailable) const SizedBox(height: 16),
+
             // Status Card
             Container(
               padding: const EdgeInsets.all(20),
@@ -76,28 +121,129 @@ class OrderDetailDoneScreen extends StatelessWidget {
             ),
             const SizedBox(height: 24),
             // Progress Tracker
-            const OrderProgressTracker(
-              currentStep: 4,
-              steps: ['Đặt hàng', 'Chờ duyệt', 'Đã duyệt', 'Hoàn thành'],
-            ),
+            _buildDoneTimeline(),
             const SizedBox(height: 24),
-            // Order Info
+            // Seller info
             _buildSection(
-              title: 'Thông tin đơn hàng',
+              title: 'Người cho',
               children: [
-                _buildInfoRow('Ngày đặt', '12/12/2024'),
-                _buildInfoRow('Ngày hoàn thành', '15/12/2024'),
-                _buildInfoRow('Tổng tiền', '240,000 VND'),
-                _buildInfoRow('Phương thức', 'Chuyển khoản'),
+                GestureDetector(
+                  onTap: () {
+                    // Navigate to seller profile
+                    context.push(
+                        AppRoutes.getUserProfileRoute(item.userId.toString()));
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      border: Border.all(color: AppColors.borderLight),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: AppColors.backgroundGray,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: const Icon(Icons.person, size: 20),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                seller.name,
+                                style: AppTextStyles.bodySmall.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              Text(
+                                '5 sản phẩm đã cho',
+                                style: AppTextStyles.caption.copyWith(
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Icon(Icons.arrow_forward_ios, size: 14),
+                      ],
+                    ),
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 16),
-            // Product List
+            // Product info
             _buildSection(
               title: 'Sản phẩm',
               children: [
-                _buildProductItem('Sản phẩm 1', '120,000 VND', 'Đen x1'),
-                _buildProductItem('Sản phẩm 2', '120,000 VND', 'Trắng x1'),
+                GestureDetector(
+                  onTap: () {
+                    // Navigate to product detail
+                    context.push(AppRoutes.getProductDetailRoute(
+                        item.itemId.toString()));
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      border: Border.all(color: AppColors.borderLight),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 60,
+                          height: 60,
+                          decoration: BoxDecoration(
+                            color: AppColors.borderGray,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(Icons.image,
+                              color: AppColors.textSecondary),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                item.name,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Số lượng: ${item.quantity}',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Text(
+                          '${item.price} VND',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.primaryTeal,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 16),
@@ -139,6 +285,43 @@ class OrderDetailDoneScreen extends StatelessWidget {
                     child: const Text('Viết đánh giá'),
                   ),
                 ],
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // Action button
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    shape: const RoundedRectangleBorder(
+                      borderRadius: BorderRadius.vertical(
+                        top: Radius.circular(24),
+                      ),
+                    ),
+                    builder: (context) => ItemRequestModal(
+                      item: item,
+                      seller: seller,
+                    ),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryYellow,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                child: Text(
+                  'Muốn nhận lại sản phẩm này',
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ),
             ),
           ],
@@ -249,6 +432,88 @@ class OrderDetailDoneScreen extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildDoneTimeline() {
+    return Column(
+      children: [
+        Row(
+          children: [
+            _buildTimelinePoint(true),
+            Expanded(
+              child: Container(
+                height: 3,
+                color: AppColors.success,
+              ),
+            ),
+            _buildTimelinePoint(true),
+            Expanded(
+              child: Container(
+                height: 3,
+                color: AppColors.success,
+              ),
+            ),
+            _buildTimelinePoint(true),
+            Expanded(
+              child: Container(
+                height: 3,
+                color: AppColors.success,
+              ),
+            ),
+            _buildTimelinePoint(true),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Đã đặt',
+              style: AppTextStyles.caption.copyWith(
+                fontSize: 11,
+              ),
+            ),
+            Text(
+              'Duyệt',
+              style: AppTextStyles.caption.copyWith(
+                fontSize: 11,
+              ),
+            ),
+            Text(
+              'Đã gửi',
+              style: AppTextStyles.caption.copyWith(
+                fontSize: 11,
+              ),
+            ),
+            Text(
+              'Hoàn thành',
+              style: AppTextStyles.caption.copyWith(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTimelinePoint(bool isCompleted) {
+    return Container(
+      width: 20,
+      height: 20,
+      decoration: BoxDecoration(
+        color: isCompleted ? AppColors.success : Colors.white,
+        border: Border.all(
+          color: isCompleted ? AppColors.success : AppColors.borderLight,
+          width: 2,
+        ),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: isCompleted
+          ? const Icon(Icons.check, size: 12, color: Colors.white)
+          : null,
     );
   }
 }

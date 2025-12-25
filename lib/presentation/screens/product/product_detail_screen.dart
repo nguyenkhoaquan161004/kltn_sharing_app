@@ -1,14 +1,23 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../../../core/constants/app_colors.dart';
+import 'package:provider/provider.dart';
+import '../../../core/theme/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/constants/app_routes.dart';
 import '../../../data/models/product_model.dart';
 import '../../../data/models/item_model.dart';
+import '../../../data/providers/item_provider.dart';
+import '../../../data/models/item_response_model.dart';
+import '../../../data/models/cart_request_model.dart';
+import '../../../data/services/cart_api_service.dart';
+import '../../../data/providers/auth_provider.dart';
 import '../../../data/mock_data.dart';
 import 'widgets/product_image_carousel.dart';
 import 'widgets/order_request_modal.dart';
+import 'widgets/add_to_cart_modal.dart';
+import 'widgets/expandable_description.dart';
+import '../../widgets/item_card.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   final String productId;
@@ -30,11 +39,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   Timer? _timer;
   late Duration _remainingTime;
 
-  // Mock product data
-  late ProductModel _product;
+  // Product data
+  ProductModel? _product;
+  ItemDto? _itemDto;
+  bool _isLoading = true;
+  String? _errorMessage;
 
   // Mock related products
-  late List<ProductModel> _relatedProducts;
+  late List<ItemModel> _relatedProducts;
 
   @override
   void initState() {
@@ -42,119 +54,91 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     _loadProduct();
   }
 
-  void _loadProduct() {
+  Future<void> _loadProduct() async {
     try {
-      int productId = int.parse(widget.productId);
-      // Try to find product in MockData
-      ItemModel? mockItem = MockData.getItemById(productId);
+      final itemProvider = context.read<ItemProvider>();
+      final itemDto = await itemProvider.getItemById(widget.productId);
 
-      if (mockItem != null) {
-        // Found in MockData - use real data
-        final user = MockData.users.firstWhere(
-          (u) => u.userId == mockItem.userId,
-          orElse: () => MockData.users[0],
-        );
-
-        _product = ProductModel(
-          id: mockItem.itemId.toString(),
-          name: mockItem.name,
-          description: mockItem.description,
-          price: mockItem.price,
-          images: [],
-          category:
-              MockData.getCategoryById(mockItem.categoryId)?.name ?? 'Khác',
-          quantity: mockItem.quantity,
-          interestedCount: 0,
-          expiryDate: mockItem.expirationDate ??
-              DateTime.now().add(const Duration(hours: 12)),
-          createdAt: mockItem.createdAt,
-          owner: UserInfo(
-            id: user.userId.toString(),
-            name: user.name,
-            avatar: user.avatar ?? '',
-            productsShared: MockData.getItemsByUserId(user.userId).length,
-          ),
-          isFree: mockItem.price == 0,
-        );
+      if (itemDto != null) {
+        setState(() {
+          _itemDto = itemDto;
+          _product = _convertDtoToProduct(itemDto);
+          _isLoading = false;
+          _remainingTime = _product!.remainingTime;
+        });
+        _startTimer();
       } else {
-        // Use fallback mock data
-        final defaultUser = MockData.users[0];
-        _product = ProductModel(
-          id: widget.productId,
-          name: 'Giày Nike',
-          description:
-              '''Lorem ipsum dolor sit amet consectetur adipiscing elit. Quisque faucibus ex sapien vitae pellentesque sem placerat. In id cursus mi pretium tellus duis convallis. Tempus leo eu aenean sed diam urna tempor. Pulvinar vivamus fringilla lacus nec metus bibendum egestas. Iaculis massa nisl malesuada lacinia integer nunc posuere. Ut hendrerit semper vel class aptent taciti sociosqu. Ad litora torquent per conubia nostra inceptos himenaeos...''',
-          price: 0,
-          images: [],
-          category: 'Thể thao',
-          quantity: 63,
-          interestedCount: 12,
-          expiryDate: DateTime.now()
-              .add(const Duration(hours: 12, minutes: 32, seconds: 34)),
-          createdAt: DateTime.now(),
-          owner: UserInfo(
-            id: defaultUser.userId.toString(),
-            name: defaultUser.name,
-            avatar: defaultUser.avatar ?? '',
-            productsShared:
-                MockData.getItemsByUserId(defaultUser.userId).length,
-          ),
-          isFree: true,
-        );
+        setState(() {
+          _isLoading = false;
+          _errorMessage =
+              itemProvider.errorMessage ?? 'Không thể tải dữ liệu sản phẩm';
+        });
       }
     } catch (e) {
-      print('DEBUG: Error loading product: $e');
-      // Fallback
-      final defaultUser = MockData.users[0];
-      _product = ProductModel(
-        id: widget.productId,
-        name: 'Giày Nike',
-        description: 'Mô tả sản phẩm',
-        price: 0,
-        images: [],
-        category: 'Thể thao',
-        quantity: 63,
-        interestedCount: 12,
-        expiryDate: DateTime.now()
-            .add(const Duration(hours: 12, minutes: 32, seconds: 34)),
-        createdAt: DateTime.now(),
-        owner: UserInfo(
-          id: defaultUser.userId.toString(),
-          name: defaultUser.name,
-          avatar: defaultUser.avatar ?? '',
-          productsShared: MockData.getItemsByUserId(defaultUser.userId).length,
-        ),
-        isFree: true,
-      );
+      setState(() {
+        _isLoading = false;
+        _errorMessage = e.toString();
+      });
+      print('Error loading product: $e');
     }
 
-    _remainingTime = _product.remainingTime;
-    _startTimer();
+    // Load related products (from same category or all)
+    _loadRelatedProducts();
+  }
 
-    _relatedProducts = List.generate(
-      6,
-      (index) => ProductModel(
-        id: 'related_$index',
-        name: 'Giày Nike aaaaaaaaaaaaaaaaaaaaaa',
-        description: '',
-        price: 12000,
-        images: [],
-        category: 'Thể thao',
-        quantity: 3,
-        interestedCount: 32,
-        expiryDate: DateTime.now().add(const Duration(hours: 12)),
-        createdAt: DateTime.now(),
-        owner: _product.owner,
-        isFree: index % 2 == 0,
+  void _loadRelatedProducts() {
+    try {
+      _relatedProducts = MockData.items
+          .where((item) => item.itemId.toString() != widget.productId)
+          .take(6)
+          .toList();
+    } catch (e) {
+      _relatedProducts = [];
+    }
+  }
+
+  ProductModel _convertDtoToProduct(ItemDto itemDto) {
+    // Try to find user info in MockData
+    final user = MockData.users.firstWhere(
+      (u) => u.userId.toString() == itemDto.userId,
+      orElse: () => MockData.users[0],
+    );
+
+    // Get category name from MockData or use the one from API
+    final categoryName = itemDto.categoryName ??
+        MockData.getCategoryById(itemDto.categoryId.hashCode)?.name ??
+        'Khác';
+
+    return ProductModel(
+      id: itemDto.id,
+      name: itemDto.name,
+      description: itemDto.description ?? '',
+      price: itemDto.price?.toDouble() ?? 0.0,
+      images: [
+        itemDto.imageUrl ?? 'https://via.placeholder.com/500x500?text=No+Image',
+      ],
+      category: categoryName,
+      quantity: itemDto.quantity ?? 1,
+      interestedCount: 0,
+      expiryDate:
+          itemDto.expiryDate ?? DateTime.now().add(const Duration(days: 30)),
+      createdAt: itemDto.createdAt ?? DateTime.now(),
+      owner: UserInfo(
+        id: user.userId.toString(),
+        name: user.name,
+        avatar: user.avatar ?? '',
+        productsShared: MockData.getItemsByUserId(user.userId).length,
       ),
+      isFree: (itemDto.price ?? 0) == 0,
     );
   }
 
   void _startTimer() {
+    if (_product == null) return;
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (mounted) {
         setState(() {
-          _remainingTime = _product.expiryDate.difference(DateTime.now());
+          _remainingTime = _product!.expiryDate.difference(DateTime.now());
           if (_remainingTime.isNegative) timer.cancel();
         });
       }
@@ -176,16 +160,87 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   void _showOrderModal() {
+    if (_product == null) return;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => OrderRequestModal(product: _product),
+      builder: (context) => OrderRequestModal(product: _product!),
+    );
+  }
+
+  void _showAddToCartModal() {
+    if (_product == null || _itemDto == null) return;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => AddToCartModal(
+        item: _itemDto!,
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    // Show loading state
+    if (_isLoading) {
+      return Scaffold(
+        backgroundColor: AppColors.backgroundWhite,
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
+            onPressed: () => context.pop(),
+          ),
+        ),
+        body: const Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    // Show error state
+    if (_errorMessage != null || _product == null) {
+      return Scaffold(
+        backgroundColor: AppColors.backgroundWhite,
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
+            onPressed: () => context.pop(),
+          ),
+        ),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline, size: 64, color: Colors.grey),
+              const SizedBox(height: 16),
+              Text(
+                'Không thể tải sản phẩm',
+                style: AppTextStyles.h4,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _errorMessage ?? 'Vui lòng thử lại',
+                style: AppTextStyles.bodyMedium,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: _loadProduct,
+                child: const Text('Thử lại'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Show product details
     return Scaffold(
       backgroundColor: AppColors.backgroundWhite,
       body: CustomScrollView(
@@ -209,7 +264,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               onPressed: () => context.pop(),
             ),
             flexibleSpace: FlexibleSpaceBar(
-              background: ProductImageCarousel(images: _product.images),
+              background: ProductImageCarousel(images: _product!.images),
             ),
           ),
 
@@ -221,12 +276,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Product name
-                  Text(_product.name, style: AppTextStyles.h2),
+                  Text(_product!.name, style: AppTextStyles.h2),
                   const SizedBox(height: 8),
 
                   // Price
                   Text(
-                    _product.formattedPrice,
+                    _product!.formattedPrice,
                     style: AppTextStyles.priceLarge,
                   ),
                   const SizedBox(height: 16),
@@ -262,11 +317,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   Widget _buildStatsRow() {
     return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildStatItem('${_product.quantity}', 'Số lượng'),
-        const SizedBox(width: 24),
-        _buildStatItem('${_product.interestedCount}', 'Số người muốn nhận'),
-        const SizedBox(width: 24),
+        _buildStatItem('${_product?.quantity ?? 0}', 'Số lượng'),
+        _buildStatItem(
+            '${_product?.interestedCount ?? 0}', 'Số người muốn nhận'),
         _buildStatItem(_formattedTime, 'Thời gian còn lại'),
       ],
     );
@@ -274,12 +330,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   Widget _buildStatItem(String value, String label) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Text(
           value,
           style: AppTextStyles.h4.copyWith(fontWeight: FontWeight.bold),
         ),
+        const SizedBox(height: 4),
         Text(label, style: AppTextStyles.caption),
       ],
     );
@@ -294,7 +351,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       ),
       child: Column(
         children: [
-          _buildInfoRow('Phân loại', _product.category),
+          _buildInfoRow('Phân loại', _product?.category ?? 'Khác'),
           const Divider(height: 24),
           _buildInfoRow('Hạn sử dụng', 'Không giới hạn'),
         ],
@@ -316,10 +373,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   Widget _buildOwnerSection() {
+    if (_product == null) {
+      return const SizedBox.shrink();
+    }
     return GestureDetector(
       onTap: () {
         // Navigate to owner profile
-        context.push(AppRoutes.getUserProfileRoute(_product.owner.id));
+        context.push(AppRoutes.getUserProfileRoute(_product!.owner.id));
       },
       child: Container(
         padding: const EdgeInsets.all(16),
@@ -350,12 +410,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 children: [
                   const Text('Người cho', style: AppTextStyles.caption),
                   Text(
-                    _product.owner.name,
+                    _product!.owner.name,
                     style: AppTextStyles.bodyLarge
                         .copyWith(fontWeight: FontWeight.w600),
                   ),
                   Text(
-                    '${_product.owner.productsShared} sản phẩm đã cho',
+                    '${_product!.owner.productsShared} sản phẩm đã cho',
                     style: AppTextStyles.caption,
                   ),
                 ],
@@ -370,16 +430,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   Widget _buildDescriptionSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('Mô tả sản phẩm', style: AppTextStyles.h4),
-        const SizedBox(height: 12),
-        Text(
-          _product.description,
-          style: AppTextStyles.bodyMedium.copyWith(height: 1.6),
-        ),
-      ],
+    return ExpandableDescription(
+      text: _product?.description ?? '',
+      maxLines: 3,
     );
   }
 
@@ -389,72 +442,25 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       children: [
         const Text('Sản phẩm liên quan', style: AppTextStyles.h4),
         const SizedBox(height: 16),
-        SizedBox(
-          height: 220,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: _relatedProducts.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 12),
-            itemBuilder: (context, index) {
-              return SizedBox(
-                width: 160,
-                child: _buildMiniProductCard(_relatedProducts[index]),
-              );
-            },
+        GridView.builder(
+          shrinkWrap: true,
+          padding: EdgeInsets.zero,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            childAspectRatio: 0.65,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
           ),
+          itemCount: _relatedProducts.length,
+          itemBuilder: (context, index) {
+            return ItemCard(
+              item: _relatedProducts[index],
+              showTimeRemaining: true,
+            );
+          },
         ),
       ],
-    );
-  }
-
-  Widget _buildMiniProductCard(ProductModel product) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.backgroundWhite,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            height: 100,
-            decoration: BoxDecoration(
-              color: AppColors.backgroundGray,
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(12)),
-            ),
-            child: const Center(
-                child: Icon(Icons.image, color: AppColors.textSecondary)),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(8),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  product.name,
-                  style: AppTextStyles.bodySmall
-                      .copyWith(fontWeight: FontWeight.w600),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 4),
-                Text(product.formattedPrice,
-                    style: AppTextStyles.price.copyWith(fontSize: 14)),
-                Text('Còn ${product.quantity} sản phẩm',
-                    style: AppTextStyles.caption),
-              ],
-            ),
-          ),
-        ],
-      ),
     );
   }
 
@@ -496,6 +502,30 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               child: IconButton(
                 icon: const Icon(Icons.chat_bubble_outline),
                 onPressed: () {},
+              ),
+            ),
+            const SizedBox(width: 12),
+
+            // Add to cart button
+            Expanded(
+              child: GestureDetector(
+                onTap: _showAddToCartModal,
+                child: Container(
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: Colors.blue,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Center(
+                    child: Text(
+                      'Thêm vào giỏ',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
               ),
             ),
             const SizedBox(width: 12),

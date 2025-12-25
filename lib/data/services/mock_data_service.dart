@@ -295,7 +295,8 @@ class MockDataService {
       () => MockData.items
           .where((i) =>
               i.name.toLowerCase().contains(query.toLowerCase()) ||
-              i.description.toLowerCase().contains(query.toLowerCase()))
+              (i.description?.toLowerCase().contains(query.toLowerCase()) ??
+                  false))
           .toList(),
     );
   }

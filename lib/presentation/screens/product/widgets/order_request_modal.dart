@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../../../../core/constants/app_colors.dart';
+import 'package:provider/provider.dart';
+import '../../../../core/theme/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../../../../data/models/product_model.dart';
+import '../../../../data/models/transaction_request_model.dart';
+import '../../../../data/services/transaction_api_service.dart';
+import '../../../../data/providers/auth_provider.dart';
 
 class OrderRequestModal extends StatefulWidget {
   final ProductModel product;
@@ -19,11 +23,20 @@ class OrderRequestModal extends StatefulWidget {
 class _OrderRequestModalState extends State<OrderRequestModal> {
   int _quantity = 1;
   final TextEditingController _reasonController = TextEditingController();
+  final TextEditingController _fullNameController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _addressController = TextEditingController();
+  final TextEditingController _noteController = TextEditingController();
   bool _isLoading = false;
+  String? _errorMessage;
 
   @override
   void dispose() {
     _reasonController.dispose();
+    _fullNameController.dispose();
+    _phoneController.dispose();
+    _addressController.dispose();
+    _noteController.dispose();
     super.dispose();
   }
 
@@ -59,16 +72,66 @@ class _OrderRequestModalState extends State<OrderRequestModal> {
   }
 
   void _requestNow() async {
-    setState(() => _isLoading = true);
+    // Validate inputs
+    if (_fullNameController.text.isEmpty) {
+      setState(() => _errorMessage = 'Vui lòng nhập họ tên');
+      return;
+    }
+    if (_phoneController.text.isEmpty) {
+      setState(() => _errorMessage = 'Vui lòng nhập số điện thoại');
+      return;
+    }
+    if (_addressController.text.isEmpty) {
+      setState(() => _errorMessage = 'Vui lòng nhập địa chỉ');
+      return;
+    }
+    if (_reasonController.text.isEmpty) {
+      setState(() => _errorMessage = 'Vui lòng nhập lý do');
+      return;
+    }
 
-    // Simulate API call
-    await Future.delayed(const Duration(seconds: 1));
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
 
-    setState(() => _isLoading = false);
+    try {
+      final authProvider = context.read<AuthProvider>();
+      final transactionService = TransactionApiService();
 
-    if (mounted) {
-      context.pop();
-      _showSuccessDialog();
+      // Set auth token if available
+      if (authProvider.accessToken != null) {
+        transactionService.setAuthToken(authProvider.accessToken!);
+      }
+
+      // Create transaction request
+      final request = TransactionRequest(
+        itemId: widget.product.id,
+        message: _reasonController.text,
+        receiverFullName: _fullNameController.text,
+        receiverPhone: _phoneController.text,
+        shippingAddress: _addressController.text,
+        shippingNote: _noteController.text,
+        paymentMethod: 'CASH',
+        transactionFee: 0.0,
+        receiverId: authProvider.accessToken != null ? 'current_user' : '',
+      );
+
+      // Call API
+      await transactionService.createTransaction(request);
+
+      setState(() => _isLoading = false);
+
+      if (mounted) {
+        context.pop();
+        _showSuccessDialog();
+      }
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        _errorMessage = e.toString().replaceAll('Exception: ', '');
+      });
+      print('Error creating transaction: $e');
     }
   }
 
@@ -266,7 +329,112 @@ class _OrderRequestModalState extends State<OrderRequestModal> {
                 ),
               ),
             ),
-            const SizedBox(height: 32),
+            const SizedBox(height: 24),
+
+            // Receiver info section
+            const Text('Thông tin người nhận', style: AppTextStyles.h4),
+            const SizedBox(height: 16),
+
+            // Full name field
+            const Text('Họ tên', style: AppTextStyles.label),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _fullNameController,
+              decoration: InputDecoration(
+                hintText: 'Nhập họ tên của bạn',
+                hintStyle: AppTextStyles.bodyMedium.copyWith(
+                  color: AppColors.textDisabled,
+                ),
+                filled: true,
+                fillColor: AppColors.backgroundGray,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Phone field
+            const Text('Số điện thoại', style: AppTextStyles.label),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _phoneController,
+              keyboardType: TextInputType.phone,
+              decoration: InputDecoration(
+                hintText: 'Nhập số điện thoại',
+                hintStyle: AppTextStyles.bodyMedium.copyWith(
+                  color: AppColors.textDisabled,
+                ),
+                filled: true,
+                fillColor: AppColors.backgroundGray,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Address field
+            const Text('Địa chỉ giao hàng', style: AppTextStyles.label),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _addressController,
+              maxLines: 2,
+              decoration: InputDecoration(
+                hintText: 'Nhập địa chỉ giao hàng',
+                hintStyle: AppTextStyles.bodyMedium.copyWith(
+                  color: AppColors.textDisabled,
+                ),
+                filled: true,
+                fillColor: AppColors.backgroundGray,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Note field
+            const Text('Ghi chú (tùy chọn)', style: AppTextStyles.label),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _noteController,
+              maxLines: 2,
+              decoration: InputDecoration(
+                hintText: 'Ghi chú thêm (ví dụ: giao hàng vào buổi tối)',
+                hintStyle: AppTextStyles.bodyMedium.copyWith(
+                  color: AppColors.textDisabled,
+                ),
+                filled: true,
+                fillColor: AppColors.backgroundGray,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+
+            // Error message
+            if (_errorMessage != null) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.red.shade200),
+                ),
+                child: Text(
+                  _errorMessage!,
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    color: Colors.red.shade700,
+                  ),
+                ),
+              ),
+            ],
 
             // Action buttons
             Row(

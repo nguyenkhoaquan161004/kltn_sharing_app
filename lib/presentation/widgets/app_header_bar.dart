@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../../core/constants/app_colors.dart';
+import '../../core/theme/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
 import '../../core/constants/app_routes.dart';
 
@@ -8,12 +8,16 @@ class AppHeaderBar extends StatelessWidget implements PreferredSizeWidget {
   final int orderCount;
   final VoidCallback? onSearchTap;
   final VoidCallback? onMessagesTap;
+  final VoidCallback? onSettingsTap;
+  final bool showSettingsButton;
 
   const AppHeaderBar({
     super.key,
     this.orderCount = 0,
     this.onSearchTap,
     this.onMessagesTap,
+    this.onSettingsTap,
+    this.showSettingsButton = false,
   });
 
   @override
@@ -65,6 +69,12 @@ class AppHeaderBar extends StatelessWidget implements PreferredSizeWidget {
           icon: const Icon(Icons.mail_outline, color: AppColors.textPrimary),
           onPressed: onMessagesTap ?? () => context.push(AppRoutes.messages),
         ),
+        // Settings button (optional)
+        if (showSettingsButton)
+          IconButton(
+            icon: const Icon(Icons.settings, color: AppColors.textPrimary),
+            onPressed: onSettingsTap ?? () {},
+          ),
       ],
     );
   }

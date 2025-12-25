@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../../../../core/constants/app_colors.dart';
+import 'package:provider/provider.dart';
+import '../../../../core/theme/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
+import '../../../../data/providers/auth_provider.dart';
+import '../../../../data/providers/user_provider.dart';
 import '../../widgets/bottom_navigation_widget.dart';
+import '../../widgets/app_header_bar.dart';
 import 'widgets/profile_header.dart';
 import 'widgets/profile_info_tab.dart';
 import 'widgets/profile_products_tab.dart';
@@ -10,10 +14,12 @@ import 'widgets/profile_achievements_tab.dart';
 
 class ProfileScreen extends StatefulWidget {
   final bool isOwnProfile;
+  final String? userId;
 
   const ProfileScreen({
     super.key,
     this.isOwnProfile = true,
+    this.userId,
   });
 
   @override
@@ -24,21 +30,32 @@ class _ProfileScreenState extends State<ProfileScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
-  // Mock user data
-  final Map<String, dynamic> _userData = {
-    'name': 'Quan Nguyen',
-    'email': 'quan123@gmail.com',
-    'address': '8A/12A Thái Văn Lung, Q.1, TP.HCM',
-    'avatar': '',
-    'points': 23123,
-    'productsShared': 63,
-    'productsReceived': 12,
-  };
-
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+
+    // Load user profile when screen initializes
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final authProvider = context.read<AuthProvider>();
+      final userProvider = context.read<UserProvider>();
+
+      print('[ProfileScreen] Auth token: ${authProvider.accessToken}');
+      print('[ProfileScreen] Is logged in: ${authProvider.isLoggedIn}');
+
+      // Set auth token if available
+      if (authProvider.accessToken != null) {
+        print('[ProfileScreen] Setting token for UserProvider');
+        userProvider.setAuthToken(authProvider.accessToken!);
+      } else {
+        print('[ProfileScreen] WARNING: No access token found!');
+      }
+
+      // Load current user if it's own profile
+      if (widget.isOwnProfile) {
+        userProvider.loadCurrentUser();
+      }
+    });
   }
 
   @override
@@ -51,127 +68,104 @@ class _ProfileScreenState extends State<ProfileScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.backgroundWhite,
-      body: NestedScrollView(
-        headerSliverBuilder: (context, innerBoxIsScrolled) {
-          return [
-            // App bar
-            SliverAppBar(
-              backgroundColor: Colors.transparent,
-              elevation: 0,
-              pinned: true,
-              expandedHeight: 0,
-              leading: widget.isOwnProfile
-                  ? IconButton(
-                      icon: const Icon(Icons.search,
-                          color: AppColors.textPrimary),
-                      onPressed: () {},
-                    )
-                  : IconButton(
-                      icon: const Icon(Icons.arrow_back,
-                          color: AppColors.textPrimary),
-                      onPressed: () => context.pop(),
-                    ),
-              actions: [
-                // Order badge
-                if (widget.isOwnProfile) ...[
-                  Row(
-                    children: [
-                      const Text('Đơn hàng', style: AppTextStyles.bodyMedium),
-                      const SizedBox(width: 4),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: AppColors.badgePink,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Text(
-                          '8',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.mail_outline,
-                        color: AppColors.textPrimary),
-                    onPressed: () {},
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.settings,
-                        color: AppColors.textPrimary),
-                    onPressed: () {},
-                  ),
-                ] else ...[
-                  IconButton(
-                    icon: const Icon(Icons.mail_outline,
-                        color: AppColors.textPrimary),
-                    onPressed: () {},
-                  ),
-                  IconButton(
-                    icon:
-                        const Icon(Icons.search, color: AppColors.textPrimary),
-                    onPressed: () {},
+      appBar: AppHeaderBar(
+        orderCount: 8,
+        onSearchTap: () => context.push('/search'),
+        onSettingsTap: () {},
+        showSettingsButton: widget.isOwnProfile,
+      ),
+      body: Consumer<UserProvider>(
+        builder: (context, userProvider, child) {
+          if (userProvider.isLoading && userProvider.currentUser == null) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          if (userProvider.errorMessage != null) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text('Lỗi: ${userProvider.errorMessage}'),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: () => userProvider.loadCurrentUser(),
+                    child: const Text('Thử lại'),
                   ),
                 ],
+              ),
+            );
+          }
+
+          final user = userProvider.currentUser;
+          if (user == null) {
+            return const Center(
+                child: Text('Không tìm thấy thông tin người dùng'));
+          }
+
+          return NestedScrollView(
+            headerSliverBuilder: (context, innerBoxIsScrolled) {
+              return [
+                // Profile header
+                SliverToBoxAdapter(
+                  child: ProfileHeader(
+                    name: user.fullName,
+                    points: user.points,
+                    avatar: user.avatar ?? '',
+                  ),
+                ),
+
+                // Tab bar
+                SliverPersistentHeader(
+                  pinned: true,
+                  delegate: _SliverTabBarDelegate(
+                    TabBar(
+                      controller: _tabController,
+                      labelColor: AppColors.primaryTeal,
+                      unselectedLabelColor: AppColors.textSecondary,
+                      labelStyle: AppTextStyles.label,
+                      indicatorColor: AppColors.primaryTeal,
+                      indicatorWeight: 3,
+                      tabs: const [
+                        Tab(text: 'Thông tin'),
+                        Tab(text: 'Sản phẩm'),
+                        Tab(text: 'Thành tựu'),
+                      ],
+                    ),
+                  ),
+                ),
+              ];
+            },
+            body: TabBarView(
+              controller: _tabController,
+              children: [
+                // Tab 1: Thông tin
+                ProfileInfoTab(
+                  userData: {
+                    'name': user.fullName,
+                    'email': user.email,
+                    'address': user.address ?? 'N/A',
+                    'phone': user.phoneNumber ?? 'N/A',
+                    'avatar': user.avatar ?? '',
+                    'points': user.points,
+                    'productsShared': user.itemsShared,
+                    'productsReceived': user.itemsReceived,
+                  },
+                  isOwnProfile: widget.isOwnProfile,
+                  userId: int.tryParse(user.id) ?? 0,
+                ),
+
+                // Tab 2: Sản phẩm
+                ProfileProductsTab(
+                  isOwnProfile: widget.isOwnProfile,
+                  userId: int.tryParse(user.id) ?? 0,
+                ),
+
+                // Tab 3: Thành tựu
+                ProfileAchievementsTab(),
               ],
             ),
-
-            // Profile header
-            SliverToBoxAdapter(
-              child: ProfileHeader(
-                name: _userData['name'],
-                points: _userData['points'],
-                avatar: _userData['avatar'],
-              ),
-            ),
-
-            // Tab bar
-            SliverPersistentHeader(
-              pinned: true,
-              delegate: _SliverTabBarDelegate(
-                TabBar(
-                  controller: _tabController,
-                  labelColor: AppColors.primaryTeal,
-                  unselectedLabelColor: AppColors.textSecondary,
-                  labelStyle: AppTextStyles.label,
-                  indicatorColor: AppColors.primaryTeal,
-                  indicatorWeight: 3,
-                  tabs: const [
-                    Tab(text: 'Thông tin'),
-                    Tab(text: 'Sản phẩm'),
-                    Tab(text: 'Thành tựu'),
-                  ],
-                ),
-              ),
-            ),
-          ];
+          );
         },
-        body: TabBarView(
-          controller: _tabController,
-          children: [
-            // Tab 1: Thông tin
-            ProfileInfoTab(
-              userData: _userData,
-              isOwnProfile: widget.isOwnProfile,
-              userId: 1, // Current user ID (for own profile)
-            ),
-
-            // Tab 2: Sản phẩm
-            ProfileProductsTab(
-              isOwnProfile: widget.isOwnProfile,
-              userId:
-                  0, // Current user ID (would be from auth/state management in real app)
-            ),
-
-            // Tab 3: Thành tựu
-            ProfileAchievementsTab(),
-          ],
-        ),
       ),
       bottomNavigationBar: const BottomNavigationWidget(currentIndex: 3),
     );

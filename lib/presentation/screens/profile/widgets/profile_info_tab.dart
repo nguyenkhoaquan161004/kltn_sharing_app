@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
-import '../../../../core/constants/app_colors.dart';
+import '../../../../core/theme/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../../../../data/mock_data.dart';
+import '../../../widgets/item_card.dart';
 import 'profile_stats.dart';
 import 'scoring_mechanism_modal.dart';
+import 'edit_profile_modal.dart';
 
-class ProfileInfoTab extends StatelessWidget {
+class ProfileInfoTab extends StatefulWidget {
   final Map<String, dynamic> userData;
   final bool isOwnProfile;
   final int? userId;
@@ -18,6 +20,11 @@ class ProfileInfoTab extends StatelessWidget {
   });
 
   @override
+  State<ProfileInfoTab> createState() => _ProfileInfoTabState();
+}
+
+class _ProfileInfoTabState extends State<ProfileInfoTab> {
+  @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
@@ -29,8 +36,8 @@ class ProfileInfoTab extends StatelessWidget {
               Expanded(
                 flex: 2,
                 child: ProfileStats(
-                  productsShared: userData['productsShared'],
-                  productsReceived: userData['productsReceived'],
+                  productsShared: widget.userData['productsShared'],
+                  productsReceived: widget.userData['productsReceived'],
                 ),
               ),
               const SizedBox(width: 16),
@@ -62,7 +69,7 @@ class ProfileInfoTab extends StatelessWidget {
           const SizedBox(height: 32),
 
           // Content based on profile type
-          if (isOwnProfile)
+          if (widget.isOwnProfile)
             // Own profile: Show user info
             _buildOwnProfileContent()
           else
@@ -106,7 +113,22 @@ class ProfileInfoTab extends StatelessWidget {
                   size: 20,
                 ),
                 onPressed: () {
-                  // TODO: Navigate to edit profile
+                  showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    builder: (context) => EditProfileModal(
+                      currentName: widget.userData['name'],
+                      currentEmail: widget.userData['email'],
+                      currentAddress: widget.userData['address'],
+                      currentAvatar: widget.userData['avatar'],
+                      onProfileUpdated: () {
+                        // Refresh parent widget to update UI
+                        setState(() {
+                          // Trigger rebuild
+                        });
+                      },
+                    ),
+                  );
                 },
               ),
             ],
@@ -116,21 +138,21 @@ class ProfileInfoTab extends StatelessWidget {
           // Name
           _buildInfoRow(
             label: 'Tên người dùng',
-            value: userData['name'] ?? '',
+            value: widget.userData['name'] ?? '',
           ),
           const SizedBox(height: 16),
 
           // Email
           _buildInfoRow(
             label: 'Email',
-            value: userData['email'] ?? '',
+            value: widget.userData['email'] ?? '',
           ),
           const SizedBox(height: 16),
 
           // Address
           _buildInfoRow(
             label: 'Địa chỉ',
-            value: userData['address'] ?? '',
+            value: widget.userData['address'] ?? '',
           ),
         ],
       ),
@@ -139,8 +161,8 @@ class ProfileInfoTab extends StatelessWidget {
 
   Widget _buildOtherUserProfileContent() {
     // Get products for this user
-    final userProducts = userId != null
-        ? MockData.items.where((item) => item.userId == userId).toList()
+    final userProducts = widget.userId != null
+        ? MockData.items.where((item) => item.userId == widget.userId).toList()
         : [];
 
     // Split products: free (0 đồng) and paid (suggested)
@@ -184,12 +206,15 @@ class ProfileInfoTab extends StatelessWidget {
               crossAxisCount: 2,
               crossAxisSpacing: 12,
               mainAxisSpacing: 12,
-              childAspectRatio: 0.75,
+              childAspectRatio: 0.6,
             ),
             itemCount: freeProducts.length > 3 ? 3 : freeProducts.length,
             itemBuilder: (context, index) {
               final product = freeProducts[index];
-              return _buildProductCard(product);
+              return ItemCard(
+                item: product,
+                showTimeRemaining: true,
+              );
             },
           ),
           const SizedBox(height: 32),
@@ -228,13 +253,16 @@ class ProfileInfoTab extends StatelessWidget {
               crossAxisCount: 2,
               crossAxisSpacing: 12,
               mainAxisSpacing: 12,
-              childAspectRatio: 0.75,
+              childAspectRatio: 0.6,
             ),
             itemCount:
                 suggestedProducts.length > 3 ? 3 : suggestedProducts.length,
             itemBuilder: (context, index) {
               final product = suggestedProducts[index];
-              return _buildProductCard(product);
+              return ItemCard(
+                item: product,
+                showTimeRemaining: true,
+              );
             },
           ),
         ],
@@ -253,81 +281,6 @@ class ProfileInfoTab extends StatelessWidget {
             ),
           ),
       ],
-    );
-  }
-
-  Widget _buildProductCard(dynamic product) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.backgroundWhite,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 5,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Product image
-          Container(
-            width: double.infinity,
-            height: 100,
-            decoration: BoxDecoration(
-              color: AppColors.backgroundGray,
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(12),
-                topRight: Radius.circular(12),
-              ),
-            ),
-            child: const Icon(
-              Icons.image,
-              color: AppColors.textSecondary,
-              size: 32,
-            ),
-          ),
-          const SizedBox(height: 8),
-          // Product name
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8.0),
-            child: Text(
-              product.name,
-              style: AppTextStyles.caption.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          const SizedBox(height: 4),
-          // Price
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8.0),
-            child: Text(
-              product.price == 0 ? '0 đồng' : '${product.price} VND',
-              style: AppTextStyles.caption.copyWith(
-                color: AppColors.primaryTeal,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          const SizedBox(height: 4),
-          // Quantity
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8.0),
-            child: Text(
-              'Còn ${product.quantity} sản phẩm',
-              style: AppTextStyles.caption.copyWith(
-                color: AppColors.textSecondary,
-                fontSize: 11,
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 

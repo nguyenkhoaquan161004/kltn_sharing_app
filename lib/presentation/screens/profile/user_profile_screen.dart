@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../../../../core/constants/app_colors.dart';
+import 'package:kltn_sharing_app/core/constants/app_routes.dart';
+import '../../../../core/theme/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../../../../data/mock_data.dart';
 import 'widgets/profile_header.dart';
@@ -105,7 +106,12 @@ class _UserProfileScreenState extends State<UserProfileScreen>
               leading: IconButton(
                 icon:
                     const Icon(Icons.arrow_back, color: AppColors.textPrimary),
-                onPressed: () => context.pop(),
+                onPressed: () => {
+                  if (context.canPop())
+                    {context.pop()}
+                  else
+                    {context.go(AppRoutes.home)}
+                },
               ),
               actions: [
                 IconButton(
