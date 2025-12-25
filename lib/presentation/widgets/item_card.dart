@@ -65,7 +65,10 @@ class _ItemCardState extends State<ItemCard> {
     return GestureDetector(
       onTap: widget.onTap ??
           () {
-            context.push('/item/${widget.item.itemId}');
+            // Use UUID string (itemId_str) if available, otherwise fallback to itemId
+            final itemId =
+                widget.item.itemId_str ?? widget.item.itemId.toString();
+            context.push('/item/$itemId');
           },
       child: Container(
         decoration: BoxDecoration(
@@ -86,22 +89,50 @@ class _ItemCardState extends State<ItemCard> {
             // Image with tags overlay
             Stack(
               children: [
-                // Image placeholder
+                // Image placeholder or actual image
                 Container(
                   height: 120,
+                  width: double.infinity,
                   decoration: BoxDecoration(
                     borderRadius: const BorderRadius.vertical(
                       top: Radius.circular(12),
                     ),
                     color: Colors.grey[200],
                   ),
-                  child: Center(
-                    child: Icon(
-                      Icons.image,
-                      size: 40,
-                      color: Colors.grey[400],
-                    ),
-                  ),
+                  child: widget.item.image != null &&
+                          widget.item.image!.isNotEmpty
+                      ? Image.network(
+                          widget.item.image!,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Center(
+                              child: Icon(
+                                Icons.image_not_supported,
+                                size: 40,
+                                color: Colors.grey[400],
+                              ),
+                            );
+                          },
+                          loadingBuilder: (context, child, loadingProgress) {
+                            if (loadingProgress == null) return child;
+                            return Center(
+                              child: CircularProgressIndicator(
+                                value: loadingProgress.expectedTotalBytes !=
+                                        null
+                                    ? loadingProgress.cumulativeBytesLoaded /
+                                        loadingProgress.expectedTotalBytes!
+                                    : null,
+                              ),
+                            );
+                          },
+                        )
+                      : Center(
+                          child: Icon(
+                            Icons.image,
+                            size: 40,
+                            color: Colors.grey[400],
+                          ),
+                        ),
                 ),
 
                 // Free tag at top left (if price is 0) and Time remaining at top right
@@ -187,7 +218,10 @@ class _ItemCardState extends State<ItemCard> {
 
                     // Category
                     Text(
-                      MockData.getCategoryById(widget.item.categoryId)?.name ??
+                      widget.item.categoryName ??
+                          MockData.getCategoryById(
+                                  widget.item.categoryId.hashCode)
+                              ?.name ??
                           'Khác',
                       style: TextStyle(
                         fontSize: 10,

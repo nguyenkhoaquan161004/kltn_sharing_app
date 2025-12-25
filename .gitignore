@@ -41,3 +41,8 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+# Configuration files with sensitive data
+lib/config/cloudinary_config.dart
+lib/config/firebase_config.dart
+.env
+.env.local

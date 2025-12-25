@@ -437,7 +437,6 @@ class _ProfileProductsTabState extends State<ProfileProductsTab> {
               ],
             ),
             const SizedBox(height: 20),
-
             // Description
             Text(
               'Mô tả',
@@ -445,7 +444,7 @@ class _ProfileProductsTabState extends State<ProfileProductsTab> {
             ),
             const SizedBox(height: 8),
             Text(
-              item.description,
+              item.description ?? '',
               style: AppTextStyles.bodySmall,
               maxLines: 5,
               overflow: TextOverflow.ellipsis,

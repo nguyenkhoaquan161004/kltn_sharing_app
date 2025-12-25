@@ -76,7 +76,7 @@ class _CreateProductModalState extends State<CreateProductModal> {
           status: 'available',
           categoryId: int.parse(_selectedCategory),
           locationId: 1, // Default location
-          expirationDate: _expirationDate,
+          expiryDate: _expirationDate,
           createdAt: DateTime.now(),
           price: double.parse(_priceController.text),
         );

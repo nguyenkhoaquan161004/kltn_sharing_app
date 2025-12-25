@@ -1,14 +1,21 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/constants/app_routes.dart';
 import '../../../data/models/product_model.dart';
 import '../../../data/models/item_model.dart';
+import '../../../data/providers/item_provider.dart';
+import '../../../data/models/item_response_model.dart';
+import '../../../data/models/cart_request_model.dart';
+import '../../../data/services/cart_api_service.dart';
+import '../../../data/providers/auth_provider.dart';
 import '../../../data/mock_data.dart';
 import 'widgets/product_image_carousel.dart';
 import 'widgets/order_request_modal.dart';
+import 'widgets/add_to_cart_modal.dart';
 import 'widgets/expandable_description.dart';
 import '../../widgets/item_card.dart';
 
@@ -32,8 +39,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   Timer? _timer;
   late Duration _remainingTime;
 
-  // Mock product data
-  late ProductModel _product;
+  // Product data
+  ProductModel? _product;
+  ItemDto? _itemDto;
+  bool _isLoading = true;
+  String? _errorMessage;
 
   // Mock related products
   late List<ItemModel> _relatedProducts;
@@ -44,178 +54,91 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     _loadProduct();
   }
 
-  void _loadProduct() {
+  Future<void> _loadProduct() async {
     try {
-      int productId = int.parse(widget.productId);
-      // Try to find product in MockData
-      ItemModel? mockItem = MockData.getItemById(productId);
+      final itemProvider = context.read<ItemProvider>();
+      final itemDto = await itemProvider.getItemById(widget.productId);
 
-      if (mockItem != null) {
-        // Found in MockData - use real data
-        final user = MockData.users.firstWhere(
-          (u) => u.userId == mockItem.userId,
-          orElse: () => MockData.users[0],
-        );
-
-        _product = ProductModel(
-          id: mockItem.itemId.toString(),
-          name: mockItem.name,
-          description: mockItem.description,
-          price: mockItem.price,
-          images: [
-            'https://via.placeholder.com/500x500?text=Product+Image+1',
-            'https://via.placeholder.com/500x500?text=Product+Image+2',
-            'https://via.placeholder.com/500x500?text=Product+Image+3',
-          ],
-          category:
-              MockData.getCategoryById(mockItem.categoryId)?.name ?? 'Khác',
-          quantity: mockItem.quantity,
-          interestedCount: 0,
-          expiryDate: mockItem.expirationDate ??
-              DateTime.now().add(const Duration(hours: 12)),
-          createdAt: mockItem.createdAt,
-          owner: UserInfo(
-            id: user.userId.toString(),
-            name: user.name,
-            avatar: user.avatar ?? '',
-            productsShared: MockData.getItemsByUserId(user.userId).length,
-          ),
-          isFree: mockItem.price == 0,
-        );
+      if (itemDto != null) {
+        setState(() {
+          _itemDto = itemDto;
+          _product = _convertDtoToProduct(itemDto);
+          _isLoading = false;
+          _remainingTime = _product!.remainingTime;
+        });
+        _startTimer();
       } else {
-        // Use fallback mock data
-        final defaultUser = MockData.users[0];
-        _product = ProductModel(
-          id: widget.productId,
-          name: 'Giày Nike Air Max',
-          description:
-              '''Giày Nike Air Max 90 chính hãng 100%, tình trạng như mới, mới mua được 2 tháng, chỉ mang 2 lần. Chất liệu cao cấp, đế bền, thoáng khí tốt. Phù hợp cho những ai yêu thích thể thao hoặc đi casual hàng ngày.
-
-Thông tin chi tiết sản phẩm:
-• Hãng: Nike chính hãng từ shop official
-• Model: Air Max 90
-• Kích cỡ: 42 (US 8.5)
-• Màu sắc: Trắng xám, bóng bẩy
-• Tình trạng: Như mới, 99% không có lỗi
-• Số lần mang: Chỉ 2 lần
-• Đế: Bền chắc, không trầy xước
-• Chất liệu: Canvas + Leather cao cấp
-• Thoáng khí: Cực tốt, thích hợp đi quanh năm
-• Đi kèm: Hộp nguyên bản, túi bụi, giấy tờ đầy đủ
-
-Lý do chia sẻ:
-Giày được tặng nhân dịp sinh nhật nhưng mình không có nhu cầu sử dụng nhiều vì công việc thường xuyên phải mang giày tây chính thức. Do vậy mình muốn chia sẻ để bạn nào thích sneaker có cơ hội sử dụng.
-
-Tình trạng chi tiết:
-- Mặt giày không bị bẩn hay dơ
-- Sợi chỉ không bị lỏng hay nát
-- Đế ngoài vẫn cứng chắc, không mềm
-- Lót giày sạch sẽ, mùi hương tự nhiên
-- Dây giày không bị sờn
-
-Hướng dẫn bảo quản:
-Để giữ giày lâu bền, nên rửa bằng nước lạnh với xà phòng nhẹ, không nên giặt máy hoặc ngâm nước lâu. Sau khi rửa, phơi khô tự nhiên ở nơi thoáng mát.
-
-Liên hệ:
-Bạn nào quan tâm có thể liên hệ để xem thực tế hoặc chat hỏi thêm thông tin. Mình ở quận 1, TP.HCM, có thể gặp trực tiếp hoặc giao hàng gần đây. Giờ làm việc từ 8h-17h hàng ngày.''',
-          price: 0,
-          images: [
-            'https://via.placeholder.com/500x500?text=Giay+Nike+1',
-            'https://via.placeholder.com/500x500?text=Giay+Nike+2',
-            'https://via.placeholder.com/500x500?text=Giay+Nike+3',
-            'https://via.placeholder.com/500x500?text=Giay+Nike+4',
-          ],
-          category: 'Thể thao',
-          quantity: 1,
-          interestedCount: 12,
-          expiryDate: DateTime.now()
-              .add(const Duration(hours: 12, minutes: 32, seconds: 34)),
-          createdAt: DateTime.now(),
-          owner: UserInfo(
-            id: defaultUser.userId.toString(),
-            name: defaultUser.name,
-            avatar: defaultUser.avatar ?? '',
-            productsShared:
-                MockData.getItemsByUserId(defaultUser.userId).length,
-          ),
-          isFree: true,
-        );
+        setState(() {
+          _isLoading = false;
+          _errorMessage =
+              itemProvider.errorMessage ?? 'Không thể tải dữ liệu sản phẩm';
+        });
       }
     } catch (e) {
-      print('DEBUG: Error loading product: $e');
-      // Fallback
-      final defaultUser = MockData.users[0];
-      _product = ProductModel(
-        id: widget.productId,
-        name: 'Giày Nike Air Max',
-        description:
-            '''Giày Nike Air Max 90 chính hãng 100%, tình trạng như mới, mới mua được 2 tháng, chỉ mang 2 lần. Chất liệu cao cấp, đế bền, thoáng khí tốt. Phù hợp cho những ai yêu thích thể thao hoặc đi casual hàng ngày.
-
-Thông tin chi tiết sản phẩm:
-• Hãng: Nike chính hãng từ shop official
-• Model: Air Max 90
-• Kích cỡ: 42 (US 8.5)
-• Màu sắc: Trắng xám, bóng bẩy
-• Tình trạng: Như mới, 99% không có lỗi
-• Số lần mang: Chỉ 2 lần
-• Đế: Bền chắc, không trầy xước
-• Chất liệu: Canvas + Leather cao cấp
-• Thoáng khí: Cực tốt, thích hợp đi quanh năm
-• Đi kèm: Hộp nguyên bản, túi bụi, giấy tờ đầy đủ
-
-Lý do chia sẻ:
-Giày được tặng nhân dịp sinh nhật nhưng mình không có nhu cầu sử dụng nhiều vì công việc thường xuyên phải mang giày tây chính thức. Do vậy mình muốn chia sẻ để bạn nào thích sneaker có cơ hội sử dụng.
-
-Tình trạng chi tiết:
-- Mặt giày không bị bẩn hay dơ
-- Sợi chỉ không bị lỏng hay nát
-- Đế ngoài vẫn cứng chắc, không mềm
-- Lót giày sạch sẽ, mùi hương tự nhiên
-- Dây giày không bị sờn
-
-Hướng dẫn bảo quản:
-Để giữ giày lâu bền, nên rửa bằng nước lạnh với xà phòng nhẹ, không nên giặt máy hoặc ngâm nước lâu. Sau khi rửa, phơi khô tự nhiên ở nơi thoáng mát.
-
-Liên hệ:
-Bạn nào quan tâm có thể liên hệ để xem thực tế hoặc chat hỏi thêm thông tin. Mình ở quận 1, TP.HCM, có thể gặp trực tiếp hoặc giao hàng gần đây. Giờ làm việc từ 8h-17h hàng ngày.''',
-        price: 0,
-        images: [
-          'https://via.placeholder.com/500x500?text=Giay+Nike+1',
-          'https://via.placeholder.com/500x500?text=Giay+Nike+2',
-          'https://via.placeholder.com/500x500?text=Giay+Nike+3',
-          'https://via.placeholder.com/500x500?text=Giay+Nike+4',
-        ],
-        category: 'Thể thao',
-        quantity: 1,
-        interestedCount: 12,
-        expiryDate: DateTime.now()
-            .add(const Duration(hours: 12, minutes: 32, seconds: 34)),
-        createdAt: DateTime.now(),
-        owner: UserInfo(
-          id: defaultUser.userId.toString(),
-          name: defaultUser.name,
-          avatar: defaultUser.avatar ?? '',
-          productsShared: MockData.getItemsByUserId(defaultUser.userId).length,
-        ),
-        isFree: true,
-      );
+      setState(() {
+        _isLoading = false;
+        _errorMessage = e.toString();
+      });
+      print('Error loading product: $e');
     }
 
-    _remainingTime = _product.remainingTime;
-    _startTimer();
+    // Load related products (from same category or all)
+    _loadRelatedProducts();
+  }
 
-    // Get 6 related products from MockData (items from same category or just first 6)
-    _relatedProducts = MockData.items
-        .where((item) => item.itemId.toString() != widget.productId)
-        .take(6)
-        .toList();
+  void _loadRelatedProducts() {
+    try {
+      _relatedProducts = MockData.items
+          .where((item) => item.itemId.toString() != widget.productId)
+          .take(6)
+          .toList();
+    } catch (e) {
+      _relatedProducts = [];
+    }
+  }
+
+  ProductModel _convertDtoToProduct(ItemDto itemDto) {
+    // Try to find user info in MockData
+    final user = MockData.users.firstWhere(
+      (u) => u.userId.toString() == itemDto.userId,
+      orElse: () => MockData.users[0],
+    );
+
+    // Get category name from MockData or use the one from API
+    final categoryName = itemDto.categoryName ??
+        MockData.getCategoryById(itemDto.categoryId.hashCode)?.name ??
+        'Khác';
+
+    return ProductModel(
+      id: itemDto.id,
+      name: itemDto.name,
+      description: itemDto.description ?? '',
+      price: itemDto.price?.toDouble() ?? 0.0,
+      images: [
+        itemDto.imageUrl ?? 'https://via.placeholder.com/500x500?text=No+Image',
+      ],
+      category: categoryName,
+      quantity: itemDto.quantity ?? 1,
+      interestedCount: 0,
+      expiryDate:
+          itemDto.expiryDate ?? DateTime.now().add(const Duration(days: 30)),
+      createdAt: itemDto.createdAt ?? DateTime.now(),
+      owner: UserInfo(
+        id: user.userId.toString(),
+        name: user.name,
+        avatar: user.avatar ?? '',
+        productsShared: MockData.getItemsByUserId(user.userId).length,
+      ),
+      isFree: (itemDto.price ?? 0) == 0,
+    );
   }
 
   void _startTimer() {
+    if (_product == null) return;
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (mounted) {
         setState(() {
-          _remainingTime = _product.expiryDate.difference(DateTime.now());
+          _remainingTime = _product!.expiryDate.difference(DateTime.now());
           if (_remainingTime.isNegative) timer.cancel();
         });
       }
@@ -237,16 +160,87 @@ Bạn nào quan tâm có thể liên hệ để xem thực tế hoặc chat hỏ
   }
 
   void _showOrderModal() {
+    if (_product == null) return;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => OrderRequestModal(product: _product),
+      builder: (context) => OrderRequestModal(product: _product!),
+    );
+  }
+
+  void _showAddToCartModal() {
+    if (_product == null || _itemDto == null) return;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => AddToCartModal(
+        item: _itemDto!,
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    // Show loading state
+    if (_isLoading) {
+      return Scaffold(
+        backgroundColor: AppColors.backgroundWhite,
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
+            onPressed: () => context.pop(),
+          ),
+        ),
+        body: const Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    // Show error state
+    if (_errorMessage != null || _product == null) {
+      return Scaffold(
+        backgroundColor: AppColors.backgroundWhite,
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
+            onPressed: () => context.pop(),
+          ),
+        ),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline, size: 64, color: Colors.grey),
+              const SizedBox(height: 16),
+              Text(
+                'Không thể tải sản phẩm',
+                style: AppTextStyles.h4,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _errorMessage ?? 'Vui lòng thử lại',
+                style: AppTextStyles.bodyMedium,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: _loadProduct,
+                child: const Text('Thử lại'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Show product details
     return Scaffold(
       backgroundColor: AppColors.backgroundWhite,
       body: CustomScrollView(
@@ -270,7 +264,7 @@ Bạn nào quan tâm có thể liên hệ để xem thực tế hoặc chat hỏ
               onPressed: () => context.pop(),
             ),
             flexibleSpace: FlexibleSpaceBar(
-              background: ProductImageCarousel(images: _product.images),
+              background: ProductImageCarousel(images: _product!.images),
             ),
           ),
 
@@ -282,12 +276,12 @@ Bạn nào quan tâm có thể liên hệ để xem thực tế hoặc chat hỏ
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Product name
-                  Text(_product.name, style: AppTextStyles.h2),
+                  Text(_product!.name, style: AppTextStyles.h2),
                   const SizedBox(height: 8),
 
                   // Price
                   Text(
-                    _product.formattedPrice,
+                    _product!.formattedPrice,
                     style: AppTextStyles.priceLarge,
                   ),
                   const SizedBox(height: 16),
@@ -326,8 +320,9 @@ Bạn nào quan tâm có thể liên hệ để xem thực tế hoặc chat hỏ
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildStatItem('${_product.quantity}', 'Số lượng'),
-        _buildStatItem('${_product.interestedCount}', 'Số người muốn nhận'),
+        _buildStatItem('${_product?.quantity ?? 0}', 'Số lượng'),
+        _buildStatItem(
+            '${_product?.interestedCount ?? 0}', 'Số người muốn nhận'),
         _buildStatItem(_formattedTime, 'Thời gian còn lại'),
       ],
     );
@@ -356,7 +351,7 @@ Bạn nào quan tâm có thể liên hệ để xem thực tế hoặc chat hỏ
       ),
       child: Column(
         children: [
-          _buildInfoRow('Phân loại', _product.category),
+          _buildInfoRow('Phân loại', _product?.category ?? 'Khác'),
           const Divider(height: 24),
           _buildInfoRow('Hạn sử dụng', 'Không giới hạn'),
         ],
@@ -378,10 +373,13 @@ Bạn nào quan tâm có thể liên hệ để xem thực tế hoặc chat hỏ
   }
 
   Widget _buildOwnerSection() {
+    if (_product == null) {
+      return const SizedBox.shrink();
+    }
     return GestureDetector(
       onTap: () {
         // Navigate to owner profile
-        context.push(AppRoutes.getUserProfileRoute(_product.owner.id));
+        context.push(AppRoutes.getUserProfileRoute(_product!.owner.id));
       },
       child: Container(
         padding: const EdgeInsets.all(16),
@@ -412,12 +410,12 @@ Bạn nào quan tâm có thể liên hệ để xem thực tế hoặc chat hỏ
                 children: [
                   const Text('Người cho', style: AppTextStyles.caption),
                   Text(
-                    _product.owner.name,
+                    _product!.owner.name,
                     style: AppTextStyles.bodyLarge
                         .copyWith(fontWeight: FontWeight.w600),
                   ),
                   Text(
-                    '${_product.owner.productsShared} sản phẩm đã cho',
+                    '${_product!.owner.productsShared} sản phẩm đã cho',
                     style: AppTextStyles.caption,
                   ),
                 ],
@@ -433,7 +431,7 @@ Bạn nào quan tâm có thể liên hệ để xem thực tế hoặc chat hỏ
 
   Widget _buildDescriptionSection() {
     return ExpandableDescription(
-      text: _product.description,
+      text: _product?.description ?? '',
       maxLines: 3,
     );
   }
@@ -504,6 +502,30 @@ Bạn nào quan tâm có thể liên hệ để xem thực tế hoặc chat hỏ
               child: IconButton(
                 icon: const Icon(Icons.chat_bubble_outline),
                 onPressed: () {},
+              ),
+            ),
+            const SizedBox(width: 12),
+
+            // Add to cart button
+            Expanded(
+              child: GestureDetector(
+                onTap: _showAddToCartModal,
+                child: Container(
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: Colors.blue,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Center(
+                    child: Text(
+                      'Thêm vào giỏ',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
               ),
             ),
             const SizedBox(width: 12),

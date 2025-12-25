@@ -5,8 +5,9 @@ import '../../../../data/mock_data.dart';
 import '../../../widgets/item_card.dart';
 import 'profile_stats.dart';
 import 'scoring_mechanism_modal.dart';
+import 'edit_profile_modal.dart';
 
-class ProfileInfoTab extends StatelessWidget {
+class ProfileInfoTab extends StatefulWidget {
   final Map<String, dynamic> userData;
   final bool isOwnProfile;
   final int? userId;
@@ -19,6 +20,11 @@ class ProfileInfoTab extends StatelessWidget {
   });
 
   @override
+  State<ProfileInfoTab> createState() => _ProfileInfoTabState();
+}
+
+class _ProfileInfoTabState extends State<ProfileInfoTab> {
+  @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
@@ -30,8 +36,8 @@ class ProfileInfoTab extends StatelessWidget {
               Expanded(
                 flex: 2,
                 child: ProfileStats(
-                  productsShared: userData['productsShared'],
-                  productsReceived: userData['productsReceived'],
+                  productsShared: widget.userData['productsShared'],
+                  productsReceived: widget.userData['productsReceived'],
                 ),
               ),
               const SizedBox(width: 16),
@@ -63,7 +69,7 @@ class ProfileInfoTab extends StatelessWidget {
           const SizedBox(height: 32),
 
           // Content based on profile type
-          if (isOwnProfile)
+          if (widget.isOwnProfile)
             // Own profile: Show user info
             _buildOwnProfileContent()
           else
@@ -107,7 +113,22 @@ class ProfileInfoTab extends StatelessWidget {
                   size: 20,
                 ),
                 onPressed: () {
-                  // TODO: Navigate to edit profile
+                  showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    builder: (context) => EditProfileModal(
+                      currentName: widget.userData['name'],
+                      currentEmail: widget.userData['email'],
+                      currentAddress: widget.userData['address'],
+                      currentAvatar: widget.userData['avatar'],
+                      onProfileUpdated: () {
+                        // Refresh parent widget to update UI
+                        setState(() {
+                          // Trigger rebuild
+                        });
+                      },
+                    ),
+                  );
                 },
               ),
             ],
@@ -117,21 +138,21 @@ class ProfileInfoTab extends StatelessWidget {
           // Name
           _buildInfoRow(
             label: 'Tên người dùng',
-            value: userData['name'] ?? '',
+            value: widget.userData['name'] ?? '',
           ),
           const SizedBox(height: 16),
 
           // Email
           _buildInfoRow(
             label: 'Email',
-            value: userData['email'] ?? '',
+            value: widget.userData['email'] ?? '',
           ),
           const SizedBox(height: 16),
 
           // Address
           _buildInfoRow(
             label: 'Địa chỉ',
-            value: userData['address'] ?? '',
+            value: widget.userData['address'] ?? '',
           ),
         ],
       ),
@@ -140,8 +161,8 @@ class ProfileInfoTab extends StatelessWidget {
 
   Widget _buildOtherUserProfileContent() {
     // Get products for this user
-    final userProducts = userId != null
-        ? MockData.items.where((item) => item.userId == userId).toList()
+    final userProducts = widget.userId != null
+        ? MockData.items.where((item) => item.userId == widget.userId).toList()
         : [];
 
     // Split products: free (0 đồng) and paid (suggested)

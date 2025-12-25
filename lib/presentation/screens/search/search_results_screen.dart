@@ -1,17 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/constants/app_routes.dart';
 import '../../../data/models/item_model.dart';
-import '../../../data/mock_data.dart';
+import '../../../data/models/item_response_model.dart';
+import '../../../data/services/item_api_service.dart';
+import '../../../data/providers/auth_provider.dart';
 import '../../widgets/item_card.dart';
 
 class SearchResultsScreen extends StatefulWidget {
   final String keyword;
+  final String? category;
 
   const SearchResultsScreen({
     super.key,
     this.keyword = '',
+    this.category,
   });
 
   @override
@@ -19,9 +24,9 @@ class SearchResultsScreen extends StatefulWidget {
 }
 
 class _SearchResultsScreenState extends State<SearchResultsScreen> {
-  late List<ItemModel> _searchResults = [];
+  late List<ItemDto> _searchResults = [];
   TextEditingController _searchKeywordController = TextEditingController();
-  String _sortBy = 'suggested'; // suggested (default), newest
+  String _sortBy = 'createdAt'; // createdAt (newest), or other sort options
   String _filterByPrice = 'all'; // all, free, paid
   String _filterByCategory = 'all'; // all, or categoryId
 
@@ -32,12 +37,53 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
   TextEditingController _maxPriceController =
       TextEditingController(text: '1000000');
 
+  bool _isLoading = true;
+  String? _errorMessage;
+
   @override
   void initState() {
     super.initState();
     _searchKeywordController.text = widget.keyword;
-    // Load all available items
-    _searchResults = MockData.items;
+    if (widget.category != null && widget.category!.isNotEmpty) {
+      _filterByCategory = widget.category!;
+    }
+    _loadItems();
+  }
+
+  Future<void> _loadItems() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final authProvider = context.read<AuthProvider>();
+      final itemService = context.read<ItemApiService>();
+
+      if (authProvider.accessToken != null) {
+        itemService.setAuthToken(authProvider.accessToken!);
+      }
+
+      final response = await itemService.searchItems(
+        search: widget.keyword.isNotEmpty ? widget.keyword : null,
+        category: _filterByCategory != 'all' ? _filterByCategory : null,
+        minPrice: _minPrice,
+        maxPrice: _maxPrice,
+        sortBy: _sortBy,
+        sortDirection: 'DESC',
+      );
+
+      setState(() {
+        _searchResults = response.content;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Lỗi: ${e.toString()}';
+        _isLoading = false;
+      });
+      print('[SearchResults] Error: $e');
+    }
   }
 
   @override
@@ -98,139 +144,118 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
           },
         ),
       ),
-      body: Column(
-        children: [
-          const SizedBox(height: 8),
-          // Sort and Filter header
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                // Sort button
-                GestureDetector(
-                  onTap: () {
-                    showModalBottomSheet(
-                      context: context,
-                      shape: const RoundedRectangleBorder(
-                        borderRadius:
-                            BorderRadius.vertical(top: Radius.circular(20)),
-                      ),
-                      builder: (context) => _buildFilterModal(),
-                    );
-                  },
-                  child: Row(
+      body: _isLoading
+          ? const Center(
+              child: CircularProgressIndicator(),
+            )
+          : _errorMessage != null
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Text(
-                        'Sort By: ',
-                        style: TextStyle(
-                          fontSize: 16,
+                      const Icon(Icons.error, color: Colors.red, size: 48),
+                      const SizedBox(height: 16),
+                      Text(_errorMessage!),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: _loadItems,
+                        child: const Text('Tải lại'),
+                      ),
+                    ],
+                  ),
+                )
+              : Column(
+                  children: [
+                    const SizedBox(height: 8),
+                    // Sort and Filter header
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 8),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          // Sort button
+                          GestureDetector(
+                            onTap: () {
+                              showModalBottomSheet(
+                                context: context,
+                                shape: const RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.vertical(
+                                      top: Radius.circular(20)),
+                                ),
+                                builder: (context) => _buildFilterModal(),
+                              );
+                            },
+                            child: Row(
+                              children: [
+                                const Text(
+                                  'Sort By: ',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w500,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                ),
+                                Text(
+                                  _getSortLabel(),
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.primaryTeal,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          // Filter button
+                          GestureDetector(
+                            onTap: () {
+                              showModalBottomSheet(
+                                context: context,
+                                shape: const RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.vertical(
+                                      top: Radius.circular(20)),
+                                ),
+                                builder: (context) => _buildFilterModal(),
+                              );
+                            },
+                            child: const Icon(
+                              Icons.tune,
+                              color: AppColors.textPrimary,
+                              size: 28,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    // Results count
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Text(
+                        'Tìm thấy ${_searchResults.length} sản phẩm',
+                        style: const TextStyle(
+                          fontSize: 14,
                           fontWeight: FontWeight.w500,
                           color: AppColors.textSecondary,
                         ),
                       ),
-                      Text(
-                        _getSortLabel(),
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.primaryTeal,
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(height: 16),
+                    Expanded(
+                      child: _buildProductGrid(),
+                    ),
+                  ],
                 ),
-                // Filter button
-                GestureDetector(
-                  onTap: () {
-                    showModalBottomSheet(
-                      context: context,
-                      shape: const RoundedRectangleBorder(
-                        borderRadius:
-                            BorderRadius.vertical(top: Radius.circular(20)),
-                      ),
-                      builder: (context) => _buildFilterModal(),
-                    );
-                  },
-                  child: const Icon(
-                    Icons.tune,
-                    color: AppColors.textPrimary,
-                    size: 28,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 8),
-          // Results count
-          // Padding(
-          //   padding: const EdgeInsets.symmetric(horizontal: 16),
-          //   child: Text(
-          //     'Tìm thấy ${_getFilteredProducts().length} sản phẩm',
-          //     style: const TextStyle(
-          //       fontSize: 14,
-          //       fontWeight: FontWeight.w500,
-          //       color: AppColors.textSecondary,
-          //     ),
-          //   ),
-          // ),
-          // const SizedBox(height: 16),
-          Expanded(
-            child: _buildProductGrid(),
-          ),
-        ],
-      ),
     );
   }
 
   String _getSortLabel() {
-    return _sortBy == 'newest' ? 'Gần đây' : 'Đề xuất';
-  }
-
-  List<ItemModel> _getFilteredProducts() {
-    List<ItemModel> filtered = _searchResults;
-
-    // Apply keyword filter first
-    if (widget.keyword.isNotEmpty) {
-      filtered = filtered
-          .where((item) =>
-              item.name.toLowerCase().contains(widget.keyword.toLowerCase()))
-          .toList();
-    }
-
-    // Apply price type filter
-    if (_filterByPrice == 'free') {
-      filtered = filtered.where((item) => item.price == 0).toList();
-    } else if (_filterByPrice == 'paid') {
-      filtered = filtered.where((item) => item.price > 0).toList();
-    }
-
-    // Apply price range filter
-    filtered = filtered.where((item) {
-      final price = item.price.toDouble();
-      return price >= _minPrice && price <= _maxPrice;
-    }).toList();
-
-    // Apply category filter
-    if (_filterByCategory != 'all') {
-      filtered = filtered
-          .where((item) => item.categoryId.toString() == _filterByCategory)
-          .toList();
-    }
-
-    // Apply sort
-    if (_sortBy == 'newest') {
-      filtered.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-    }
-    // 'suggested' (default) = no sort, keep original order
-
-    return filtered;
+    return _sortBy == 'createdAt' ? 'Mới nhất' : 'Đề xuất';
   }
 
   Widget _buildProductGrid() {
-    final filtered = _getFilteredProducts();
-
-    if (filtered.isEmpty) {
+    if (_searchResults.isEmpty) {
       return const Center(
         child: Text('Không tìm thấy sản phẩm nào'),
       );
@@ -244,12 +269,35 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
         crossAxisSpacing: 12,
         mainAxisSpacing: 12,
       ),
-      itemCount: filtered.length,
+      itemCount: _searchResults.length,
       itemBuilder: (context, index) {
-        final item = filtered[index];
-        return ItemCard(
-          item: item,
-          showTimeRemaining: true,
+        final dto = _searchResults[index];
+        // Convert ItemDto to ItemModel for display
+        final item = ItemModel(
+          itemId: int.tryParse(dto.id) ?? 0,
+          userId: int.tryParse(dto.userId) ?? 0,
+          name: dto.name,
+          description: dto.description,
+          quantity: 1,
+          status: dto.status,
+          categoryId: 0,
+          locationId: 0,
+          expiryDate: null,
+          createdAt: dto.createdAt,
+          price: dto.price ?? 0,
+        );
+
+        return GestureDetector(
+          onTap: () {
+            context.pushNamed(
+              'product-detail',
+              pathParameters: {'id': dto.id},
+            );
+          },
+          child: ItemCard(
+            item: item,
+            showTimeRemaining: false,
+          ),
         );
       },
     );
@@ -283,7 +331,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                       GestureDetector(
                         onTap: () {
                           setModalState(() {
-                            _sortBy = 'suggested';
+                            _sortBy = 'createdAt';
                             _filterByPrice = 'all';
                             _filterByCategory = 'all';
                             _minPrice = 0;
@@ -292,6 +340,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                             _maxPriceController.text = '1000000';
                           });
                           setState(() {});
+                          _loadItems();
                         },
                         child: const Text(
                           'Đặt lại',
@@ -333,9 +382,10 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                             child: GestureDetector(
                               onTap: () {
                                 setModalState(() {
-                                  _sortBy = 'newest';
+                                  _sortBy = 'createdAt';
                                 });
                                 setState(() {});
+                                _loadItems();
                               },
                               child: Container(
                                 padding: const EdgeInsets.symmetric(
@@ -343,11 +393,11 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                                   vertical: 10,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: _sortBy == 'newest'
+                                  color: _sortBy == 'createdAt'
                                       ? AppColors.primaryTeal
                                       : Colors.transparent,
                                   border: Border.all(
-                                    color: _sortBy == 'newest'
+                                    color: _sortBy == 'createdAt'
                                         ? AppColors.primaryTeal
                                         : const Color(0xFFCCCCCC),
                                     width: 1.5,
@@ -355,12 +405,12 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                                   borderRadius: BorderRadius.circular(20),
                                 ),
                                 child: Text(
-                                  'Gần đây',
+                                  'Mới nhất',
                                   textAlign: TextAlign.center,
                                   style: TextStyle(
                                     fontSize: 14,
                                     fontWeight: FontWeight.w600,
-                                    color: _sortBy == 'newest'
+                                    color: _sortBy == 'createdAt'
                                         ? Colors.white
                                         : AppColors.primaryTeal,
                                   ),
@@ -373,9 +423,10 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                             child: GestureDetector(
                               onTap: () {
                                 setModalState(() {
-                                  _sortBy = 'suggested';
+                                  _sortBy = 'default';
                                 });
                                 setState(() {});
+                                _loadItems();
                               },
                               child: Container(
                                 padding: const EdgeInsets.symmetric(
@@ -383,11 +434,11 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                                   vertical: 10,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: _sortBy == 'suggested'
+                                  color: _sortBy == 'default'
                                       ? AppColors.primaryTeal
                                       : Colors.transparent,
                                   border: Border.all(
-                                    color: _sortBy == 'suggested'
+                                    color: _sortBy == 'default'
                                         ? AppColors.primaryTeal
                                         : const Color(0xFFCCCCCC),
                                     width: 1.5,
@@ -490,9 +541,15 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                         runSpacing: 8,
                         children: [
                           _buildCategoryPill('all', 'Tất cả', setModalState),
-                          for (final category in MockData.categories)
-                            _buildCategoryPill(category.categoryId.toString(),
-                                category.name, setModalState),
+                          _buildCategoryPill('Sách', 'Sách', setModalState),
+                          _buildCategoryPill(
+                              'Quần áo', 'Quần áo', setModalState),
+                          _buildCategoryPill(
+                              'Thực phẩm', 'Thực phẩm', setModalState),
+                          _buildCategoryPill(
+                              'Nội thất', 'Nội thất', setModalState),
+                          _buildCategoryPill(
+                              'Thể thao', 'Thể thao', setModalState),
                         ],
                       ),
                     ],
@@ -515,6 +572,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
           _filterByCategory = value;
         });
         setState(() {});
+        _loadItems();
       },
       child: Container(
         padding: const EdgeInsets.symmetric(

@@ -110,10 +110,16 @@ class AppRouter {
       ),
       GoRoute(
         path: AppRoutes.emailVerification,
-        pageBuilder: (context, state) => _buildPageWithTransition(
-            child: const EmailVerificationScreen(),
+        pageBuilder: (context, state) {
+          final email = state.extra as String?;
+          return _buildPageWithTransition(
+            child: EmailVerificationScreen(
+              email: email ?? '',
+            ),
             state: state,
-            name: 'email-verification'),
+            name: 'email-verification',
+          );
+        },
         name: 'email-verification',
       ),
       GoRoute(
