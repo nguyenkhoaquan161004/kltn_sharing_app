@@ -133,8 +133,8 @@ class _HomeScreenState extends State<HomeScreen>
           child: RefreshIndicator(
             onRefresh: () => recommendationProvider.loadRecommendations(),
             child: GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
+              shrinkWrap: false,
+              physics: const AlwaysScrollableScrollPhysics(),
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 2,
                 crossAxisSpacing: 12,
@@ -198,8 +198,8 @@ class _HomeScreenState extends State<HomeScreen>
             onRefresh: () =>
                 recommendationProvider.loadTrendingRecommendations(),
             child: GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
+              shrinkWrap: false,
+              physics: const AlwaysScrollableScrollPhysics(),
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 2,
                 crossAxisSpacing: 12,

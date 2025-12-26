@@ -239,7 +239,7 @@ class _ItemCardState extends State<ItemCard> {
                       style: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.primaryTeal,
+                        color: AppColors.primaryGreen,
                       ),
                     ),
 

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../../../../data/mock_data.dart';
+import '../../../../data/providers/user_provider.dart';
 import '../../../widgets/item_card.dart';
 import 'profile_stats.dart';
 import 'scoring_mechanism_modal.dart';
@@ -51,7 +53,7 @@ class _ProfileInfoTabState extends State<ProfileInfoTab> {
                     );
                   },
                   style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: AppColors.primaryTeal),
+                    side: const BorderSide(color: AppColors.primaryGreen),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10),
                     ),
@@ -120,12 +122,14 @@ class _ProfileInfoTabState extends State<ProfileInfoTab> {
                       currentName: widget.userData['name'],
                       currentEmail: widget.userData['email'],
                       currentAddress: widget.userData['address'],
+                      currentPhone: widget.userData['phone'],
                       currentAvatar: widget.userData['avatar'],
                       onProfileUpdated: () {
-                        // Refresh parent widget to update UI
-                        setState(() {
-                          // Trigger rebuild
-                        });
+                        // Reload user data from server
+                        if (mounted) {
+                          final userProvider = context.read<UserProvider>();
+                          userProvider.loadCurrentUser();
+                        }
                       },
                     ),
                   );
@@ -153,6 +157,13 @@ class _ProfileInfoTabState extends State<ProfileInfoTab> {
           _buildInfoRow(
             label: 'Địa chỉ',
             value: widget.userData['address'] ?? '',
+          ),
+          const SizedBox(height: 16),
+
+          // Phone
+          _buildInfoRow(
+            label: 'Số điện thoại',
+            value: widget.userData['phone'] ?? '',
           ),
         ],
       ),

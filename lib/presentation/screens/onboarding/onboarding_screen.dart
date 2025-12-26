@@ -136,7 +136,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         onPressed: _nextPage,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.white,
-                          foregroundColor: AppColors.primaryTeal,
+                          foregroundColor: AppColors.primaryGreen,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(16),
                           ),
@@ -147,7 +147,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                               ? 'Bắt đầu chia sẻ'
                               : 'Tiếp theo',
                           style: AppTextStyles.button.copyWith(
-                            color: AppColors.primaryTeal,
+                            color: AppColors.primaryGreen,
                           ),
                         ),
                       ),

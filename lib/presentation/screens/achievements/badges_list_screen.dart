@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
+import '../../../data/services/gamification_api_service.dart';
 
 class BadgesListScreen extends StatefulWidget {
   const BadgesListScreen({super.key});
@@ -11,95 +13,100 @@ class BadgesListScreen extends StatefulWidget {
 }
 
 class _BadgesListScreenState extends State<BadgesListScreen> {
-  // Mock badges data
-  late List<Map<String, dynamic>> _badges;
+  late GamificationApiService _gamificationApiService;
+  List<Map<String, dynamic>> _allBadges = [];
+  List<Map<String, dynamic>> _userBadges = [];
+  bool _isLoading = true;
+  String? _errorMessage;
 
   @override
   void initState() {
     super.initState();
-    _badges = [
-      // Unlocked badges
-      {
-        'id': '1',
-        'name': 'Bạn tốt bụng',
-        'description': 'Chia sẻ mà không cần tiền',
-        'icon': '💚',
-        'color': 'green',
-        'isUnlocked': true,
-        'unlockedDate': '20.10.2025',
+    _gamificationApiService = context.read<GamificationApiService>();
+    _loadBadges();
+  }
+
+  /// Load all badges and user's earned badges
+  Future<void> _loadBadges() async {
+    if (!mounted) return;
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      // Fetch all badges and user badges in parallel
+      final allBadgesResponse = _gamificationApiService.getAllBadges();
+      final userBadgesResponse = _gamificationApiService.getUserBadges();
+
+      final results = await Future.wait([
+        allBadgesResponse,
+        userBadgesResponse,
+      ]);
+
+      if (!mounted) return;
+
+      setState(() {
+        _allBadges = results[0] as List<Map<String, dynamic>>;
+        _userBadges = results[1] as List<Map<String, dynamic>>;
+        _isLoading = false;
+      });
+
+      print(
+          'DEBUG: Loaded ${_allBadges.length} all badges and ${_userBadges.length} user badges');
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _errorMessage = e.toString();
+        _isLoading = false;
+      });
+      print('DEBUG: Error loading badges: $e');
+    }
+  }
+
+  /// Check if a badge is earned by the user
+  bool _isBadgeEarned(dynamic badgeId) {
+    if (badgeId == null) return false;
+    return _userBadges.any((ub) {
+      final id = ub['badge_id'] ?? ub['badgeId'];
+      return id.toString() == badgeId.toString();
+    });
+  }
+
+  /// Get earned date for a badge
+  String? _getEarnedDate(dynamic badgeId) {
+    if (badgeId == null) return null;
+    final userBadge = _userBadges.firstWhere(
+      (ub) {
+        final id = ub['badge_id'] ?? ub['badgeId'];
+        return id.toString() == badgeId.toString();
       },
-      {
-        'id': '2',
-        'name': 'Người lãnh đạo',
-        'description': 'Giành được 500 điểm',
-        'icon': '👑',
-        'color': 'gold',
-        'isUnlocked': true,
-        'unlockedDate': '18.10.2025',
-      },
-      {
-        'id': '3',
-        'name': 'Sao sáng',
-        'description': 'Nhận 5 sao từ 10 người',
-        'icon': '⭐',
-        'color': 'blue',
-        'isUnlocked': true,
-        'unlockedDate': '10.10.2025',
-      },
-      {
-        'id': '4',
-        'name': 'Quân đội xanh',
-        'description': 'Hoàn thành 5 giao dịch',
-        'icon': '💪',
-        'color': 'teal',
-        'isUnlocked': true,
-        'unlockedDate': '05.10.2025',
-      },
-      // Locked badges
-      {
-        'id': '5',
-        'name': 'Huyền thoại',
-        'description': 'Đạt 2000 điểm',
-        'icon': '🏅',
-        'color': 'locked',
-        'isUnlocked': false,
-        'progress': '500/2000',
-      },
-      {
-        'id': '6',
-        'name': 'Người gây ảnh hưởng',
-        'description': 'Có 100 người theo dõi',
-        'icon': '📢',
-        'color': 'locked',
-        'isUnlocked': false,
-        'progress': '45/100',
-      },
-      {
-        'id': '7',
-        'name': 'Chuyên gia',
-        'description': 'Chia sẻ trong 5 danh mục khác nhau',
-        'icon': '🎓',
-        'color': 'locked',
-        'isUnlocked': false,
-        'progress': '2/5',
-      },
-      {
-        'id': '8',
-        'name': 'Vị thần',
-        'description': 'Được 100 người yêu thích',
-        'icon': '✨',
-        'color': 'locked',
-        'isUnlocked': false,
-        'progress': 'Chưa bắt đầu',
-      },
-    ];
+      orElse: () => {},
+    );
+    if (userBadge.isEmpty) return null;
+
+    final earnedAt = userBadge['earned_at'] ?? userBadge['earnedAt'];
+    if (earnedAt == null) return null;
+
+    try {
+      final date = DateTime.parse(earnedAt.toString());
+      return '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year}';
+    } catch (e) {
+      return null;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    // Separate unlocked and locked badges
-    final unlockedBadges = _badges.where((b) => b['isUnlocked']).toList();
-    final lockedBadges = _badges.where((b) => !b['isUnlocked']).toList();
+    // Separate earned and unearned badges
+    final earnedBadges = _allBadges
+        .where((b) => _isBadgeEarned(b['badge_id'] ?? b['badgeId']))
+        .toList();
+    final unearnedBadges = _allBadges
+        .where((b) => !_isBadgeEarned(b['badge_id'] ?? b['badgeId']))
+        .toList();
 
     return Scaffold(
       backgroundColor: AppColors.backgroundWhite,
@@ -115,114 +122,167 @@ class _BadgesListScreenState extends State<BadgesListScreen> {
           style: AppTextStyles.h3,
         ),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Stats
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppColors.backgroundGray,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  Column(
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _errorMessage != null
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        '${unlockedBadges.length}',
-                        style: AppTextStyles.h2.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                        'Lỗi tải danh hiệu',
+                        style: AppTextStyles.h4,
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 8),
                       Text(
-                        'Đã đạt được',
-                        style: AppTextStyles.caption,
+                        _errorMessage ?? 'Đã xảy ra lỗi',
+                        style: AppTextStyles.bodySmall,
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: _loadBadges,
+                        child: const Text('Thử lại'),
                       ),
                     ],
                   ),
-                  Column(
+                )
+              : SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        '${lockedBadges.length}',
-                        style: AppTextStyles.h2.copyWith(
-                          fontWeight: FontWeight.bold,
+                      // Stats
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: AppColors.backgroundGray,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceAround,
+                          children: [
+                            Column(
+                              children: [
+                                Text(
+                                  '${earnedBadges.length}',
+                                  style: AppTextStyles.h2.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Đã đạt được',
+                                  style: AppTextStyles.caption,
+                                ),
+                              ],
+                            ),
+                            Column(
+                              children: [
+                                Text(
+                                  '${unearnedBadges.length}',
+                                  style: AppTextStyles.h2.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Chưa đạt được',
+                                  style: AppTextStyles.caption,
+                                ),
+                              ],
+                            ),
+                            Column(
+                              children: [
+                                Text(
+                                  _allBadges.isEmpty
+                                      ? '0%'
+                                      : '${(earnedBadges.length / _allBadges.length * 100).toStringAsFixed(0)}%',
+                                  style: AppTextStyles.h2.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.primaryTeal,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Hoàn thành',
+                                  style: AppTextStyles.caption,
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Chưa đạt được',
-                        style: AppTextStyles.caption,
-                      ),
-                    ],
-                  ),
-                  Column(
-                    children: [
-                      Text(
-                        '${(unlockedBadges.length / _badges.length * 100).toStringAsFixed(0)}%',
-                        style: AppTextStyles.h2.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.primaryTeal,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Hoàn thành',
-                        style: AppTextStyles.caption,
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
+                      const SizedBox(height: 24),
 
-            // Unlocked badges section
-            if (unlockedBadges.isNotEmpty) ...[
-              Text(
-                'Danh hiệu đã đạt được',
-                style: AppTextStyles.h4,
-              ),
-              const SizedBox(height: 12),
-              ...unlockedBadges.map((b) => _buildBadgeItem(b)).toList(),
-              const SizedBox(height: 24),
-            ],
+                      // Earned badges section
+                      if (earnedBadges.isNotEmpty) ...[
+                        Text(
+                          'Danh hiệu đã đạt được',
+                          style: AppTextStyles.h4,
+                        ),
+                        const SizedBox(height: 12),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          child: GridView.count(
+                            crossAxisCount: 2,
+                            childAspectRatio: 0.85,
+                            crossAxisSpacing: 12,
+                            mainAxisSpacing: 12,
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            children: earnedBadges
+                                .map((b) => _buildBadgeItem(b, true))
+                                .toList(),
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                      ],
 
-            // Locked badges section
-            if (lockedBadges.isNotEmpty) ...[
-              Text(
-                'Danh hiệu chưa đạt được',
-                style: AppTextStyles.h4,
-              ),
-              const SizedBox(height: 12),
-              ...lockedBadges.map((b) => _buildBadgeItem(b)).toList(),
-            ],
-          ],
-        ),
-      ),
+                      // Unearned badges section
+                      if (unearnedBadges.isNotEmpty) ...[
+                        Text(
+                          'Danh hiệu chưa đạt được',
+                          style: AppTextStyles.h4,
+                        ),
+                        const SizedBox(height: 12),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          child: GridView.count(
+                            crossAxisCount: 2,
+                            childAspectRatio: 0.85,
+                            crossAxisSpacing: 12,
+                            mainAxisSpacing: 12,
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            children: unearnedBadges
+                                .map((b) => _buildBadgeItem(b, false))
+                                .toList(),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
     );
   }
 
-  Widget _buildBadgeItem(Map<String, dynamic> badge) {
-    final isUnlocked = badge['isUnlocked'];
-    final backgroundColor = isUnlocked ? Colors.white : Colors.grey[200];
-    final borderColor = isUnlocked ? AppColors.borderLight : Colors.grey[300];
+  Widget _buildBadgeItem(Map<String, dynamic> badge, bool isEarned) {
+    final badgeName = badge['name'] ?? badge['badge_name'] ?? 'Unknown Badge';
+    final badgeDescription = badge['description'] ?? '';
+    final iconName = badge['icon'] ?? '';
+    final badgeIcon = _getEmojiForBadge(iconName);
+    final badgeColor = badge['color'] ?? badge['badge_color'] ?? 'gray';
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: backgroundColor,
+        color: isEarned ? Colors.white : Colors.grey[200],
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: borderColor ?? Colors.transparent,
+          color: isEarned ? AppColors.borderLight : Colors.grey[300]!,
           width: 1,
         ),
-        boxShadow: isUnlocked
+        boxShadow: isEarned
             ? [
                 BoxShadow(
                   color: Colors.black.withOpacity(0.05),
@@ -232,103 +292,94 @@ class _BadgesListScreenState extends State<BadgesListScreen> {
               ]
             : [],
       ),
-      child: Row(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // Badge circle
+          // Circular badge
           Container(
             width: 80,
             height: 80,
             decoration: BoxDecoration(
+              color: isEarned ? _getBadgeColor(badgeColor) : Colors.grey[300],
               shape: BoxShape.circle,
-              gradient: isUnlocked
-                  ? LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        _getBadgeColor(badge['color']),
-                        _getBadgeColor(badge['color']).withOpacity(0.7),
-                      ],
-                    )
-                  : null,
-              color: isUnlocked ? null : Colors.grey[300],
-              boxShadow: isUnlocked
+              boxShadow: isEarned
                   ? [
                       BoxShadow(
-                        color: _getBadgeColor(badge['color']).withOpacity(0.3),
+                        color: _getBadgeColor(badgeColor).withOpacity(0.35),
                         blurRadius: 12,
-                        spreadRadius: 2,
+                        spreadRadius: 1,
+                        offset: const Offset(0, 4),
                       ),
                     ]
-                  : [],
+                  : [
+                      BoxShadow(
+                        color: Colors.grey.withOpacity(0.15),
+                        blurRadius: 8,
+                        spreadRadius: 0,
+                      ),
+                    ],
             ),
             child: Center(
               child: Text(
-                badge['icon'],
-                style: const TextStyle(
-                  fontSize: 36,
-                ),
+                badgeIcon,
+                style: const TextStyle(fontSize: 36),
               ),
             ),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(height: 10),
 
-          // Info
+          // Badge info
           Expanded(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
-                  badge['name'],
-                  style: AppTextStyles.bodyMedium.copyWith(
+                  badgeName,
+                  style: AppTextStyles.caption.copyWith(
                     fontWeight: FontWeight.w600,
-                    color:
-                        isUnlocked ? AppColors.textPrimary : Colors.grey[600],
+                    color: isEarned ? AppColors.textPrimary : Colors.grey[600],
                   ),
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  badge['description'],
-                  style: AppTextStyles.caption.copyWith(
-                    color:
-                        isUnlocked ? AppColors.textSecondary : Colors.grey[500],
+                Expanded(
+                  child: Text(
+                    badgeDescription,
+                    style: AppTextStyles.caption.copyWith(
+                      color:
+                          isEarned ? AppColors.textSecondary : Colors.grey[500],
+                      fontSize: 10,
+                    ),
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                const SizedBox(height: 8),
-                if (isUnlocked)
-                  Text(
-                    'Đạt được: ${badge['unlockedDate']}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                      color: AppColors.primaryTeal,
+                if (isEarned)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      'Đạt được: ${_getEarnedDate(badge['badge_id'] ?? badge['badgeId']) ?? 'N/A'}',
+                      style: AppTextStyles.caption.copyWith(
+                        color: AppColors.primaryTeal,
+                        fontSize: 9,
+                      ),
+                      textAlign: TextAlign.center,
                     ),
                   )
                 else
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(4),
-                          child: LinearProgressIndicator(
-                            value: _parseProgress(badge['progress']),
-                            minHeight: 4,
-                            backgroundColor: Colors.grey[300],
-                            valueColor: const AlwaysStoppedAnimation<Color>(
-                              AppColors.primaryTeal,
-                            ),
-                          ),
-                        ),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      'Tiếp tục cố gắng',
+                      style: AppTextStyles.caption.copyWith(
+                        color: Colors.grey[600],
+                        fontSize: 9,
                       ),
-                      const SizedBox(width: 8),
-                      Text(
-                        badge['progress'],
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                    ],
+                      textAlign: TextAlign.center,
+                    ),
                   ),
               ],
             ),
@@ -338,23 +389,8 @@ class _BadgesListScreenState extends State<BadgesListScreen> {
     );
   }
 
-  double _parseProgress(String progress) {
-    if (progress == 'Chưa bắt đầu') return 0;
-    try {
-      final parts = progress.split('/');
-      if (parts.length == 2) {
-        final current = int.parse(parts[0].trim());
-        final total = int.parse(parts[1].trim());
-        return current / total;
-      }
-    } catch (e) {
-      return 0;
-    }
-    return 0;
-  }
-
   Color _getBadgeColor(String color) {
-    switch (color) {
+    switch (color.toLowerCase()) {
       case 'green':
         return const Color(0xFF4CAF50);
       case 'gold':
@@ -363,8 +399,53 @@ class _BadgesListScreenState extends State<BadgesListScreen> {
         return const Color(0xFF64B5F6);
       case 'teal':
         return AppColors.primaryTeal;
+      case 'purple':
+        return const Color(0xFF9C27B0);
+      case 'red':
+        return const Color(0xFFE53935);
+      case 'orange':
+        return const Color(0xFFFF9800);
       default:
         return AppColors.achievementLocked;
+    }
+  }
+
+  /// Map icon name from API to emoji
+  String _getEmojiForBadge(String? iconName) {
+    if (iconName == null || iconName.isEmpty) return '🏅';
+
+    final name = iconName.toLowerCase().replaceAll('-', '').replaceAll('_', '');
+
+    switch (name) {
+      case 'badgenewcomer':
+      case 'newcomer':
+        return '👋';
+      case 'badgestar':
+      case 'star':
+        return '⭐';
+      case 'badgetop':
+      case 'top':
+        return '🏆';
+      case 'badgehero':
+      case 'hero':
+        return '💪';
+      case 'badgesharer':
+      case 'sharer':
+        return '🤝';
+      case 'badgecommunity':
+      case 'community':
+        return '👥';
+      case 'badgegold':
+      case 'gold':
+        return '✨';
+      case 'badgefire':
+      case 'fire':
+        return '🔥';
+      case 'badgecertified':
+      case 'certified':
+        return '✓';
+      default:
+        return '🏅';
     }
   }
 }

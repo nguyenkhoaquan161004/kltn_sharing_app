@@ -14,6 +14,7 @@ class EditProfileModal extends StatefulWidget {
   final String? currentName;
   final String? currentEmail;
   final String? currentAddress;
+  final String? currentPhone;
   final String? currentAvatar;
   final DateTime? currentBirthDate;
   final VoidCallback? onProfileUpdated;
@@ -23,6 +24,7 @@ class EditProfileModal extends StatefulWidget {
     this.currentName,
     this.currentEmail,
     this.currentAddress,
+    this.currentPhone,
     this.currentAvatar,
     this.currentBirthDate,
     this.onProfileUpdated,
@@ -37,6 +39,7 @@ class _EditProfileModalState extends State<EditProfileModal> {
   late TextEditingController _firstNameController;
   late TextEditingController _lastNameController;
   late TextEditingController _addressController;
+  late TextEditingController _phoneController;
   DateTime? _selectedBirthDate;
   String? _avatarUrl;
   File? _selectedImageFile;
@@ -54,6 +57,7 @@ class _EditProfileModalState extends State<EditProfileModal> {
     _lastNameController = TextEditingController();
     _addressController =
         TextEditingController(text: widget.currentAddress ?? '');
+    _phoneController = TextEditingController(text: widget.currentPhone ?? '');
     _selectedBirthDate = widget.currentBirthDate;
     _avatarUrl = widget.currentAvatar;
 
@@ -75,6 +79,7 @@ class _EditProfileModalState extends State<EditProfileModal> {
     _firstNameController.dispose();
     _lastNameController.dispose();
     _addressController.dispose();
+    _phoneController.dispose();
     super.dispose();
   }
 
@@ -159,6 +164,9 @@ class _EditProfileModalState extends State<EditProfileModal> {
     String address = _addressController.text.isNotEmpty
         ? _addressController.text
         : (widget.currentAddress ?? '');
+    String phone = _phoneController.text.isNotEmpty
+        ? _phoneController.text
+        : (widget.currentPhone ?? '');
     DateTime? birthDate = _selectedBirthDate ?? widget.currentBirthDate;
     String? avatarUrl = _avatarUrl ?? widget.currentAvatar;
 
@@ -166,6 +174,7 @@ class _EditProfileModalState extends State<EditProfileModal> {
     if (firstName.isEmpty &&
         lastName.isEmpty &&
         address.isEmpty &&
+        phone.isEmpty &&
         birthDate == null) {
       setState(() =>
           _errorMessage = 'Vui lòng nhập ít nhất một thông tin để cập nhật');
@@ -188,6 +197,7 @@ class _EditProfileModalState extends State<EditProfileModal> {
         avatarUrl: avatarUrl,
         birthDate: birthDate,
         address: address.isNotEmpty ? address : null,
+        phone: phone.isNotEmpty ? phone : null,
       );
 
       // Create API service
@@ -465,6 +475,26 @@ class _EditProfileModalState extends State<EditProfileModal> {
               maxLines: 2,
               decoration: InputDecoration(
                 hintText: 'Nhập địa chỉ',
+                filled: true,
+                fillColor: AppColors.backgroundGray,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Phone
+            const Text('Số điện thoại', style: AppTextStyles.label),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _phoneController,
+              keyboardType: TextInputType.phone,
+              decoration: InputDecoration(
+                hintText: 'Nhập số điện thoại',
                 filled: true,
                 fillColor: AppColors.backgroundGray,
                 border: OutlineInputBorder(

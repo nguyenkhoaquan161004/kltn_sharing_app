@@ -11,10 +11,20 @@ class TokenRefreshInterceptor extends InterceptorsWrapper {
 
   late Dio _authDio; // Separate Dio instance for auth endpoints
   late SharedPreferences _prefs;
+  late Future<void> _prefsReady;
   bool _isRefreshing = false;
   final List<DioException> _failedRequests = [];
 
-  TokenRefreshInterceptor() {
+  // Callback to get valid token from AuthProvider
+  Future<String?> Function()? _getValidTokenCallback;
+  // Callback when token refresh fails and user needs to re-login
+  Future<void> Function()? _onTokenExpiredCallback;
+
+  TokenRefreshInterceptor({
+    Future<String?> Function()? getValidTokenCallback,
+    Future<void> Function()? onTokenExpiredCallback,
+  })  : _getValidTokenCallback = getValidTokenCallback,
+        _onTokenExpiredCallback = onTokenExpiredCallback {
     _authDio = Dio(
       BaseOptions(
         baseUrl: AppConfig.authBaseUrl,
@@ -23,11 +33,32 @@ class TokenRefreshInterceptor extends InterceptorsWrapper {
         contentType: 'application/json',
       ),
     );
-    _initPrefs();
+    // Initialize SharedPreferences
+    _prefsReady = _initPrefs();
+  }
+
+  /// Set callbacks after initialization
+  void setCallbacks({
+    required Future<String?> Function() getValidTokenCallback,
+    required Future<void> Function() onTokenExpiredCallback,
+  }) {
+    _getValidTokenCallback = getValidTokenCallback;
+    _onTokenExpiredCallback = onTokenExpiredCallback;
   }
 
   Future<void> _initPrefs() async {
     _prefs = await SharedPreferences.getInstance();
+  }
+
+  /// Static method to easily add this interceptor to a Dio instance
+  static TokenRefreshInterceptor create({
+    Future<String?> Function()? getValidTokenCallback,
+    Future<void> Function()? onTokenExpiredCallback,
+  }) {
+    return TokenRefreshInterceptor(
+      getValidTokenCallback: getValidTokenCallback,
+      onTokenExpiredCallback: onTokenExpiredCallback,
+    );
   }
 
   @override
@@ -38,9 +69,12 @@ class TokenRefreshInterceptor extends InterceptorsWrapper {
       return handler.next(err);
     }
 
-    // Make sure SharedPreferences is initialized
-    if (!_prefs.getKeys().isNotEmpty && _prefs.getKeys().isEmpty) {
-      print('[TokenRefreshInterceptor] SharedPreferences not ready');
+    // Wait for SharedPreferences to be initialized
+    try {
+      await _prefsReady;
+    } catch (e) {
+      print(
+          '[TokenRefreshInterceptor] Failed to initialize SharedPreferences: $e');
       return handler.next(err);
     }
 
@@ -53,21 +87,27 @@ class TokenRefreshInterceptor extends InterceptorsWrapper {
     _isRefreshing = true;
 
     try {
-      // Get refresh token
+      // Get refresh token from preferences
       final refreshToken = _prefs.getString(_refreshTokenKey);
       if (refreshToken == null || refreshToken.isEmpty) {
-        print('[TokenRefreshInterceptor] No refresh token available');
+        print(
+            '[TokenRefreshInterceptor] ❌ No refresh token available in SharedPreferences');
         await _clearTokens();
         _isRefreshing = false;
+
+        // Notify callback about token expiration
+        if (_onTokenExpiredCallback != null) {
+          await _onTokenExpiredCallback!();
+        }
         return handler.next(err);
       }
 
       print(
           '[TokenRefreshInterceptor] Attempting to refresh token after ${err.response?.statusCode} error');
       print(
-          '[TokenRefreshInterceptor] Using refresh token: ${refreshToken.substring(0, 30)}...');
+          '[TokenRefreshInterceptor] Using refresh token from SharedPreferences: ${refreshToken.substring(0, 20)}...');
 
-      // Call refresh token endpoint
+      // Call refresh token endpoint - MUST use refreshToken from storage
       final response = await _authDio.post(
         '/refresh-token',
         data: {'refreshToken': refreshToken},
@@ -78,18 +118,25 @@ class TokenRefreshInterceptor extends InterceptorsWrapper {
         if (data['success'] == true && data['data'] != null) {
           final tokenResponse = TokenResponse.fromJson(data['data']);
 
-          // Save new tokens (refreshToken is guaranteed non-null from TokenResponse)
+          // Verify we got new tokens back
+          if (tokenResponse.refreshToken.isEmpty) {
+            print(
+                '[TokenRefreshInterceptor] ❌ Backend returned empty refresh token');
+            throw Exception('Invalid token response from backend');
+          }
+
+          // Save new tokens - IMPORTANT: Save refreshToken!
           await _saveTokens(
             tokenResponse.accessToken,
             tokenResponse.refreshToken,
             tokenResponse.expiresIn,
           );
 
-          print('[TokenRefreshInterceptor] Token refreshed successfully');
+          print('[TokenRefreshInterceptor] ✅ Token refreshed successfully');
           print(
-              '[TokenRefreshInterceptor] New refresh token saved: ${tokenResponse.refreshToken.substring(0, 30)}...');
+              '[TokenRefreshInterceptor] New refresh token saved: ${tokenResponse.refreshToken.substring(0, 20)}...');
           print(
-              '[TokenRefreshInterceptor] New access token saved: ${tokenResponse.accessToken.substring(0, 30)}...');
+              '[TokenRefreshInterceptor] New access token saved: ${tokenResponse.accessToken.substring(0, 20)}...');
 
           // Update original request with new token
           err.requestOptions.headers['Authorization'] =
@@ -124,21 +171,37 @@ class TokenRefreshInterceptor extends InterceptorsWrapper {
             );
             return handler.resolve(retryResponse);
           } catch (retryErr) {
-            print('[TokenRefreshInterceptor] Retry failed: $retryErr');
+            print('[TokenRefreshInterceptor] ❌ Retry failed: $retryErr');
             return handler.next(err);
           }
+        } else {
+          print(
+              '[TokenRefreshInterceptor] ❌ Invalid refresh response: success=${data['success']}, data=${data['data']}');
         }
+      } else {
+        print(
+            '[TokenRefreshInterceptor] ❌ Refresh endpoint returned ${response.statusCode}');
       }
 
       // Refresh failed
-      print('[TokenRefreshInterceptor] Token refresh response error');
+      print('[TokenRefreshInterceptor] ❌ Token refresh failed');
       await _clearTokens();
       _isRefreshing = false;
+
+      // Notify about token expiration so user can re-login
+      if (_onTokenExpiredCallback != null) {
+        await _onTokenExpiredCallback!();
+      }
       return handler.next(err);
     } catch (e) {
-      print('[TokenRefreshInterceptor] Token refresh error: $e');
+      print('[TokenRefreshInterceptor] ❌ Token refresh error: $e');
       await _clearTokens();
       _isRefreshing = false;
+
+      // Notify about token expiration so user can re-login
+      if (_onTokenExpiredCallback != null) {
+        await _onTokenExpiredCallback!();
+      }
       return handler.next(err);
     }
   }

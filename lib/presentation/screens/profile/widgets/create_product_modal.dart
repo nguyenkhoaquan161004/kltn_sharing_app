@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
-import '../../../../data/models/item_model.dart';
+import '../../../../data/services/item_api_service.dart';
+import '../../../../data/services/cloudinary_service.dart';
 
 class CreateProductModal extends StatefulWidget {
-  final Function(ItemModel) onProductCreated;
+  final Function(bool) onProductCreated; // true = success, false = error
 
   const CreateProductModal({
     super.key,
@@ -20,36 +22,54 @@ class CreateProductModal extends StatefulWidget {
 class _CreateProductModalState extends State<CreateProductModal> {
   final _formKey = GlobalKey<FormState>();
   final ImagePicker _imagePicker = ImagePicker();
+  final CloudinaryService _cloudinaryService = CloudinaryService();
+  late ItemApiService _itemApiService;
 
   late TextEditingController _nameController;
   late TextEditingController _descriptionController;
   late TextEditingController _priceController;
   late TextEditingController _quantityController;
 
-  String _selectedCategory = '1';
+  String _selectedCategory = '';
   DateTime _expirationDate = DateTime.now().add(const Duration(days: 30));
   bool _isLoading = false;
-  List<File> _selectedImages = [];
-  final int _maxImages = 5;
+  String? _selectedImagePath;
+  String? _uploadedImageUrl;
+  String? _errorMessage;
 
-  final List<Map<String, dynamic>> categories = [
-    {'id': '1', 'name': 'Quần áo'},
-    {'id': '2', 'name': 'Giày dép'},
-    {'id': '3', 'name': 'Điện tử'},
-    {'id': '4', 'name': 'Sách'},
-    {'id': '5', 'name': 'Đồ chơi'},
-    {'id': '6', 'name': 'Nội thất'},
-    {'id': '7', 'name': 'Thể thao'},
-    {'id': '8', 'name': 'Khác'},
+  // Location
+  double? _latitude;
+  double? _longitude;
+
+  // Mock categories - should be fetched from API
+  final List<Map<String, String>> categories = [
+    {'id': '3fa85f64-5717-4562-b3fc-2c963f66afa1', 'name': 'Quần áo'},
+    {'id': '3fa85f64-5717-4562-b3fc-2c963f66afa2', 'name': 'Giày dép'},
+    {'id': '3fa85f64-5717-4562-b3fc-2c963f66afa3', 'name': 'Điện tử'},
+    {'id': '3fa85f64-5717-4562-b3fc-2c963f66afa4', 'name': 'Sách'},
+    {'id': '3fa85f64-5717-4562-b3fc-2c963f66afa5', 'name': 'Đồ chơi'},
+    {'id': '3fa85f64-5717-4562-b3fc-2c963f66afa6', 'name': 'Nội thất'},
   ];
 
   @override
   void initState() {
     super.initState();
+    // Get ItemApiService from Provider (already configured with token callback)
+    _itemApiService = context.read<ItemApiService>();
+
     _nameController = TextEditingController();
     _descriptionController = TextEditingController();
     _priceController = TextEditingController(text: '0');
     _quantityController = TextEditingController(text: '1');
+
+    if (categories.isNotEmpty) {
+      _selectedCategory = categories[0]['id']!;
+    }
+
+    // Use default Ho Chi Minh City coordinates
+    // In a real app, you would integrate with location services
+    _latitude = 10.7769;
+    _longitude = 106.7009;
   }
 
   @override
@@ -61,59 +81,120 @@ class _CreateProductModalState extends State<CreateProductModal> {
     super.dispose();
   }
 
-  void _submitForm() {
+  Future<void> _pickAndUploadImage() async {
+    try {
+      final XFile? pickedFile = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 80,
+      );
+
+      if (pickedFile != null) {
+        setState(() {
+          _selectedImagePath = pickedFile.path;
+          _isLoading = true;
+          _errorMessage = null;
+        });
+
+        // Upload to Cloudinary
+        final imageFile = File(pickedFile.path);
+        final imageUrl = await _cloudinaryService.uploadProductImage(imageFile);
+
+        setState(() {
+          _uploadedImageUrl = imageUrl;
+          _isLoading = false;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Tải ảnh lên thành công!'),
+            backgroundColor: AppColors.success,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = e.toString().replaceFirst('Exception: ', '');
+        _isLoading = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Lỗi tải ảnh: $_errorMessage'),
+          backgroundColor: AppColors.error,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
+  }
+
+  Future<void> _submitForm() async {
     if (_formKey.currentState!.validate()) {
+      if (_uploadedImageUrl == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Vui lòng tải lên ảnh sản phẩm'),
+            backgroundColor: AppColors.warning,
+          ),
+        );
+        return;
+      }
+
+      if (_latitude == null || _longitude == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Không thể lấy vị trí. Vui lòng thử lại.'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+        return;
+      }
+
       setState(() => _isLoading = true);
 
-      // Simulate upload delay
-      Future.delayed(const Duration(seconds: 1), () {
-        final newProduct = ItemModel(
-          itemId: DateTime.now().millisecondsSinceEpoch,
-          userId: 1, // Current user
-          name: _nameController.text,
-          description: _descriptionController.text,
+      try {
+        // Call API to create item
+        final success = await _itemApiService.createItem(
+          name: _nameController.text.trim(),
+          description: _descriptionController.text.trim(),
           quantity: int.parse(_quantityController.text),
-          status: 'available',
-          categoryId: int.parse(_selectedCategory),
-          locationId: 1, // Default location
+          imageUrl: _uploadedImageUrl!,
           expiryDate: _expirationDate,
-          createdAt: DateTime.now(),
+          categoryId: _selectedCategory,
+          latitude: _latitude!,
+          longitude: _longitude!,
           price: double.parse(_priceController.text),
         );
 
-        widget.onProductCreated(newProduct);
-        Navigator.pop(context);
-      });
+        if (success) {
+          widget.onProductCreated(true);
+          Navigator.pop(context);
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Chia sẻ sản phẩm thành công!'),
+              backgroundColor: AppColors.success,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      } catch (e) {
+        setState(() {
+          _errorMessage = e.toString().replaceFirst('Exception: ', '');
+          _isLoading = false;
+        });
+
+        widget.onProductCreated(false);
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Lỗi: $_errorMessage'),
+            backgroundColor: AppColors.error,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
     }
-  }
-
-  Future<void> _pickImage() async {
-    if (_selectedImages.length >= _maxImages) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Tối đa $_maxImages ảnh'),
-          backgroundColor: AppColors.warning,
-        ),
-      );
-      return;
-    }
-
-    final XFile? pickedFile = await _imagePicker.pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 80,
-    );
-
-    if (pickedFile != null) {
-      setState(() {
-        _selectedImages.add(File(pickedFile.path));
-      });
-    }
-  }
-
-  void _removeImage(int index) {
-    setState(() {
-      _selectedImages.removeAt(index);
-    });
   }
 
   @override
@@ -166,6 +247,9 @@ class _CreateProductModalState extends State<CreateProductModal> {
                   if (value == null || value.isEmpty) {
                     return 'Vui lòng nhập tên sản phẩm';
                   }
+                  if (value.length < 3) {
+                    return 'Tên sản phẩm phải có ít nhất 3 ký tự';
+                  }
                   return null;
                 },
               ),
@@ -212,12 +296,12 @@ class _CreateProductModalState extends State<CreateProductModal> {
                 ),
                 items: categories.map((category) {
                   return DropdownMenuItem<String>(
-                    value: category['id'].toString(),
-                    child: Text(category['name']),
+                    value: category['id']!,
+                    child: Text(category['name']!),
                   );
                 }).toList(),
                 onChanged: (value) {
-                  setState(() => _selectedCategory = value ?? '1');
+                  setState(() => _selectedCategory = value ?? '');
                 },
               ),
               const SizedBox(height: 16),
@@ -251,6 +335,9 @@ class _CreateProductModalState extends State<CreateProductModal> {
                             if (int.tryParse(value) == null) {
                               return 'Phải là số';
                             }
+                            if (int.parse(value) < 1) {
+                              return 'Số lượng phải ≥ 1';
+                            }
                             return null;
                           },
                         ),
@@ -281,8 +368,11 @@ class _CreateProductModalState extends State<CreateProductModal> {
                             if (value == null || value.isEmpty) {
                               return 'Vui lòng nhập giá';
                             }
-                            if (int.tryParse(value) == null) {
+                            if (double.tryParse(value) == null) {
                               return 'Phải là số';
+                            }
+                            if (double.parse(value) < 0) {
+                              return 'Giá không được âm';
                             }
                             return null;
                           },
@@ -295,77 +385,74 @@ class _CreateProductModalState extends State<CreateProductModal> {
               const SizedBox(height: 16),
 
               // Ảnh sản phẩm
-              Text('Ảnh sản phẩm (tối đa $_maxImages ảnh)',
-                  style: AppTextStyles.label),
+              Text('Ảnh sản phẩm *', style: AppTextStyles.label),
               const SizedBox(height: 8),
 
-              // Image preview grid
-              if (_selectedImages.isNotEmpty)
+              // Image preview
+              if (_uploadedImageUrl != null)
                 Column(
                   children: [
-                    GridView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 3,
-                        crossAxisSpacing: 8,
-                        mainAxisSpacing: 8,
-                      ),
-                      itemCount: _selectedImages.length,
-                      itemBuilder: (context, index) {
-                        return Stack(
-                          children: [
-                            Container(
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                  color: AppColors.borderLight,
-                                  width: 1,
-                                ),
+                    Stack(
+                      children: [
+                        Container(
+                          width: double.infinity,
+                          height: 200,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: AppColors.borderLight,
+                              width: 1,
+                            ),
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: Image.network(
+                              _uploadedImageUrl!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Container(
+                                  color: AppColors.backgroundGray,
+                                  child: const Icon(Icons.broken_image),
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                        Positioned(
+                          top: 8,
+                          right: 8,
+                          child: GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _uploadedImageUrl = null;
+                                _selectedImagePath = null;
+                              });
+                            },
+                            child: Container(
+                              decoration: const BoxDecoration(
+                                color: AppColors.error,
+                                shape: BoxShape.circle,
                               ),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(8),
-                                child: Image.file(
-                                  _selectedImages[index],
-                                  fit: BoxFit.cover,
-                                ),
+                              padding: const EdgeInsets.all(4),
+                              child: const Icon(
+                                Icons.close,
+                                color: Colors.white,
+                                size: 16,
                               ),
                             ),
-                            Positioned(
-                              top: -8,
-                              right: -8,
-                              child: GestureDetector(
-                                onTap: () => _removeImage(index),
-                                child: Container(
-                                  decoration: const BoxDecoration(
-                                    color: AppColors.error,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  padding: const EdgeInsets.all(4),
-                                  child: const Icon(
-                                    Icons.close,
-                                    color: Colors.white,
-                                    size: 16,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        );
-                      },
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 12),
                   ],
-                ),
-
-              // Add image button
-              if (_selectedImages.length < _maxImages)
+                )
+              else
                 GestureDetector(
-                  onTap: _pickImage,
+                  onTap: _isLoading ? null : _pickAndUploadImage,
                   child: Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    padding: const EdgeInsets.symmetric(vertical: 32),
                     decoration: BoxDecoration(
                       border: Border.all(
                         color: AppColors.primaryTeal,
@@ -377,14 +464,26 @@ class _CreateProductModalState extends State<CreateProductModal> {
                     ),
                     child: Column(
                       children: [
-                        const Icon(
-                          Icons.add_photo_alternate,
-                          color: AppColors.primaryTeal,
-                          size: 32,
-                        ),
-                        const SizedBox(height: 8),
+                        if (_isLoading)
+                          const SizedBox(
+                            height: 32,
+                            width: 32,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                AppColors.primaryTeal,
+                              ),
+                            ),
+                          )
+                        else
+                          const Icon(
+                            Icons.add_photo_alternate,
+                            color: AppColors.primaryTeal,
+                            size: 32,
+                          ),
+                        const SizedBox(height: 12),
                         Text(
-                          'Thêm ảnh (${_selectedImages.length}/$_maxImages)',
+                          _isLoading ? 'Đang tải lên...' : 'Thêm ảnh sản phẩm',
                           style: AppTextStyles.bodyMedium.copyWith(
                             color: AppColors.primaryTeal,
                           ),
@@ -400,10 +499,13 @@ class _CreateProductModalState extends State<CreateProductModal> {
               const SizedBox(height: 8),
               GestureDetector(
                 onTap: () async {
+                  final firstDate = DateTime.now().add(const Duration(days: 1));
                   final pickedDate = await showDatePicker(
                     context: context,
-                    initialDate: _expirationDate,
-                    firstDate: DateTime.now(),
+                    initialDate: _expirationDate.isBefore(firstDate)
+                        ? firstDate
+                        : _expirationDate,
+                    firstDate: firstDate,
                     lastDate: DateTime.now().add(const Duration(days: 365)),
                   );
                   if (pickedDate != null) {

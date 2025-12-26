@@ -232,7 +232,7 @@ class _CreateProductScreenState extends State<CreateProductScreen> {
                     onChanged: (value) {
                       setState(() => _useDefaultAddress = value ?? true);
                     },
-                    activeColor: AppColors.primaryTeal,
+                    activeColor: AppColors.primaryGreen,
                   ),
                   const Text(
                     'Sử dụng địa chỉ mặc định',

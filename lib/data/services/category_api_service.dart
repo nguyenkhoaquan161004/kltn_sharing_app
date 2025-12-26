@@ -5,8 +5,12 @@ import 'package:kltn_sharing_app/data/models/category_response_model.dart';
 
 class CategoryApiService {
   late Dio _dio;
+  late TokenRefreshInterceptor _tokenRefreshInterceptor;
 
   CategoryApiService() {
+    // Initialize token refresh interceptor FIRST before creating Dio
+    _tokenRefreshInterceptor = TokenRefreshInterceptor();
+
     _dio = Dio(
       BaseOptions(
         baseUrl: AppConfig.baseUrl,
@@ -20,7 +24,7 @@ class CategoryApiService {
     );
 
     // Add token refresh interceptor for handling 401/403 errors
-    _dio.interceptors.add(TokenRefreshInterceptor());
+    _dio.interceptors.add(_tokenRefreshInterceptor);
 
     // Add logging interceptor
     _dio.interceptors.add(
@@ -41,6 +45,20 @@ class CategoryApiService {
         },
       ),
     );
+  }
+
+  /// Set callback to get valid access token from AuthProvider
+  void setGetValidTokenCallback(Future<String?> Function() callback) {
+    try {
+      _tokenRefreshInterceptor.setCallbacks(
+        getValidTokenCallback: callback,
+        onTokenExpiredCallback: () async {
+          print('[CategoryAPI] Token refresh failed, user session expired');
+        },
+      );
+    } catch (e) {
+      print('[CategoryAPI] Error setting token refresh callback: $e');
+    }
   }
 
   /// Update Dio baseUrl when backend switches

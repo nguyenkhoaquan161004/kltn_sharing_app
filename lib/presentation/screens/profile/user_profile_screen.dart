@@ -3,7 +3,8 @@ import 'package:go_router/go_router.dart';
 import 'package:kltn_sharing_app/core/constants/app_routes.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
-import '../../../../data/mock_data.dart';
+import '../../../../data/models/user_response_model.dart';
+import '../../../../data/services/user_api_service.dart';
 import 'widgets/profile_header.dart';
 import 'widgets/profile_info_tab.dart';
 import 'widgets/profile_products_tab.dart';
@@ -26,61 +27,39 @@ class UserProfileScreen extends StatefulWidget {
 class _UserProfileScreenState extends State<UserProfileScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  late Map<String, dynamic> _userData;
+  UserDto? _userData;
+  bool _isLoading = true;
+  String? _errorMessage;
+  late UserApiService _userApiService;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    _userApiService = UserApiService();
     _loadUserData();
   }
 
-  void _loadUserData() {
+  Future<void> _loadUserData() async {
     try {
-      int userId = int.parse(widget.userId);
-      // Debug print
-      print('DEBUG: UserProfileScreen - Looking for userId: $userId');
-      print(
-          'DEBUG: Available users: ${MockData.users.map((u) => u.userId).toList()}');
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
 
-      final user = MockData.users.firstWhere(
-        (u) => u.userId == userId,
-        orElse: () {
-          print('DEBUG: User $userId not found, using fallback user 2');
-          return MockData.users[1];
-        },
-      );
+      // Gọi API để lấy dữ liệu người dùng
+      final user = await _userApiService.getUserById(widget.userId);
 
       setState(() {
-        _userData = {
-          'id': user.userId.toString(),
-          'name': user.name,
-          'email': user.email,
-          'address': user.address,
-          'avatar': user.avatar,
-          'points': user.trustScore * 100,
-          'productsShared':
-              MockData.items.where((i) => i.userId == user.userId).length,
-          'productsReceived': 0,
-        };
+        _userData = user;
+        _isLoading = false;
       });
     } catch (e) {
-      print('DEBUG: Error in _loadUserData: $e');
-      // Fallback to user id 2
-      final user = MockData.users[1];
       setState(() {
-        _userData = {
-          'id': user.userId.toString(),
-          'name': user.name,
-          'email': user.email,
-          'address': user.address,
-          'avatar': user.avatar,
-          'points': user.trustScore * 100,
-          'productsShared':
-              MockData.items.where((i) => i.userId == user.userId).length,
-          'productsReceived': 0,
-        };
+        _errorMessage = e.toString().replaceFirst('Exception: ', '');
+        _isLoading = false;
       });
+      print('[UserProfileScreen] Error loading user: $e');
     }
   }
 
@@ -92,6 +71,68 @@ class _UserProfileScreenState extends State<UserProfileScreen>
 
   @override
   Widget build(BuildContext context) {
+    // Nếu đang loading
+    if (_isLoading) {
+      return Scaffold(
+        backgroundColor: AppColors.backgroundWhite,
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
+            onPressed: () => context.pop(),
+          ),
+        ),
+        body: const Center(
+          child: CircularProgressIndicator(color: AppColors.primaryGreen),
+        ),
+      );
+    }
+
+    // Nếu có lỗi
+    if (_errorMessage != null || _userData == null) {
+      return Scaffold(
+        backgroundColor: AppColors.backgroundWhite,
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
+            onPressed: () => context.pop(),
+          ),
+        ),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline, size: 48, color: Colors.red),
+              const SizedBox(height: 16),
+              Text(
+                'Không thể tải thông tin người dùng',
+                style: AppTextStyles.bodyMedium,
+              ),
+              const SizedBox(height: 8),
+              if (_errorMessage != null)
+                Text(
+                  _errorMessage!,
+                  style: AppTextStyles.bodySmall.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: _loadUserData,
+                child: const Text('Thử lại'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final user = _userData!;
+
     return Scaffold(
       backgroundColor: AppColors.backgroundWhite,
       body: NestedScrollView(
@@ -124,9 +165,9 @@ class _UserProfileScreenState extends State<UserProfileScreen>
             // Header
             SliverToBoxAdapter(
               child: ProfileHeader(
-                name: _userData['name'],
-                points: _userData['points'],
-                avatar: _userData['avatar'],
+                name: user.fullName,
+                trustScore: user.trustScore,
+                avatar: user.avatar,
               ),
             ),
           ];
@@ -142,7 +183,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                 unselectedLabelColor: AppColors.textSecondary,
                 labelStyle: AppTextStyles.bodyMedium,
                 unselectedLabelStyle: AppTextStyles.bodyMedium,
-                indicatorColor: AppColors.primaryTeal,
+                indicatorColor: AppColors.primaryGreen,
                 indicatorWeight: 2,
                 tabs: const [
                   Tab(text: 'Thông tin'),
@@ -158,12 +199,26 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                 controller: _tabController,
                 children: [
                   ProfileInfoTab(
-                    userData: _userData,
+                    userData: {
+                      'id': user.id,
+                      'name': user.fullName,
+                      'email': user.email,
+                      'address': user.address,
+                      'avatar': user.avatar,
+                      'bio': user.bio,
+                      'phoneNumber': user.phoneNumber,
+                      'points': user.trustScore ?? 0,
+                      'productsShared': user.itemsShared,
+                      'productsReceived': user.itemsReceived,
+                      'verified': user.verified,
+                    },
                     isOwnProfile: false,
-                    userId: int.parse(widget.userId),
+                    userId: int.tryParse(user.id) ?? 0,
                   ),
                   ProfileProductsTab(
-                      isOwnProfile: false, userId: int.parse(widget.userId)),
+                    isOwnProfile: false,
+                    userId: int.tryParse(user.id) ?? 0,
+                  ),
                   ProfileAchievementsTab(),
                 ],
               ),

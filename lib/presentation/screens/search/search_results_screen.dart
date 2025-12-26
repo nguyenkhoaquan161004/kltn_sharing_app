@@ -201,7 +201,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                                   style: const TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w600,
-                                    color: AppColors.primaryTeal,
+                                    color: AppColors.primaryGreen,
                                   ),
                                 ),
                               ],
@@ -274,17 +274,24 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
         final dto = _searchResults[index];
         // Convert ItemDto to ItemModel for display
         final item = ItemModel(
-          itemId: int.tryParse(dto.id) ?? 0,
+          itemId: 0, // Will use itemId_str instead
+          itemId_str: dto.id, // UUID from API
           userId: int.tryParse(dto.userId) ?? 0,
+          userId_str: dto.userId,
           name: dto.name,
           description: dto.description,
-          quantity: 1,
+          quantity: dto.quantity ?? 1,
           status: dto.status,
           categoryId: 0,
+          categoryId_str: dto.categoryId,
           locationId: 0,
-          expiryDate: null,
+          expiryDate: dto.expiryDate,
           createdAt: dto.createdAt,
           price: dto.price ?? 0,
+          image: dto.imageUrl,
+          latitude: dto.latitude,
+          longitude: dto.longitude,
+          distance: dto.distanceKm,
         );
 
         return GestureDetector(
@@ -347,7 +354,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
-                            color: AppColors.primaryTeal,
+                            color: AppColors.primaryGreen,
                           ),
                         ),
                       ),
@@ -394,11 +401,11 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                                 ),
                                 decoration: BoxDecoration(
                                   color: _sortBy == 'createdAt'
-                                      ? AppColors.primaryTeal
+                                      ? AppColors.primaryGreen
                                       : Colors.transparent,
                                   border: Border.all(
                                     color: _sortBy == 'createdAt'
-                                        ? AppColors.primaryTeal
+                                        ? AppColors.primaryGreen
                                         : const Color(0xFFCCCCCC),
                                     width: 1.5,
                                   ),
@@ -412,7 +419,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                                     fontWeight: FontWeight.w600,
                                     color: _sortBy == 'createdAt'
                                         ? Colors.white
-                                        : AppColors.primaryTeal,
+                                        : AppColors.primaryGreen,
                                   ),
                                 ),
                               ),
@@ -435,11 +442,11 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                                 ),
                                 decoration: BoxDecoration(
                                   color: _sortBy == 'default'
-                                      ? AppColors.primaryTeal
+                                      ? AppColors.primaryGreen
                                       : Colors.transparent,
                                   border: Border.all(
                                     color: _sortBy == 'default'
-                                        ? AppColors.primaryTeal
+                                        ? AppColors.primaryGreen
                                         : const Color(0xFFCCCCCC),
                                     width: 1.5,
                                   ),
@@ -453,7 +460,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                                     fontWeight: FontWeight.w600,
                                     color: _sortBy == 'suggested'
                                         ? Colors.white
-                                        : AppColors.primaryTeal,
+                                        : AppColors.primaryGreen,
                                   ),
                                 ),
                               ),

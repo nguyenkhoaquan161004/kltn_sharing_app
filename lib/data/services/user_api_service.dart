@@ -6,8 +6,13 @@ import 'package:kltn_sharing_app/data/models/update_profile_request.dart';
 
 class UserApiService {
   late Dio _dio;
+  Future<String?> Function()? _getValidTokenCallback;
+  late TokenRefreshInterceptor _tokenRefreshInterceptor;
 
   UserApiService() {
+    // Initialize token refresh interceptor FIRST before creating Dio
+    _tokenRefreshInterceptor = TokenRefreshInterceptor();
+
     _dio = Dio(
       BaseOptions(
         baseUrl: AppConfig.baseUrl,
@@ -21,7 +26,7 @@ class UserApiService {
     );
 
     // Add token refresh interceptor for handling 401/403 errors
-    _dio.interceptors.add(TokenRefreshInterceptor());
+    _dio.interceptors.add(_tokenRefreshInterceptor);
 
     // Add logging interceptor
     _dio.interceptors.add(
@@ -44,6 +49,22 @@ class UserApiService {
         },
       ),
     );
+  }
+
+  /// Set callback to get valid access token from AuthProvider
+  void setGetValidTokenCallback(Future<String?> Function() callback) {
+    _getValidTokenCallback = callback;
+    try {
+      _tokenRefreshInterceptor.setCallbacks(
+        getValidTokenCallback: callback,
+        onTokenExpiredCallback: () async {
+          // Token refresh failed, user needs to re-login
+          print('[UserAPI] Token refresh failed, user session expired');
+        },
+      );
+    } catch (e) {
+      print('[UserAPI] Error setting token refresh callback: $e');
+    }
   }
 
   /// Set authorization header with bearer token

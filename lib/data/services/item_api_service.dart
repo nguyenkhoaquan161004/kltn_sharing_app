@@ -6,9 +6,13 @@ import 'package:kltn_sharing_app/data/models/item_response_model.dart';
 class ItemApiService {
   late Dio _dio;
   Future<String?> Function()? _getValidTokenCallback;
+  late TokenRefreshInterceptor _tokenRefreshInterceptor;
 
   ItemApiService({Future<String?> Function()? getValidTokenCallback})
       : _getValidTokenCallback = getValidTokenCallback {
+    // Initialize token refresh interceptor FIRST before creating Dio
+    _tokenRefreshInterceptor = TokenRefreshInterceptor();
+
     _dio = Dio(
       BaseOptions(
         baseUrl: AppConfig.baseUrl, // Use base URL, not authBaseUrl
@@ -22,7 +26,7 @@ class ItemApiService {
     );
 
     // Add token refresh interceptor for handling 401/403 errors
-    _dio.interceptors.add(TokenRefreshInterceptor());
+    _dio.interceptors.add(_tokenRefreshInterceptor);
 
     // Add logging interceptor
     _dio.interceptors.add(
@@ -50,6 +54,17 @@ class ItemApiService {
   /// Set getValidToken callback (from AuthProvider)
   void setGetValidTokenCallback(Future<String?> Function() callback) {
     _getValidTokenCallback = callback;
+    try {
+      _tokenRefreshInterceptor.setCallbacks(
+        getValidTokenCallback: callback,
+        onTokenExpiredCallback: () async {
+          // Token refresh failed, user needs to re-login
+          print('[ItemAPI] Token refresh failed, user session expired');
+        },
+      );
+    } catch (e) {
+      print('[ItemAPI] Error setting token refresh callback: $e');
+    }
   }
 
   /// Also support setAuthToken for backward compatibility
@@ -88,14 +103,16 @@ class ItemApiService {
       }
 
       final queryParams = {
-        'page': page,
-        'size': size,
-        if (search != null) 'search': search,
-        if (category != null) 'category': category,
+        'page': page + 1, // BE expects 1-based page numbering
+        'limit': size,
+        if (search != null && search.isNotEmpty)
+          'name': search, // Use 'name' parameter for BE
+        if (category != null) 'categoryId': category, // Use 'categoryId' for BE
         if (minPrice != null) 'minPrice': minPrice,
         if (maxPrice != null) 'maxPrice': maxPrice,
         'sortBy': sortBy,
-        'sortDirection': sortDirection,
+        'sortOrder':
+            sortDirection, // BE expects 'sortOrder' not 'sortDirection'
       };
 
       final response = await _dio.get(
@@ -108,8 +125,6 @@ class ItemApiService {
 
         // Handle case where response is already a Map (API returns ApiResponse<PageResponse>)
         if (data is Map<String, dynamic>) {
-          print('[ItemAPI] Response is Map: $data');
-
           if (data.containsKey('data')) {
             final pageData = data['data'];
             if (pageData is Map<String, dynamic>) {
@@ -117,6 +132,16 @@ class ItemApiService {
                 pageData,
                 (json) => ItemDto.fromJson(json),
               );
+            }
+          } else {
+            // Try to parse directly if no "data" wrapper
+            try {
+              return PageResponse<ItemDto>.fromJson(
+                data,
+                (json) => ItemDto.fromJson(json),
+              );
+            } catch (e) {
+              print('[ItemAPI] Failed to parse response: $e');
             }
           }
         }
@@ -133,6 +158,14 @@ class ItemApiService {
   /// Get single item by ID
   Future<ItemDto> getItem(String itemId) async {
     try {
+      // Ensure token is valid before making request
+      if (_getValidTokenCallback != null) {
+        final validToken = await _getValidTokenCallback!();
+        if (validToken != null) {
+          _dio.options.headers['Authorization'] = 'Bearer $validToken';
+        }
+      }
+
       final response = await _dio.get('/api/v2/items/$itemId');
 
       if (response.statusCode == 200) {
@@ -151,24 +184,216 @@ class ItemApiService {
     }
   }
 
+  /// Get all items owned by the authenticated user
+  Future<PageResponse<ItemDto>> getUserItems({
+    int page = 1, // Backend uses 1-indexed pages, not 0
+    int size = 10,
+    String? status,
+    String? sortBy = 'createdAt',
+    String? sortOrder = 'DESC',
+  }) async {
+    try {
+      // Ensure token is valid before making request
+      if (_getValidTokenCallback != null) {
+        final validToken = await _getValidTokenCallback!();
+        if (validToken != null) {
+          _dio.options.headers['Authorization'] = 'Bearer $validToken';
+          print(
+              '[ItemAPI] Token set for getUserItems: Bearer ${validToken.substring(0, 20)}...');
+        }
+      } else {
+        print('[ItemAPI] WARNING: No token callback set for getUserItems');
+      }
+
+      final Map<String, dynamic> queryParams = {
+        'page': page,
+        'limit': size,
+        'sortBy': sortBy,
+        'sortOrder': sortOrder,
+      };
+
+      if (status != null && status.isNotEmpty) {
+        queryParams['status'] = status;
+      }
+
+      final response = await _dio.get(
+        '/api/v2/items/me',
+        queryParameters: queryParams,
+      );
+
+      if (response.statusCode == 200) {
+        final data = response.data;
+        print('[ItemAPI] getUserItems response data: $data');
+
+        if (data is Map<String, dynamic> && data.containsKey('data')) {
+          final pageData = data['data'] as Map<String, dynamic>;
+          print('[ItemAPI] pageData keys: ${pageData.keys.toList()}');
+          print('[ItemAPI] pageData: $pageData');
+          final contentList = pageData['data'];
+          print(
+              '[ItemAPI] contentList type: ${contentList.runtimeType}, value: $contentList');
+          final content = (contentList is List<dynamic> ? contentList : [])
+              .map((item) => ItemDto.fromJson(item as Map<String, dynamic>))
+              .toList();
+
+          final currentPage = pageData['page'] ?? page;
+          final totalPages = pageData['totalPages'] ?? 0;
+
+          return PageResponse<ItemDto>(
+            content: content,
+            totalElements: pageData['totalItems'] ??
+                0, // ✅ Use 'totalItems' instead of 'totalElements'
+            totalPages: totalPages,
+            currentPage: currentPage,
+            pageSize: pageData['limit'] ?? size,
+            isFirst: currentPage == 1, // First page is 1
+            isLast: currentPage >= totalPages, // Compare with total pages
+            isEmpty: content.isEmpty,
+          );
+        }
+
+        throw Exception('Invalid response format: $data');
+      } else {
+        throw Exception('Failed to load user items: ${response.statusCode}');
+      }
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  /// Create a new item (product)
+  Future<bool> createItem({
+    required String name,
+    required String description,
+    required int quantity,
+    required String imageUrl,
+    required DateTime expiryDate,
+    required String categoryId,
+    required double latitude,
+    required double longitude,
+    required double price,
+  }) async {
+    try {
+      // Ensure token is valid before making request
+      if (_getValidTokenCallback != null) {
+        final validToken = await _getValidTokenCallback!();
+        if (validToken != null) {
+          _dio.options.headers['Authorization'] = 'Bearer $validToken';
+        }
+      }
+
+      final requestBody = {
+        'name': name,
+        'description': description,
+        'quantity': quantity,
+        'imageUrl': imageUrl,
+        'expiryDate': expiryDate.toIso8601String(),
+        'categoryId': categoryId,
+        'latitude': latitude,
+        'longitude': longitude,
+        'price': price,
+      };
+
+      print('[ItemAPI] Creating item with body: $requestBody');
+
+      final response = await _dio.post(
+        '/api/v2/items',
+        data: requestBody,
+      );
+
+      if (response.statusCode == 201) {
+        print('[ItemAPI] Item created successfully');
+        return true;
+      } else {
+        throw Exception('Failed to create item: ${response.statusCode}');
+      }
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  /// Get interested users for items user shared (as sharer)
+  Future<Map<String, int>> getSharerTransactions({
+    int page = 1,
+    int limit = 100,
+  }) async {
+    try {
+      // Ensure token is valid before making request
+      if (_getValidTokenCallback != null) {
+        final validToken = await _getValidTokenCallback!();
+        if (validToken != null) {
+          _dio.options.headers['Authorization'] = 'Bearer $validToken';
+        }
+      }
+
+      final response = await _dio.get(
+        '/api/v2/transactions/as-sharer',
+        queryParameters: {
+          'page': page,
+          'limit': limit,
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = response.data;
+
+        if (data is Map<String, dynamic> && data.containsKey('data')) {
+          final pageData = data['data'] as Map<String, dynamic>;
+          final contentList = pageData['content'];
+          final transactions = (contentList is List<dynamic> ? contentList : [])
+              .cast<Map<String, dynamic>>();
+
+          // Count transactions by itemId
+          Map<String, int> itemInterestCount = {};
+          for (final transaction in transactions) {
+            final itemId = transaction['itemId']?.toString() ??
+                transaction['itemIdUuid']?.toString();
+            if (itemId != null) {
+              itemInterestCount[itemId] = (itemInterestCount[itemId] ?? 0) + 1;
+            }
+          }
+
+          print(
+              '[ItemAPI] Loaded ${transactions.length} transactions, ${itemInterestCount.length} unique items');
+          return itemInterestCount;
+        }
+
+        throw Exception('Invalid response format: $data');
+      } else {
+        throw Exception('Failed to load transactions: ${response.statusCode}');
+      }
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
   Exception _handleDioException(DioException e) {
     String message;
 
     if (e.response != null) {
-      final data = e.response!.data as Map<String, dynamic>?;
+      // Response data might be Map, String, or other types
+      final data = e.response!.data;
+      final Map<String, dynamic>? dataAsMap =
+          data is Map<String, dynamic> ? data : null;
+
+      // Debug log for all error responses
+      print('[ItemAPI] ERROR RESPONSE[${e.response!.statusCode}]: $data');
 
       switch (e.response!.statusCode) {
+        case 400:
+          message = dataAsMap?['message'] ?? 'Yêu cầu không hợp lệ.';
+          break;
         case 401:
           message = 'Token hết hạn hoặc không hợp lệ. Vui lòng đăng nhập lại.';
           break;
         case 403:
-          message = 'Bạn không có quyền thực hiện hành động này.';
+          message = 'Bạn không có quyền thực hiện hành động này (403).';
           break;
         case 404:
           message = 'Không tìm thấy sản phẩm.';
           break;
         case 422:
-          message = data?['message'] ?? 'Dữ liệu không hợp lệ.';
+          message = dataAsMap?['message'] ?? 'Dữ liệu không hợp lệ.';
           break;
         case 500:
         case 502:
@@ -176,7 +401,7 @@ class ItemApiService {
           message = 'Máy chủ bị lỗi. Vui lòng thử lại sau.';
           break;
         default:
-          message = data?['message'] ?? 'Đã xảy ra lỗi';
+          message = dataAsMap?['message'] ?? 'Đã xảy ra lỗi';
       }
     } else if (e.type == DioExceptionType.connectionTimeout) {
       message = 'Kết nối bị hết thời gian. Vui lòng kiểm tra kết nối internet.';

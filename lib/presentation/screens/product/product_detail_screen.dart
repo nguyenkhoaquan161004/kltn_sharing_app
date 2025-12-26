@@ -37,7 +37,7 @@ class ProductDetailScreen extends StatefulWidget {
 
 class _ProductDetailScreenState extends State<ProductDetailScreen> {
   Timer? _timer;
-  late Duration _remainingTime;
+  late Duration _remainingTime = Duration.zero;
 
   // Product data
   ProductModel? _product;
@@ -543,7 +543,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   child: const Center(
                     child: Text(
                       'Tôi muốn nhận',
-                      style: AppTextStyles.button,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ),

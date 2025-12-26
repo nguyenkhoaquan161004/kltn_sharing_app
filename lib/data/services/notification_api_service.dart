@@ -6,8 +6,12 @@ import 'package:kltn_sharing_app/data/models/notification_model.dart';
 /// API Service for Notifications endpoints
 class NotificationApiService {
   late Dio _dio;
+  late TokenRefreshInterceptor _tokenRefreshInterceptor;
 
   NotificationApiService() {
+    // Initialize token refresh interceptor FIRST before creating Dio
+    _tokenRefreshInterceptor = TokenRefreshInterceptor();
+
     _dio = Dio(
       BaseOptions(
         baseUrl: AppConfig.baseUrl,
@@ -21,7 +25,7 @@ class NotificationApiService {
     );
 
     // Add token refresh interceptor for handling 401/403 errors
-    _dio.interceptors.add(TokenRefreshInterceptor());
+    _dio.interceptors.add(_tokenRefreshInterceptor);
 
     // Add logging interceptor
     _dio.interceptors.add(
@@ -43,6 +47,20 @@ class NotificationApiService {
         },
       ),
     );
+  }
+
+  /// Set callback to get valid access token from AuthProvider
+  void setGetValidTokenCallback(Future<String?> Function() callback) {
+    try {
+      _tokenRefreshInterceptor.setCallbacks(
+        getValidTokenCallback: callback,
+        onTokenExpiredCallback: () async {
+          print('[NotificationAPI] Token refresh failed, user session expired');
+        },
+      );
+    } catch (e) {
+      print('[NotificationAPI] Error setting token refresh callback: $e');
+    }
   }
 
   /// Set authorization header with bearer token

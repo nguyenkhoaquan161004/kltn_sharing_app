@@ -88,7 +88,7 @@ class _SplashScreenState extends State<SplashScreen>
                         style: TextStyle(
                           fontSize: 70,
                           fontWeight: FontWeight.bold,
-                          color: AppColors.primaryTeal,
+                          color: AppColors.primaryGreen,
                         ),
                       ),
                     ),

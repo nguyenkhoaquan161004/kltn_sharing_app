@@ -70,7 +70,7 @@ class Error404Screen extends StatelessWidget {
                     context.go(AppRoutes.home);
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primaryTeal,
+                    backgroundColor: AppColors.primaryGreen,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),

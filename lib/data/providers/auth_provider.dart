@@ -21,6 +21,7 @@ class AuthProvider extends ChangeNotifier {
   bool _isLoading = false;
   String? _errorMessage;
   DateTime? _tokenExpiresAt;
+  bool _isRefreshing = false; // Prevent multiple refresh attempts
 
   AuthProvider({required AuthApiService authApiService})
       : _authApiService = authApiService {
@@ -68,6 +69,7 @@ class AuthProvider extends ChangeNotifier {
   ) async {
     final expiresAt = DateTime.now().add(Duration(seconds: expiresInSeconds));
 
+    // IMPORTANT: Save refreshToken - required for future token refresh!
     await _prefs.setString(_accessTokenKey, accessToken);
     await _prefs.setString(_refreshTokenKey, refreshToken);
     await _prefs.setString(_tokenExpiresAtKey, expiresAt.toIso8601String());
@@ -81,7 +83,12 @@ class AuthProvider extends ChangeNotifier {
     _tokenExpiresAt = expiresAt;
     _authApiService.setAuthToken(accessToken);
 
-    print('[AuthProvider] Token saved. Expires at: $expiresAt');
+    print('[AuthProvider] ✅ Tokens saved to SharedPreferences');
+    print('[AuthProvider] - Access Token: ${accessToken.substring(0, 20)}...');
+    print(
+        '[AuthProvider] - Refresh Token: ${refreshToken.substring(0, 20)}...');
+    print('[AuthProvider] - Expires At: $expiresAt');
+    print('[AuthProvider] - Username: $username');
 
     notifyListeners();
   }
@@ -97,6 +104,7 @@ class AuthProvider extends ChangeNotifier {
     _refreshToken = null;
     _username = null;
     _tokenExpiresAt = null;
+    _isRefreshing = false; // Reset refresh flag
     _authApiService.removeAuthToken();
 
     notifyListeners();
@@ -115,15 +123,37 @@ class AuthProvider extends ChangeNotifier {
 
   /// Refresh access token using refresh token
   Future<bool> refreshAccessToken() async {
+    // Prevent multiple simultaneous refresh attempts
+    if (_isRefreshing) {
+      print('[AuthProvider] ⏳ Token refresh already in progress, waiting...');
+      // Wait a bit and return the current token state
+      await Future.delayed(Duration(milliseconds: 500));
+      return _accessToken != null && _accessToken!.isNotEmpty;
+    }
+
     if (_refreshToken == null || _refreshToken!.isEmpty) {
-      print('[AuthProvider] No refresh token available');
+      print('[AuthProvider] ❌ No refresh token available in memory');
       return false;
     }
 
+    _isRefreshing = true;
+
     try {
-      print('[AuthProvider] Refreshing access token...');
+      print('[AuthProvider] 🔄 Refreshing access token using refresh token...');
       final request = RefreshTokenRequest(refreshToken: _refreshToken!);
       final tokenResponse = await _authApiService.refreshToken(request);
+
+      // Check if backend returned valid refresh token
+      if (tokenResponse.refreshToken.isEmpty) {
+        print('[AuthProvider] ❌ Backend returned empty refresh token');
+        await _clearTokens();
+        _isRefreshing = false;
+        return false;
+      }
+
+      print('[AuthProvider] ✅ Got new tokens from backend');
+      print(
+          '[AuthProvider] New refresh token: ${tokenResponse.refreshToken.substring(0, 20)}...');
 
       await _saveTokens(
         tokenResponse.accessToken,
@@ -132,12 +162,14 @@ class AuthProvider extends ChangeNotifier {
         _username,
       );
 
-      print('[AuthProvider] Token refreshed successfully');
+      print('[AuthProvider] ✅ Token refreshed successfully');
+      _isRefreshing = false;
       return true;
     } catch (e) {
-      print('[AuthProvider] Token refresh failed: $e');
+      print('[AuthProvider] ❌ Token refresh failed: $e');
       // If refresh fails, user needs to login again
       await _clearTokens();
+      _isRefreshing = false;
       return false;
     }
   }

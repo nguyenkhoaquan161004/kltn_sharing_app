@@ -5,8 +5,13 @@ import 'package:kltn_sharing_app/data/models/gamification_response_model.dart';
 
 class GamificationApiService {
   late Dio _dio;
+  late TokenRefreshInterceptor _tokenRefreshInterceptor;
+  Future<String?> Function()? _getValidTokenCallback;
 
   GamificationApiService() {
+    // Initialize token refresh interceptor FIRST before creating Dio
+    _tokenRefreshInterceptor = TokenRefreshInterceptor();
+
     _dio = Dio(
       BaseOptions(
         baseUrl: AppConfig.baseUrl,
@@ -20,7 +25,27 @@ class GamificationApiService {
     );
 
     // Add token refresh interceptor for handling 401/403 errors
-    _dio.interceptors.add(TokenRefreshInterceptor());
+    _dio.interceptors.add(_tokenRefreshInterceptor);
+
+    // Add token interceptor - adds token to every request
+    _dio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (options, handler) async {
+          // Get fresh token before every request
+          if (_getValidTokenCallback != null) {
+            try {
+              final token = await _getValidTokenCallback!();
+              if (token != null && token.isNotEmpty) {
+                options.headers['Authorization'] = 'Bearer $token';
+              }
+            } catch (e) {
+              print('[GamificationAPI] Error getting token: $e');
+            }
+          }
+          return handler.next(options);
+        },
+      ),
+    );
 
     // Add logging interceptor
     _dio.interceptors.add(
@@ -42,6 +67,21 @@ class GamificationApiService {
         },
       ),
     );
+  }
+
+  /// Set callback to get valid access token from AuthProvider
+  void setGetValidTokenCallback(Future<String?> Function() callback) {
+    try {
+      _getValidTokenCallback = callback;
+      _tokenRefreshInterceptor.setCallbacks(
+        getValidTokenCallback: callback,
+        onTokenExpiredCallback: () async {
+          print('[GamificationAPI] Token refresh failed, user session expired');
+        },
+      );
+    } catch (e) {
+      print('[GamificationAPI] Error setting token refresh callback: $e');
+    }
   }
 
   /// Set authorization header with bearer token
@@ -136,18 +176,31 @@ class GamificationApiService {
     }
   }
 
-  /// Get current user's rank and stats
+  /// Get current user's gamification stats (points, level, etc.)
   Future<GamificationDto> getCurrentUserStats() async {
     try {
-      final response = await _dio.get('/api/v2/gamifications/me');
+      final response = await _dio.get('/api/v2/gamification/me');
 
       if (response.statusCode == 200) {
         final data = response.data;
 
         if (data is Map<String, dynamic>) {
           if (data.containsKey('data')) {
-            return GamificationDto.fromJson(
-                data['data'] as Map<String, dynamic>);
+            final userData = data['data'] as Map<String, dynamic>;
+            // Map the response to GamificationDto
+            return GamificationDto(
+              id: userData['id'] ?? '',
+              userId: userData['userId'] ?? userData['user_id'] ?? '',
+              username: userData['username'] ?? '',
+              avatarUrl: userData['avatarUrl'] ?? userData['avatar_url'],
+              points: userData['points'] ?? 0,
+              rank: userData['level'] ?? userData['rank'] ?? 0,
+              itemsShared:
+                  userData['totalShares'] ?? userData['items_shared'] ?? 0,
+              itemsReceived:
+                  userData['totalReceives'] ?? userData['items_received'] ?? 0,
+              badge: null,
+            );
           }
           return GamificationDto.fromJson(data);
         }
@@ -155,6 +208,139 @@ class GamificationApiService {
         throw Exception('Unexpected response format');
       } else {
         throw Exception('Failed to load user stats: ${response.statusCode}');
+      }
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  /// Get all badges in the system
+  Future<List<Map<String, dynamic>>> getAllBadges() async {
+    try {
+      final response = await _dio.get('/api/v2/gamification/badges');
+
+      if (response.statusCode == 200) {
+        final data = response.data;
+
+        // Handle ApiResponse<List<Badge>>
+        if (data is Map<String, dynamic>) {
+          if (data.containsKey('data')) {
+            final badgeList = data['data'];
+            if (badgeList is List) {
+              return badgeList
+                  .map((badge) => badge as Map<String, dynamic>)
+                  .toList();
+            }
+          }
+        } else if (data is List) {
+          // Direct list response
+          return data.map((badge) => badge as Map<String, dynamic>).toList();
+        }
+
+        throw Exception('Unexpected response format: $data');
+      } else {
+        throw Exception('Failed to load badges: ${response.statusCode}');
+      }
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  /// Get current user's earned badges
+  Future<List<Map<String, dynamic>>> getUserBadges() async {
+    try {
+      final response = await _dio.get('/api/v2/gamification/me/badges');
+
+      if (response.statusCode == 200) {
+        final data = response.data;
+
+        // Handle ApiResponse<List<UserBadge>>
+        if (data is Map<String, dynamic>) {
+          if (data.containsKey('data')) {
+            final badgeList = data['data'];
+            if (badgeList is List) {
+              return badgeList
+                  .map((badge) => badge as Map<String, dynamic>)
+                  .toList();
+            }
+          }
+        } else if (data is List) {
+          // Direct list response
+          return data.map((badge) => badge as Map<String, dynamic>).toList();
+        }
+
+        throw Exception('Unexpected response format: $data');
+      } else {
+        throw Exception('Failed to load user badges: ${response.statusCode}');
+      }
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  /// Get all achievements in the system
+  Future<List<Map<String, dynamic>>> getAllAchievements() async {
+    try {
+      final response = await _dio.get('/api/v2/gamification/achievements');
+
+      if (response.statusCode == 200) {
+        final data = response.data;
+
+        // Handle ApiResponse<List<Achievement>>
+        if (data is Map<String, dynamic>) {
+          if (data.containsKey('data')) {
+            final achievementList = data['data'];
+            if (achievementList is List) {
+              return achievementList
+                  .map((achievement) => achievement as Map<String, dynamic>)
+                  .toList();
+            }
+          }
+        } else if (data is List) {
+          // Direct list response
+          return data
+              .map((achievement) => achievement as Map<String, dynamic>)
+              .toList();
+        }
+
+        throw Exception('Unexpected response format: $data');
+      } else {
+        throw Exception('Failed to load achievements: ${response.statusCode}');
+      }
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  /// Get current user's earned achievements
+  Future<List<Map<String, dynamic>>> getUserAchievements() async {
+    try {
+      final response = await _dio.get('/api/v2/gamification/me/achievements');
+
+      if (response.statusCode == 200) {
+        final data = response.data;
+
+        // Handle ApiResponse<List<UserAchievement>>
+        if (data is Map<String, dynamic>) {
+          if (data.containsKey('data')) {
+            final achievementList = data['data'];
+            if (achievementList is List) {
+              return achievementList
+                  .map((achievement) => achievement as Map<String, dynamic>)
+                  .toList();
+            }
+          }
+        } else if (data is List) {
+          // Direct list response
+          return data
+              .map((achievement) => achievement as Map<String, dynamic>)
+              .toList();
+        }
+
+        throw Exception('Unexpected response format: $data');
+      } else {
+        throw Exception(
+            'Failed to load user achievements: ${response.statusCode}');
       }
     } on DioException catch (e) {
       throw _handleDioException(e);

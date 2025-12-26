@@ -7,6 +7,7 @@ import '../../../../data/models/product_model.dart';
 import '../../../../data/models/transaction_request_model.dart';
 import '../../../../data/services/transaction_api_service.dart';
 import '../../../../data/providers/auth_provider.dart';
+import '../../../../data/providers/user_provider.dart';
 
 class OrderRequestModal extends StatefulWidget {
   final ProductModel product;
@@ -27,8 +28,28 @@ class _OrderRequestModalState extends State<OrderRequestModal> {
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _addressController = TextEditingController();
   final TextEditingController _noteController = TextEditingController();
+
+  // Receiver info toggle
+  bool _useCurrentUserInfo = true;
+
   bool _isLoading = false;
   String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCurrentUserInfo();
+  }
+
+  void _loadCurrentUserInfo() {
+    final userProvider = context.read<UserProvider>();
+    if (userProvider.currentUser != null) {
+      final user = userProvider.currentUser!;
+      _fullNameController.text = user.fullName ?? '';
+      _phoneController.text = user.phoneNumber ?? '';
+      _addressController.text = user.address ?? '';
+    }
+  }
 
   @override
   void dispose() {
@@ -73,6 +94,10 @@ class _OrderRequestModalState extends State<OrderRequestModal> {
 
   void _requestNow() async {
     // Validate inputs
+    if (_reasonController.text.isEmpty) {
+      setState(() => _errorMessage = 'Vui lòng nhập lý do');
+      return;
+    }
     if (_fullNameController.text.isEmpty) {
       setState(() => _errorMessage = 'Vui lòng nhập họ tên');
       return;
@@ -85,10 +110,6 @@ class _OrderRequestModalState extends State<OrderRequestModal> {
       setState(() => _errorMessage = 'Vui lòng nhập địa chỉ');
       return;
     }
-    if (_reasonController.text.isEmpty) {
-      setState(() => _errorMessage = 'Vui lòng nhập lý do');
-      return;
-    }
 
     setState(() {
       _isLoading = true;
@@ -97,6 +118,7 @@ class _OrderRequestModalState extends State<OrderRequestModal> {
 
     try {
       final authProvider = context.read<AuthProvider>();
+      final userProvider = context.read<UserProvider>();
       final transactionService = TransactionApiService();
 
       // Set auth token if available
@@ -104,7 +126,10 @@ class _OrderRequestModalState extends State<OrderRequestModal> {
         transactionService.setAuthToken(authProvider.accessToken!);
       }
 
-      // Create transaction request
+      // Get receiver ID (current user's ID)
+      final receiverId = userProvider.currentUser?.id ?? '';
+
+      // Create transaction request with correct format
       final request = TransactionRequest(
         itemId: widget.product.id,
         message: _reasonController.text,
@@ -114,8 +139,11 @@ class _OrderRequestModalState extends State<OrderRequestModal> {
         shippingNote: _noteController.text,
         paymentMethod: 'CASH',
         transactionFee: 0.0,
-        receiverId: authProvider.accessToken != null ? 'current_user' : '',
+        receiverId: receiverId,
       );
+
+      print(
+          '[OrderRequestModal] Creating transaction with request: ${request.toJson()}');
 
       // Call API
       await transactionService.createTransaction(request);
@@ -131,7 +159,7 @@ class _OrderRequestModalState extends State<OrderRequestModal> {
         _isLoading = false;
         _errorMessage = e.toString().replaceAll('Exception: ', '');
       });
-      print('Error creating transaction: $e');
+      print('[OrderRequestModal] Error creating transaction: $e');
     }
   }
 
@@ -163,12 +191,12 @@ class _OrderRequestModalState extends State<OrderRequestModal> {
               ),
               const SizedBox(height: 24),
               const Text(
-                'Purchase Successful',
+                'Yêu cầu thành công',
                 style: AppTextStyles.h3,
               ),
               const SizedBox(height: 12),
               Text(
-                'The seller has been notified to ship your item and we will only release the payment after you have received it.',
+                'Người cho đã được thông báo về yêu cầu của bạn. Chúng tôi sẽ liên hệ với bạn sớm nhất.',
                 style: AppTextStyles.bodyMedium,
                 textAlign: TextAlign.center,
               ),
@@ -335,18 +363,95 @@ class _OrderRequestModalState extends State<OrderRequestModal> {
             const Text('Thông tin người nhận', style: AppTextStyles.h4),
             const SizedBox(height: 16),
 
+            // Toggle: Use current user info or enter new
+            Container(
+              decoration: BoxDecoration(
+                color: AppColors.backgroundGray,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () {
+                            setState(() => _useCurrentUserInfo = true);
+                            _loadCurrentUserInfo();
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            decoration: BoxDecoration(
+                              color: _useCurrentUserInfo
+                                  ? AppColors.primaryGreen
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Center(
+                              child: Text(
+                                'Thông tin hiện tại',
+                                style: AppTextStyles.bodyMedium.copyWith(
+                                  color: _useCurrentUserInfo
+                                      ? Colors.white
+                                      : AppColors.textSecondary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () {
+                            setState(() => _useCurrentUserInfo = false);
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            decoration: BoxDecoration(
+                              color: !_useCurrentUserInfo
+                                  ? AppColors.primaryGreen
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Center(
+                              child: Text(
+                                'Thông tin khác',
+                                style: AppTextStyles.bodyMedium.copyWith(
+                                  color: !_useCurrentUserInfo
+                                      ? Colors.white
+                                      : AppColors.textSecondary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
             // Full name field
             const Text('Họ tên', style: AppTextStyles.label),
             const SizedBox(height: 8),
             TextField(
               controller: _fullNameController,
+              enabled: !_useCurrentUserInfo,
               decoration: InputDecoration(
                 hintText: 'Nhập họ tên của bạn',
                 hintStyle: AppTextStyles.bodyMedium.copyWith(
                   color: AppColors.textDisabled,
                 ),
                 filled: true,
-                fillColor: AppColors.backgroundGray,
+                fillColor: _useCurrentUserInfo
+                    ? AppColors.backgroundGray.withOpacity(0.5)
+                    : AppColors.backgroundGray,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide.none,
@@ -360,6 +465,7 @@ class _OrderRequestModalState extends State<OrderRequestModal> {
             const SizedBox(height: 8),
             TextField(
               controller: _phoneController,
+              enabled: !_useCurrentUserInfo,
               keyboardType: TextInputType.phone,
               decoration: InputDecoration(
                 hintText: 'Nhập số điện thoại',
@@ -367,7 +473,9 @@ class _OrderRequestModalState extends State<OrderRequestModal> {
                   color: AppColors.textDisabled,
                 ),
                 filled: true,
-                fillColor: AppColors.backgroundGray,
+                fillColor: _useCurrentUserInfo
+                    ? AppColors.backgroundGray.withOpacity(0.5)
+                    : AppColors.backgroundGray,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide.none,
@@ -381,6 +489,7 @@ class _OrderRequestModalState extends State<OrderRequestModal> {
             const SizedBox(height: 8),
             TextField(
               controller: _addressController,
+              enabled: !_useCurrentUserInfo,
               maxLines: 2,
               decoration: InputDecoration(
                 hintText: 'Nhập địa chỉ giao hàng',
@@ -388,7 +497,9 @@ class _OrderRequestModalState extends State<OrderRequestModal> {
                   color: AppColors.textDisabled,
                 ),
                 filled: true,
-                fillColor: AppColors.backgroundGray,
+                fillColor: _useCurrentUserInfo
+                    ? AppColors.backgroundGray.withOpacity(0.5)
+                    : AppColors.backgroundGray,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide.none,
@@ -437,30 +548,10 @@ class _OrderRequestModalState extends State<OrderRequestModal> {
             ],
 
             // Action buttons
+            const SizedBox(height: 16),
             Row(
               children: [
-                // Add to cart
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: _isLoading ? null : _addToCart,
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      side: const BorderSide(color: AppColors.primaryTeal),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: Text(
-                      'Thêm vào giỏ hàng',
-                      style: AppTextStyles.button.copyWith(
-                        color: AppColors.primaryTeal,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-
-                // Request now
+                // Request now button
                 Expanded(
                   child: Container(
                     decoration: BoxDecoration(
@@ -516,14 +607,14 @@ class _OrderRequestModalState extends State<OrderRequestModal> {
         height: 36,
         decoration: BoxDecoration(
           border: Border.all(
-            color: enabled ? AppColors.primaryTeal : AppColors.borderLight,
+            color: enabled ? AppColors.primaryGreen : AppColors.borderLight,
           ),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Icon(
           icon,
           size: 20,
-          color: enabled ? AppColors.primaryTeal : AppColors.textDisabled,
+          color: enabled ? AppColors.primaryGreen : AppColors.textDisabled,
         ),
       ),
     );

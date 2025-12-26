@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
+import '../../../data/services/gamification_api_service.dart';
 
 class AchievementsListScreen extends StatefulWidget {
   const AchievementsListScreen({super.key});
@@ -11,97 +13,105 @@ class AchievementsListScreen extends StatefulWidget {
 }
 
 class _AchievementsListScreenState extends State<AchievementsListScreen> {
-  // Mock achievements data - both unlocked and locked
-  late List<Map<String, dynamic>> _achievements;
+  late GamificationApiService _gamificationApiService;
+  List<Map<String, dynamic>> _allAchievements = [];
+  List<Map<String, dynamic>> _userAchievements = [];
+  bool _isLoading = true;
+  String? _errorMessage;
 
   @override
   void initState() {
     super.initState();
-    _achievements = [
-      // Unlocked achievements
-      {
-        'id': '1',
-        'name': 'Người chia sẻ của tháng',
-        'description': 'Chia sẻ nhiều sản phẩm nhất trong tháng',
-        'icon': '🏆',
-        'color': 'gold',
-        'isUnlocked': true,
-        'unlockedDate': '23.10.2025',
+    _gamificationApiService = context.read<GamificationApiService>();
+    _loadAchievements();
+  }
+
+  /// Load all achievements and user's earned achievements
+  Future<void> _loadAchievements() async {
+    if (!mounted) return;
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      // Fetch all achievements and user achievements in parallel
+      final allAchievementsResponse =
+          _gamificationApiService.getAllAchievements();
+      final userAchievementsResponse =
+          _gamificationApiService.getUserAchievements();
+
+      final results = await Future.wait([
+        allAchievementsResponse,
+        userAchievementsResponse,
+      ]);
+
+      if (!mounted) return;
+
+      setState(() {
+        _allAchievements = results[0] as List<Map<String, dynamic>>;
+        _userAchievements = results[1] as List<Map<String, dynamic>>;
+        _isLoading = false;
+      });
+
+      print(
+          'DEBUG: Loaded ${_allAchievements.length} all achievements and ${_userAchievements.length} user achievements');
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _errorMessage = e.toString();
+        _isLoading = false;
+      });
+      print('DEBUG: Error loading achievements: $e');
+    }
+  }
+
+  /// Check if an achievement is earned by the user
+  bool _isAchievementEarned(dynamic achievementId) {
+    if (achievementId == null) return false;
+    return _userAchievements.any((ua) {
+      final id = ua['achievement_id'] ?? ua['achievementId'];
+      return id.toString() == achievementId.toString();
+    });
+  }
+
+  /// Get earned date for an achievement
+  String? _getEarnedDate(dynamic achievementId) {
+    if (achievementId == null) return null;
+    final userAchievement = _userAchievements.firstWhere(
+      (ua) {
+        final id = ua['achievement_id'] ?? ua['achievementId'];
+        return id.toString() == achievementId.toString();
       },
-      {
-        'id': '2',
-        'name': 'Kết nối cộng đồng',
-        'description': 'Nhận được 50 lượt quan tâm',
-        'icon': '🤝',
-        'color': 'silver',
-        'isUnlocked': true,
-        'unlockedDate': '15.10.2025',
-      },
-      {
-        'id': '3',
-        'name': 'Người đào tạo',
-        'description': 'Giúp 10 người mới tham gia',
-        'icon': '👨‍🏫',
-        'color': 'bronze',
-        'isUnlocked': true,
-        'unlockedDate': '01.10.2025',
-      },
-      // Locked achievements
-      {
-        'id': '4',
-        'name': 'Điểm số cao',
-        'description': 'Đạt 1000 điểm gamification',
-        'icon': '⭐',
-        'color': 'locked',
-        'isUnlocked': false,
-        'progress': '650/1000',
-      },
-      {
-        'id': '5',
-        'name': 'Nhà sưu tập',
-        'description': 'Chia sẻ 100 sản phẩm',
-        'icon': '📦',
-        'color': 'locked',
-        'isUnlocked': false,
-        'progress': '45/100',
-      },
-      {
-        'id': '6',
-        'name': 'Người quản lý cộng đồng',
-        'description': 'Tham gia nhóm cộng đồng',
-        'icon': '👥',
-        'color': 'locked',
-        'isUnlocked': false,
-        'progress': 'Chưa bắt đầu',
-      },
-      {
-        'id': '7',
-        'name': 'Công dân tốt',
-        'description': 'Nhận được 5 sao từ 20 người',
-        'icon': '⭐⭐⭐⭐⭐',
-        'color': 'locked',
-        'isUnlocked': false,
-        'progress': '12/20',
-      },
-      {
-        'id': '8',
-        'name': 'Người chia sẻ hàng ngày',
-        'description': 'Chia sẻ sản phẩm 30 ngày liên tiếp',
-        'icon': '📅',
-        'color': 'locked',
-        'isUnlocked': false,
-        'progress': '15/30',
-      },
-    ];
+      orElse: () => {},
+    );
+    if (userAchievement.isEmpty) return null;
+
+    final earnedAt =
+        userAchievement['earned_at'] ?? userAchievement['earnedAt'];
+    if (earnedAt == null) return null;
+
+    try {
+      final date = DateTime.parse(earnedAt.toString());
+      return '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year}';
+    } catch (e) {
+      return null;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    // Separate unlocked and locked achievements
-    final unlockedAchievements =
-        _achievements.where((a) => a['isUnlocked']).toList();
-    final lockedAchievements =
-        _achievements.where((a) => !a['isUnlocked']).toList();
+    // Separate earned and unearned achievements
+    final earnedAchievements = _allAchievements
+        .where((a) =>
+            _isAchievementEarned(a['achievement_id'] ?? a['achievementId']))
+        .toList();
+    final unearnedAchievements = _allAchievements
+        .where((a) =>
+            !_isAchievementEarned(a['achievement_id'] ?? a['achievementId']))
+        .toList();
 
     return Scaffold(
       backgroundColor: AppColors.backgroundWhite,
@@ -117,118 +127,152 @@ class _AchievementsListScreenState extends State<AchievementsListScreen> {
           style: AppTextStyles.h3,
         ),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Stats
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppColors.backgroundGray,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  Column(
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _errorMessage != null
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        '${unlockedAchievements.length}',
-                        style: AppTextStyles.h2.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                        'Lỗi tải thành tựu',
+                        style: AppTextStyles.h4,
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 8),
                       Text(
-                        'Đã đạt được',
-                        style: AppTextStyles.caption,
+                        _errorMessage ?? 'Đã xảy ra lỗi',
+                        style: AppTextStyles.bodySmall,
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: _loadAchievements,
+                        child: const Text('Thử lại'),
                       ),
                     ],
                   ),
-                  Column(
+                )
+              : SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        '${lockedAchievements.length}',
-                        style: AppTextStyles.h2.copyWith(
-                          fontWeight: FontWeight.bold,
+                      // Stats
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: AppColors.backgroundGray,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceAround,
+                          children: [
+                            Column(
+                              children: [
+                                Text(
+                                  '${earnedAchievements.length}',
+                                  style: AppTextStyles.h2.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Đã đạt được',
+                                  style: AppTextStyles.caption,
+                                ),
+                              ],
+                            ),
+                            Column(
+                              children: [
+                                Text(
+                                  '${unearnedAchievements.length}',
+                                  style: AppTextStyles.h2.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Chưa đạt được',
+                                  style: AppTextStyles.caption,
+                                ),
+                              ],
+                            ),
+                            Column(
+                              children: [
+                                Text(
+                                  _allAchievements.isEmpty
+                                      ? '0%'
+                                      : '${(earnedAchievements.length / _allAchievements.length * 100).toStringAsFixed(0)}%',
+                                  style: AppTextStyles.h2.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.primaryTeal,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Hoàn thành',
+                                  style: AppTextStyles.caption,
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Chưa đạt được',
-                        style: AppTextStyles.caption,
-                      ),
-                    ],
-                  ),
-                  Column(
-                    children: [
-                      Text(
-                        '${(unlockedAchievements.length / _achievements.length * 100).toStringAsFixed(0)}%',
-                        style: AppTextStyles.h2.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.primaryTeal,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Hoàn thành',
-                        style: AppTextStyles.caption,
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
+                      const SizedBox(height: 24),
 
-            // Unlocked achievements section
-            if (unlockedAchievements.isNotEmpty) ...[
-              Text(
-                'Thành tựu đã đạt được',
-                style: AppTextStyles.h4,
-              ),
-              const SizedBox(height: 12),
-              ...unlockedAchievements
-                  .map((a) => _buildAchievementItem(a))
-                  .toList(),
-              const SizedBox(height: 24),
-            ],
+                      // Earned achievements section
+                      if (earnedAchievements.isNotEmpty) ...[
+                        Text(
+                          'Thành tựu đã đạt được',
+                          style: AppTextStyles.h4,
+                        ),
+                        const SizedBox(height: 12),
+                        ...earnedAchievements
+                            .map((a) => _buildAchievementItem(a, true))
+                            .toList(),
+                        const SizedBox(height: 24),
+                      ],
 
-            // Locked achievements section
-            if (lockedAchievements.isNotEmpty) ...[
-              Text(
-                'Thành tựu chưa đạt được',
-                style: AppTextStyles.h4,
-              ),
-              const SizedBox(height: 12),
-              ...lockedAchievements
-                  .map((a) => _buildAchievementItem(a))
-                  .toList(),
-            ],
-          ],
-        ),
-      ),
+                      // Unearned achievements section
+                      if (unearnedAchievements.isNotEmpty) ...[
+                        Text(
+                          'Thành tựu chưa đạt được',
+                          style: AppTextStyles.h4,
+                        ),
+                        const SizedBox(height: 12),
+                        ...unearnedAchievements
+                            .map((a) => _buildAchievementItem(a, false))
+                            .toList(),
+                      ],
+                    ],
+                  ),
+                ),
     );
   }
 
-  Widget _buildAchievementItem(Map<String, dynamic> achievement) {
-    final isUnlocked = achievement['isUnlocked'];
-    final backgroundColor = isUnlocked ? Colors.white : Colors.grey[200];
-    final borderColor = isUnlocked ? AppColors.borderLight : Colors.grey[300];
+  Widget _buildAchievementItem(
+      Map<String, dynamic> achievement, bool isEarned) {
+    final achievementName = achievement['name'] ??
+        achievement['achievement_name'] ??
+        'Unknown Achievement';
+    final achievementDescription = achievement['description'] ?? '';
+    final achievementIcon = achievement['icon'] ?? '🏆';
+    final achievementColor =
+        achievement['color'] ?? achievement['achievement_color'] ?? 'gold';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: backgroundColor,
+        color: isEarned ? Colors.white : Colors.grey[200],
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: borderColor ?? Colors.transparent,
+          color: isEarned
+              ? AppColors.borderLight
+              : (Colors.grey[300] ?? Colors.transparent),
           width: 1,
         ),
-        boxShadow: isUnlocked
+        boxShadow: isEarned
             ? [
                 BoxShadow(
                   color: Colors.black.withOpacity(0.05),
@@ -245,14 +289,14 @@ class _AchievementsListScreenState extends State<AchievementsListScreen> {
             width: 64,
             height: 64,
             decoration: BoxDecoration(
-              color: isUnlocked
-                  ? _getAchievementColor(achievement['color'])
+              color: isEarned
+                  ? _getAchievementColor(achievementColor)
                   : Colors.grey[300],
               borderRadius: BorderRadius.circular(12),
             ),
             child: Center(
               child: Text(
-                achievement['icon'],
+                achievementIcon,
                 style: const TextStyle(fontSize: 32),
               ),
             ),
@@ -265,25 +309,24 @@ class _AchievementsListScreenState extends State<AchievementsListScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  achievement['name'],
+                  achievementName,
                   style: AppTextStyles.bodyMedium.copyWith(
                     fontWeight: FontWeight.w600,
-                    color:
-                        isUnlocked ? AppColors.textPrimary : Colors.grey[600],
+                    color: isEarned ? AppColors.textPrimary : Colors.grey[600],
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  achievement['description'],
+                  achievementDescription,
                   style: AppTextStyles.caption.copyWith(
                     color:
-                        isUnlocked ? AppColors.textSecondary : Colors.grey[500],
+                        isEarned ? AppColors.textSecondary : Colors.grey[500],
                   ),
                 ),
                 const SizedBox(height: 8),
-                if (isUnlocked)
+                if (isEarned)
                   Text(
-                    'Đạt được: ${achievement['unlockedDate']}',
+                    'Đạt được: ${_getEarnedDate(achievement['achievement_id'] ?? achievement['achievementId']) ?? 'N/A'}',
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w500,
@@ -291,31 +334,13 @@ class _AchievementsListScreenState extends State<AchievementsListScreen> {
                     ),
                   )
                 else
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(4),
-                          child: LinearProgressIndicator(
-                            value: _parseProgress(achievement['progress']),
-                            minHeight: 4,
-                            backgroundColor: Colors.grey[300],
-                            valueColor: const AlwaysStoppedAnimation<Color>(
-                              AppColors.primaryTeal,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        achievement['progress'],
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                    ],
+                  Text(
+                    'Tiếp tục cố gắng',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.grey[600],
+                    ),
                   ),
               ],
             ),
@@ -325,23 +350,8 @@ class _AchievementsListScreenState extends State<AchievementsListScreen> {
     );
   }
 
-  double _parseProgress(String progress) {
-    if (progress == 'Chưa bắt đầu') return 0;
-    try {
-      final parts = progress.split('/');
-      if (parts.length == 2) {
-        final current = int.parse(parts[0].trim());
-        final total = int.parse(parts[1].trim());
-        return current / total;
-      }
-    } catch (e) {
-      return 0;
-    }
-    return 0;
-  }
-
   Color _getAchievementColor(String color) {
-    switch (color) {
+    switch (color.toLowerCase()) {
       case 'gold':
         return AppColors.achievementGold;
       case 'silver':

@@ -3,7 +3,10 @@ import 'package:kltn_sharing_app/data/models/item_response_model.dart';
 import 'package:kltn_sharing_app/data/services/item_api_service.dart';
 
 class ItemProvider extends ChangeNotifier {
-  final ItemApiService _itemApiService = ItemApiService();
+  final ItemApiService _itemApiService;
+
+  ItemProvider({ItemApiService? itemApiService})
+      : _itemApiService = itemApiService ?? ItemApiService();
 
   // State management
   List<ItemDto> _items = [];
@@ -26,6 +29,11 @@ class ItemProvider extends ChangeNotifier {
   /// Set authorization token from AuthProvider
   void setAuthToken(String accessToken) {
     _itemApiService.setAuthToken(accessToken);
+  }
+
+  /// Set token callback from AuthProvider
+  void setGetValidTokenCallback(Future<String?> Function() callback) {
+    _itemApiService.setGetValidTokenCallback(callback);
   }
 
   /// Load items with pagination

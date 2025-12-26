@@ -4,14 +4,14 @@ import '../../../../core/constants/app_text_styles.dart';
 
 class ProfileHeader extends StatelessWidget {
   final String name;
-  final int points;
-  final String avatar;
+  final int? trustScore; // Nullable - có thể null từ API
+  final String? avatar;
 
   const ProfileHeader({
     super.key,
     required this.name,
-    required this.points,
-    required this.avatar,
+    this.trustScore,
+    this.avatar,
   });
 
   @override
@@ -44,8 +44,8 @@ class ProfileHeader extends StatelessWidget {
               ],
             ),
             child: ClipOval(
-              child: avatar.isNotEmpty
-                  ? Image.network(avatar, fit: BoxFit.cover)
+              child: (avatar != null && avatar!.isNotEmpty)
+                  ? Image.network(avatar!, fit: BoxFit.cover)
                   : Container(
                       color: AppColors.backgroundGray,
                       child: const Icon(
@@ -69,7 +69,7 @@ class ProfileHeader extends StatelessWidget {
 
           // Points
           Text(
-            '$points điểm uy tín',
+            '${trustScore ?? 0} điểm uy tín',
             style: AppTextStyles.bodyMedium.copyWith(
               color: Colors.white.withOpacity(0.9),
             ),

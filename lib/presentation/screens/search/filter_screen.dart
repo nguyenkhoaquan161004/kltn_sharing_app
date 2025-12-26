@@ -49,7 +49,7 @@ class _FilterScreenState extends State<FilterScreen> {
                       child: const Text(
                         'Đặt lại',
                         style: TextStyle(
-                          color: AppColors.primaryTeal,
+                          color: AppColors.primaryGreen,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -129,7 +129,7 @@ class _FilterScreenState extends State<FilterScreen> {
               min: 0,
               max: 300,
               divisions: 30,
-              activeColor: AppColors.primaryTeal,
+              activeColor: AppColors.primaryGreen,
               inactiveColor: Colors.grey[300],
               onChanged: (RangeValues values) {
                 setState(() => _priceRange = values);
@@ -144,7 +144,7 @@ class _FilterScreenState extends State<FilterScreen> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
-                    color: AppColors.primaryTeal,
+                    color: AppColors.primaryGreen,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
@@ -159,7 +159,7 @@ class _FilterScreenState extends State<FilterScreen> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
-                    color: AppColors.primaryTeal,
+                    color: AppColors.primaryGreen,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
@@ -207,9 +207,9 @@ class _FilterScreenState extends State<FilterScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.primaryTeal : AppColors.white,
+          color: isSelected ? AppColors.primaryGreen : AppColors.white,
           border: Border.all(
-            color: isSelected ? AppColors.primaryTeal : AppColors.primaryTeal,
+            color: isSelected ? AppColors.primaryGreen : AppColors.primaryGreen,
             width: 2,
           ),
           borderRadius: BorderRadius.circular(20),
@@ -217,7 +217,7 @@ class _FilterScreenState extends State<FilterScreen> {
         child: Text(
           label,
           style: TextStyle(
-            color: isSelected ? AppColors.white : AppColors.primaryTeal,
+            color: isSelected ? AppColors.white : AppColors.primaryGreen,
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -240,9 +240,9 @@ class _FilterScreenState extends State<FilterScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.primaryTeal : AppColors.white,
+          color: isSelected ? AppColors.primaryGreen : AppColors.white,
           border: Border.all(
-            color: AppColors.primaryTeal,
+            color: AppColors.primaryGreen,
             width: 2,
           ),
           borderRadius: BorderRadius.circular(20),
@@ -250,7 +250,7 @@ class _FilterScreenState extends State<FilterScreen> {
         child: Text(
           label,
           style: TextStyle(
-            color: isSelected ? AppColors.white : AppColors.primaryTeal,
+            color: isSelected ? AppColors.white : AppColors.primaryGreen,
             fontWeight: FontWeight.w600,
           ),
         ),

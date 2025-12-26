@@ -8,7 +8,7 @@ class UserDto {
   final String? bio;
   final String? phoneNumber;
   final String? address;
-  final int points;
+  final int? trustScore; // Điểm uy tín từ API - nullable
   final int itemsShared;
   final int itemsReceived;
   final bool verified;
@@ -24,7 +24,7 @@ class UserDto {
     this.bio,
     this.phoneNumber,
     this.address,
-    required this.points,
+    this.trustScore,
     required this.itemsShared,
     required this.itemsReceived,
     required this.verified,
@@ -40,20 +40,23 @@ class UserDto {
 
   factory UserDto.fromJson(Map<String, dynamic> json) {
     return UserDto(
-      id: json['id'] ?? '',
+      id: json['id'] ?? json['userId'] ?? '',
       username: json['username'] ?? '',
       email: json['email'] ?? '',
-      firstName: json['firstName'],
-      lastName: json['lastName'],
-      avatar: json['avatar'],
+      firstName: json['firstName'] ?? json['first_name'],
+      lastName: json['lastName'] ?? json['last_name'],
+      avatar: json['avatar'] ?? json['avatarUrl'] ?? json['avatar_url'],
       bio: json['bio'],
-      phoneNumber: json['phoneNumber'],
+      phoneNumber: json['phoneNumber'] ?? json['phone'],
       address: json['address'],
-      points: json['points'] ?? 0,
-      itemsShared: json['itemsShared'] ?? 0,
-      itemsReceived: json['itemsReceived'] ?? 0,
+      trustScore:
+          (json['trustScore'] as int?) ?? (json['trust_score'] as int?) ?? 0,
+      itemsShared: json['itemsShared'] ?? json['items_shared'] ?? 0,
+      itemsReceived: json['itemsReceived'] ?? json['items_received'] ?? 0,
       verified: json['verified'] ?? false,
-      createdAt: DateTime.tryParse(json['createdAt'] ?? '') ?? DateTime.now(),
+      createdAt:
+          DateTime.tryParse(json['createdAt'] ?? json['created_at'] ?? '') ??
+              DateTime.now(),
     );
   }
 
@@ -68,7 +71,7 @@ class UserDto {
       'bio': bio,
       'phoneNumber': phoneNumber,
       'address': address,
-      'points': points,
+      'trustScore': trustScore,
       'itemsShared': itemsShared,
       'itemsReceived': itemsReceived,
       'verified': verified,

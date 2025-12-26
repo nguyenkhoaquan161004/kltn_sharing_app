@@ -3,8 +3,15 @@ class AppConfig {
   /// Production backend API URL
   static const String productionUrl = 'https://shareo.studio';
 
-  /// Get current base URL (always production)
-  static const String baseUrl = productionUrl;
+  /// Development/Local backend API URL
+  /// Change this to your local machine IP or server URL
+  /// Example: 'http://192.168.1.100:8080' or 'http://10.0.2.2:8080' (for emulator)
+  static const String developmentUrl =
+      'http://10.0.2.2:8080'; // Android emulator localhost
+
+  /// Get current base URL
+  /// Set to developmentUrl for testing, productionUrl for production
+  static const String baseUrl = productionUrl; // ← Using production URL
 
   /// Initialize - call this once at app startup
   static void initialize() {

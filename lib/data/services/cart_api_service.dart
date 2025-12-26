@@ -6,8 +6,12 @@ import 'package:kltn_sharing_app/data/models/cart_request_model.dart';
 /// API Service for Cart endpoints
 class CartApiService {
   late Dio _dio;
+  late TokenRefreshInterceptor _tokenRefreshInterceptor;
 
   CartApiService() {
+    // Initialize token refresh interceptor FIRST before creating Dio
+    _tokenRefreshInterceptor = TokenRefreshInterceptor();
+
     _dio = Dio(
       BaseOptions(
         baseUrl: AppConfig.baseUrl,
@@ -21,7 +25,7 @@ class CartApiService {
     );
 
     // Add token refresh interceptor for handling 401/403 errors
-    _dio.interceptors.add(TokenRefreshInterceptor());
+    _dio.interceptors.add(_tokenRefreshInterceptor);
 
     // Add logging interceptor
     _dio.interceptors.add(
@@ -42,6 +46,20 @@ class CartApiService {
         },
       ),
     );
+  }
+
+  /// Set callback to get valid access token from AuthProvider
+  void setGetValidTokenCallback(Future<String?> Function() callback) {
+    try {
+      _tokenRefreshInterceptor.setCallbacks(
+        getValidTokenCallback: callback,
+        onTokenExpiredCallback: () async {
+          print('[CartAPI] Token refresh failed, user session expired');
+        },
+      );
+    } catch (e) {
+      print('[CartAPI] Error setting token refresh callback: $e');
+    }
   }
 
   /// Set authorization header with bearer token
@@ -74,6 +92,71 @@ class CartApiService {
         throw Exception('Unexpected response format: $data');
       } else {
         throw Exception('Failed to add to cart: ${response.statusCode}');
+      }
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  /// Get all cart items for current user
+  Future<List<dynamic>> getCart({int page = 1, int limit = 20}) async {
+    try {
+      final response = await _dio.get(
+        '/api/v2/cart',
+        queryParameters: {
+          'page': page,
+          'limit': limit,
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final apiResponse = response.data;
+
+        if (apiResponse is Map<String, dynamic>) {
+          // ApiResponse structure:
+          // {
+          //   success, status, code, message,
+          //   data: {
+          //     page, limit, totalItems, totalPages,
+          //     data: [...]  // Actual cart items list
+          //   }
+          // }
+
+          final pageResponse = apiResponse['data'];
+
+          if (pageResponse is Map<String, dynamic>) {
+            final itemsList =
+                pageResponse['data'] ?? pageResponse['items'] ?? [];
+            print(
+                '[CartAPI] Cart items retrieved: ${itemsList is List ? itemsList.length : 0} items');
+            return itemsList is List ? itemsList : [];
+          } else {
+            print(
+                '[CartAPI] Warning: apiResponse["data"] is not a Map, got: ${pageResponse.runtimeType}');
+            return [];
+          }
+        }
+
+        throw Exception('Unexpected response format: $apiResponse');
+      } else {
+        throw Exception('Failed to get cart: ${response.statusCode}');
+      }
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  /// Remove item from cart
+  Future<void> removeFromCart(String itemId) async {
+    try {
+      final response = await _dio.delete(
+        '/api/v2/cart/$itemId',
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        print('[CartAPI] Item removed from cart successfully');
+      } else {
+        throw Exception('Failed to remove from cart: ${response.statusCode}');
       }
     } on DioException catch (e) {
       throw _handleDioException(e);

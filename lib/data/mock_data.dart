@@ -10,6 +10,7 @@ import 'models/item_interest_model.dart';
 import 'models/notification_model.dart';
 import 'models/user_badge_model.dart';
 import 'models/badge_model.dart';
+import 'models/transaction_status.dart';
 
 /// Mock data class chứa tất cả dữ liệu ảo cho phát triển
 class MockData {
@@ -1178,53 +1179,63 @@ Lý do chia sẻ: Gia đình mình mua bộ bàn ghế mới nên không còn c�
       itemId: 1,
       sharerId: 1,
       receiverId: 2,
-      status: 'completed',
+      status: TransactionStatus.completed,
       paymentVerified: true,
       proofImage: 'https://via.placeholder.com/300?text=Payment+Proof+1',
       createdAt: DateTime.now().subtract(Duration(days: 3)),
       confirmedAt: DateTime.now().subtract(Duration(days: 2)),
+      quantity: 1,
+      transactionFee: 50000,
     ),
     TransactionModel(
       transactionId: 2,
       itemId: 2,
       sharerId: 2,
       receiverId: 3,
-      status: 'pending',
+      status: TransactionStatus.pending,
       paymentVerified: false,
       createdAt: DateTime.now().subtract(Duration(hours: 48)),
+      quantity: 2,
+      transactionFee: 75000,
     ),
     TransactionModel(
       transactionId: 3,
       itemId: 3,
       sharerId: 3,
       receiverId: 4,
-      status: 'completed',
+      status: TransactionStatus.completed,
       paymentVerified: true,
       proofImage: 'https://via.placeholder.com/300?text=Payment+Proof+2',
       createdAt: DateTime.now().subtract(Duration(days: 5)),
       confirmedAt: DateTime.now().subtract(Duration(days: 4)),
+      quantity: 1,
+      transactionFee: 100000,
     ),
     TransactionModel(
       transactionId: 4,
       itemId: 5,
       sharerId: 5,
       receiverId: 1,
-      status: 'verified',
+      status: TransactionStatus.completed,
       paymentVerified: true,
       proofImage: 'https://via.placeholder.com/300?text=Payment+Proof+3',
       createdAt: DateTime.now().subtract(Duration(days: 2)),
       confirmedAt: DateTime.now().subtract(Duration(hours: 12)),
+      quantity: 3,
+      transactionFee: 25000,
     ),
     TransactionModel(
       transactionId: 5,
       itemId: 6,
       sharerId: 1,
       receiverId: 3,
-      status: 'completed',
+      status: TransactionStatus.completed,
       paymentVerified: true,
       proofImage: 'https://via.placeholder.com/300?text=Payment+Proof+4',
       createdAt: DateTime.now().subtract(Duration(days: 7)),
       confirmedAt: DateTime.now().subtract(Duration(days: 6)),
+      quantity: 2,
+      transactionFee: 60000,
     ),
   ];
 

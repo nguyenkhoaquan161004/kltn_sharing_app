@@ -18,6 +18,7 @@ import '../presentation/screens/orders/cart_all_screen.dart';
 import '../presentation/screens/orders/cart_processing_screen.dart';
 import '../presentation/screens/orders/cart_done_screen.dart';
 import '../presentation/screens/orders/cart_item_detail_screen.dart';
+import '../presentation/screens/orders/order_detail_screen.dart';
 import '../presentation/screens/orders/order_detail_processing_screen.dart';
 import '../presentation/screens/messages/messages_list_screen.dart';
 import '../presentation/screens/messages/chat_screen.dart';
@@ -221,9 +222,9 @@ class AppRouter {
       GoRoute(
         path: AppRoutes.orderDetail,
         pageBuilder: (context, state) {
-          final orderId = state.pathParameters['id'] ?? '';
+          final transactionId = state.pathParameters['id'] ?? '';
           return _buildPageWithTransition(
-            child: OrderDetailProcessingScreen(orderId: orderId),
+            child: OrderDetailScreen(transactionId: transactionId),
             state: state,
             name: 'order-detail',
           );

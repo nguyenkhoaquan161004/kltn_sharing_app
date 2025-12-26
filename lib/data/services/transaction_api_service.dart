@@ -2,12 +2,18 @@ import 'package:dio/dio.dart';
 import 'package:kltn_sharing_app/core/config/app_config.dart';
 import 'package:kltn_sharing_app/core/utils/token_refresh_interceptor.dart';
 import 'package:kltn_sharing_app/data/models/transaction_request_model.dart';
+import 'package:kltn_sharing_app/data/models/transaction_model.dart';
 
 /// API Service for Transactions endpoints
 class TransactionApiService {
   late Dio _dio;
+  late TokenRefreshInterceptor _tokenRefreshInterceptor;
+  Future<String?> Function()? _getValidTokenCallback;
 
   TransactionApiService() {
+    // Initialize token refresh interceptor FIRST before creating Dio
+    _tokenRefreshInterceptor = TokenRefreshInterceptor();
+
     _dio = Dio(
       BaseOptions(
         baseUrl: AppConfig.baseUrl,
@@ -21,7 +27,7 @@ class TransactionApiService {
     );
 
     // Add token refresh interceptor for handling 401/403 errors
-    _dio.interceptors.add(TokenRefreshInterceptor());
+    _dio.interceptors.add(_tokenRefreshInterceptor);
 
     // Add logging interceptor
     _dio.interceptors.add(
@@ -45,6 +51,21 @@ class TransactionApiService {
     );
   }
 
+  /// Set callback to get valid access token from AuthProvider
+  void setGetValidTokenCallback(Future<String?> Function() callback) {
+    _getValidTokenCallback = callback;
+    try {
+      _tokenRefreshInterceptor.setCallbacks(
+        getValidTokenCallback: callback,
+        onTokenExpiredCallback: () async {
+          print('[TransactionAPI] Token refresh failed, user session expired');
+        },
+      );
+    } catch (e) {
+      print('[TransactionAPI] Error setting token refresh callback: $e');
+    }
+  }
+
   /// Set authorization header with bearer token
   void setAuthToken(String accessToken) {
     _dio.options.headers['Authorization'] = 'Bearer $accessToken';
@@ -60,6 +81,14 @@ class TransactionApiService {
   Future<Map<String, dynamic>> createTransaction(
       TransactionRequest request) async {
     try {
+      // Ensure token is valid before making request
+      if (_getValidTokenCallback != null) {
+        final validToken = await _getValidTokenCallback!();
+        if (validToken != null) {
+          _dio.options.headers['Authorization'] = 'Bearer $validToken';
+        }
+      }
+
       final response = await _dio.post(
         '/api/v2/transactions',
         data: request.toJson(),
@@ -119,5 +148,154 @@ class TransactionApiService {
     }
 
     return Exception(message);
+  }
+
+  /// Get all transactions for current user
+  Future<List<TransactionModel>> getMyTransactions({
+    int page = 1,
+    int limit = 20,
+  }) async {
+    try {
+      final response = await _dio.get(
+        '/api/v2/transactions/me',
+        queryParameters: {
+          'page': page,
+          'limit': limit,
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final apiResponse = response.data;
+        print('[TransactionAPI] API Response type: ${apiResponse.runtimeType}');
+
+        if (apiResponse is Map<String, dynamic>) {
+          print(
+              '[TransactionAPI] API Response keys: ${apiResponse.keys.toList()}');
+
+          // The response structure is:
+          // {
+          //   success, status, code, message,
+          //   data: {
+          //     page, limit, totalItems, totalPages,
+          //     data: [...]  // Actual transactions list
+          //   }
+          // }
+
+          // First, extract the PageResponse from ApiResponse.data
+          final pageResponse = apiResponse['data'];
+          print(
+              '[TransactionAPI] PageResponse type: ${pageResponse.runtimeType}');
+
+          if (pageResponse is Map<String, dynamic>) {
+            // Now extract the transactions list from PageResponse.data
+            final transactionsList = pageResponse['data'];
+            print(
+                '[TransactionAPI] Transactions array type: ${transactionsList.runtimeType}');
+
+            if (transactionsList is List) {
+              if (transactionsList.isEmpty) {
+                print('[TransactionAPI] Retrieved 0 transactions (empty list)');
+                return [];
+              }
+
+              final transactions = transactionsList.map((json) {
+                try {
+                  final jsonStr = json.toString();
+                  final preview = jsonStr.length > 500
+                      ? jsonStr.substring(0, 500)
+                      : jsonStr;
+                  print('[TransactionAPI] Parsing transaction JSON: $preview');
+                  final transaction =
+                      TransactionModel.fromJson(json as Map<String, dynamic>);
+                  print(
+                      '[TransactionAPI] Parsed transaction - itemName: ${transaction.itemName}, itemImageUrl: ${transaction.itemImageUrl}');
+                  return transaction;
+                } catch (e) {
+                  print('[TransactionAPI] Error parsing transaction: $e');
+                  rethrow;
+                }
+              }).toList();
+              print(
+                  '[TransactionAPI] Retrieved ${transactions.length} transactions');
+              return transactions;
+            } else {
+              throw Exception(
+                  'pageResponse["data"] is not a List, got: ${transactionsList.runtimeType}');
+            }
+          } else {
+            throw Exception(
+                'apiResponse["data"] is not a PageResponse Map, got: ${pageResponse.runtimeType}');
+          }
+        }
+
+        throw Exception(
+            'Unexpected API response type: ${apiResponse.runtimeType}');
+      } else {
+        throw Exception('Failed to get transactions: ${response.statusCode}');
+      }
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  /// Get transaction details by ID (UUID string)
+  Future<TransactionModel> getTransactionDetail(String transactionId) async {
+    try {
+      final response = await _dio.get(
+        '/api/v2/transactions/$transactionId',
+      );
+
+      if (response.statusCode == 200) {
+        final apiResponse = response.data;
+
+        if (apiResponse is Map<String, dynamic>) {
+          // Extract transaction from ApiResponse
+          final transactionData = apiResponse['data'];
+
+          if (transactionData is Map<String, dynamic>) {
+            print(
+                '[TransactionAPI] Transaction detail JSON: ${transactionData.toString().substring(0, transactionData.toString().length > 500 ? 500 : transactionData.toString().length)}');
+            final transaction = TransactionModel.fromJson(transactionData);
+            print(
+                '[TransactionAPI] Retrieved transaction detail - itemName: ${transaction.itemName}, itemImageUrl: ${transaction.itemImageUrl}');
+            return transaction;
+          }
+
+          throw Exception(
+              'Transaction data is not a Map, got: ${transactionData.runtimeType}');
+        }
+
+        throw Exception(
+            'Unexpected API response type: ${apiResponse.runtimeType}');
+      } else {
+        throw Exception(
+            'Failed to get transaction detail: ${response.statusCode}');
+      }
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  /// Cancel a transaction by ID
+  Future<void> cancelTransaction(String transactionId, {String? reason}) async {
+    try {
+      final url = '/api/v2/transactions/$transactionId/cancel';
+      final requestBody = reason != null ? {'reason': reason} : {};
+
+      final response = await _dio.put(
+        url,
+        data: requestBody,
+      );
+
+      if (response.statusCode == 200) {
+        print(
+            '[TransactionAPI] Transaction $transactionId cancelled successfully');
+        return;
+      } else {
+        throw Exception('Failed to cancel transaction: ${response.statusCode}');
+      }
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
   }
 }

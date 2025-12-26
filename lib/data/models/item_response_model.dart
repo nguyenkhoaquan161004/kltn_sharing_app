@@ -92,20 +92,22 @@ class PageResponse<T> {
 
   factory PageResponse.fromJson(
       Map<String, dynamic> json, T Function(Map<String, dynamic>) fromJsonT) {
-    final contentList = (json['content'] as List<dynamic>?)
+    // Handle both 'content' (old format) and 'data' (current BE format)
+    final itemList = json['content'] ?? json['data'] ?? [];
+    final contentList = (itemList as List<dynamic>?)
             ?.map((e) => fromJsonT(e as Map<String, dynamic>))
             .toList() ??
         [];
 
     return PageResponse(
       content: contentList,
-      totalElements: json['totalElements'] ?? 0,
+      totalElements: json['totalItems'] ?? json['totalElements'] ?? 0,
       totalPages: json['totalPages'] ?? 0,
-      currentPage: json['currentPage'] ?? 0,
-      pageSize: json['pageSize'] ?? 10,
+      currentPage: json['page'] ?? json['currentPage'] ?? 1,
+      pageSize: json['limit'] ?? json['pageSize'] ?? 10,
       isFirst: json['isFirst'] ?? false,
       isLast: json['isLast'] ?? false,
-      isEmpty: json['isEmpty'] ?? true,
+      isEmpty: json['isEmpty'] ?? contentList.isEmpty,
     );
   }
 }

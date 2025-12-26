@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../../../../data/models/item_model.dart';
 import '../../../../data/mock_data.dart';
+import '../../../../data/services/item_api_service.dart';
+import '../../../../data/models/item_response_model.dart';
 import '../../../widgets/gradient_button.dart';
 import '../../../widgets/profile_item_card.dart';
 import '../../../widgets/item_card.dart';
@@ -22,10 +25,17 @@ class ProfileProductsTab extends StatefulWidget {
   State<ProfileProductsTab> createState() => _ProfileProductsTabState();
 }
 
-class _ProfileProductsTabState extends State<ProfileProductsTab> {
-  late List<ItemModel> _availableProducts;
-  late List<ItemModel> _sharedProducts;
-  late List<ItemModel> _expiredProducts;
+class _ProfileProductsTabState extends State<ProfileProductsTab>
+    with AutomaticKeepAliveClientMixin {
+  late List<ItemDto> _availableProducts;
+  late List<ItemDto> _expiredProducts;
+  late ItemApiService _itemApiService;
+  Map<String, int> _itemInterestCount =
+      {}; // itemId -> count of interested users
+
+  bool _isLoadingProducts = false;
+  String? _errorMessage;
+
   String _sortBy = 'suggested'; // suggested (default), newest
   String _filterByPrice = 'all'; // all, free, paid
   String _filterByCategory = 'all'; // all, or categoryId
@@ -38,38 +48,149 @@ class _ProfileProductsTabState extends State<ProfileProductsTab> {
       TextEditingController(text: '1000000');
 
   @override
+  bool get wantKeepAlive => true;
+
+  @override
   void initState() {
     super.initState();
+    // Get ItemApiService from Provider (already configured with token callback)
+    _itemApiService = context.read<ItemApiService>();
 
+    _availableProducts = [];
+    _expiredProducts = [];
+
+    // Load products for own profile only
+    if (widget.isOwnProfile) {
+      _loadUserProducts();
+      _loadInterestedCount();
+    } else {
+      // For other users, use mock data
+      _loadMockData();
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Re-load data when dependencies change (e.g., route change)
+    if (widget.isOwnProfile &&
+        _availableProducts.isEmpty &&
+        _expiredProducts.isEmpty &&
+        !_isLoadingProducts) {
+      _loadUserProducts();
+    }
+  }
+
+  /// Load user's products from API
+  Future<void> _loadUserProducts() async {
+    if (!mounted) return;
+
+    setState(() {
+      _isLoadingProducts = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final response = await _itemApiService.getUserItems(
+        page: 1, // Backend uses 1-indexed pages
+        size: 50,
+        sortBy: 'createdAt',
+        sortOrder: 'DESC',
+      );
+
+      print('DEBUG: response.content length = ${response.content.length}');
+      print('DEBUG: response = $response');
+
+      if (!mounted) return;
+
+      final now = DateTime.now();
+
+      // Separate into available and expired based on expiryDate
+      final available = <ItemDto>[];
+      final expired = <ItemDto>[];
+
+      for (final item in response.content) {
+        print(
+            'DEBUG: Processing item: ${item.name}, expiryDate: ${item.expiryDate}');
+        if (item.expiryDate != null && item.expiryDate!.isBefore(now)) {
+          expired.add(item);
+        } else {
+          available.add(item);
+        }
+      }
+
+      setState(() {
+        _availableProducts = available;
+        _expiredProducts = expired;
+        _isLoadingProducts = false;
+      });
+
+      print(
+          'DEBUG: Loaded ${available.length} available, ${expired.length} expired products');
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _errorMessage = e.toString().replaceFirst('Exception: ', '');
+        _isLoadingProducts = false;
+      });
+
+      print('ERROR loading user products: $_errorMessage');
+    }
+  }
+
+  /// Load mock data for other users' profiles
+  void _loadMockData() {
     final allProducts = MockData.getItemsByUserId(widget.userId);
     print(
-        'DEBUG ProfileProductsTab: userId=${widget.userId}, allProducts=${allProducts.length}, isOwnProfile=${widget.isOwnProfile}');
-
-    // Separate into available, shared, and expired
-    _availableProducts =
-        allProducts.where((p) => p.status == 'available').toList();
-    _sharedProducts = allProducts.where((p) => p.status == 'shared').toList();
-    _expiredProducts = allProducts.where((p) => p.status == 'expired').toList();
+        'DEBUG ProfileProductsTab: userId=${widget.userId}, allProducts=${allProducts.length}');
 
     // For mock: simulate distribution
-    if (_availableProducts.isEmpty && allProducts.isNotEmpty) {
-      int count = (allProducts.length / 3).ceil();
-      _availableProducts = allProducts.sublist(0, count);
-    }
-    if (_sharedProducts.isEmpty &&
-        allProducts.length > (allProducts.length / 3).ceil()) {
-      int start = (allProducts.length / 3).ceil();
-      int count = (allProducts.length / 3).ceil();
-      _sharedProducts = allProducts.sublist(start, start + count);
-    }
-    if (_expiredProducts.isEmpty &&
-        allProducts.length > (2 * allProducts.length / 3).ceil()) {
-      int start = (2 * allProducts.length / 3).ceil();
-      _expiredProducts = allProducts.sublist(start);
+    final available = <ItemDto>[];
+    final expired = <ItemDto>[];
+
+    if (allProducts.isNotEmpty) {
+      // In mock, we don't have real expiry dates, so all go to available
+      for (var product in allProducts) {
+        available.add(ItemDto(
+          id: product.itemId.toString(),
+          name: product.name,
+          description: product.description,
+          quantity: product.quantity,
+          imageUrl: null,
+          status: product.status,
+          userId: product.userId.toString(),
+          categoryId: product.categoryId.toString(),
+          categoryName: null,
+          price: product.price,
+          createdAt: DateTime.now(),
+          expiryDate: null,
+        ));
+      }
     }
 
-    print(
-        'DEBUG: _availableProducts=${_availableProducts.length}, _sharedProducts=${_sharedProducts.length}, _expiredProducts=${_expiredProducts.length}');
+    setState(() {
+      _availableProducts = available;
+      _expiredProducts = expired;
+    });
+  }
+
+  /// Load interested count for user's items
+  Future<void> _loadInterestedCount() async {
+    try {
+      final interestCount = await _itemApiService.getSharerTransactions();
+      if (!mounted) return;
+
+      setState(() {
+        _itemInterestCount = interestCount;
+      });
+
+      print(
+          'DEBUG: Loaded interested count for ${interestCount.length} items: $interestCount');
+    } catch (e) {
+      print('DEBUG: Error loading interested count: $e');
+      // Don't show error to user, just log it
+    }
   }
 
   @override
@@ -81,6 +202,7 @@ class _ProfileProductsTabState extends State<ProfileProductsTab> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     // For other users' profile (store view)
     if (!widget.isOwnProfile) {
       return _buildStoreView();
@@ -105,19 +227,11 @@ class _ProfileProductsTabState extends State<ProfileProductsTab> {
                   ),
                 ),
                 builder: (context) => CreateProductModal(
-                  onProductCreated: (newProduct) {
-                    // Add the new product to the list
-                    setState(() {
-                      _availableProducts.add(newProduct);
-                    });
-                    // Show success message
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: const Text('Chia sẻ sản phẩm thành công!'),
-                        backgroundColor: AppColors.success,
-                        duration: const Duration(seconds: 2),
-                      ),
-                    );
+                  onProductCreated: (success) {
+                    if (success) {
+                      // Reload products after creating
+                      _loadUserProducts();
+                    }
                   },
                 ),
               );
@@ -125,16 +239,62 @@ class _ProfileProductsTabState extends State<ProfileProductsTab> {
           ),
           const SizedBox(height: 24),
 
-          // Sản phẩm khả dụng section
-          _buildProductSection(
-            title: 'Sản phẩm khả dụng',
-            products: _availableProducts,
-            statusType: 'available',
-          ),
-          const SizedBox(height: 32),
+          // Loading state
+          if (_isLoadingProducts)
+            const Center(
+              child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  AppColors.primaryTeal,
+                ),
+              ),
+            )
+          else if (_errorMessage != null)
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.error.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                children: [
+                  Text(
+                    'Lỗi tải dữ liệu',
+                    style: AppTextStyles.h4.copyWith(
+                      color: AppColors.error,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _errorMessage ?? 'Đã xảy ra lỗi',
+                    style: AppTextStyles.bodySmall.copyWith(
+                      color: AppColors.error,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  ElevatedButton.icon(
+                    onPressed: _loadUserProducts,
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Thử lại'),
+                  ),
+                ],
+              ),
+            )
+          else
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Sản phẩm khả dụng section
+                _buildProductSection(
+                  title: 'Sản phẩm khả dụng',
+                  products: _availableProducts,
+                  statusType: 'available',
+                ),
+                const SizedBox(height: 32),
 
-          // Sản phẩm không khả dụng section
-          _buildUnavailableSection(),
+                // Sản phẩm không khả dụng section
+                _buildUnavailableSection(),
+              ],
+            ),
         ],
       ),
     );
@@ -142,10 +302,28 @@ class _ProfileProductsTabState extends State<ProfileProductsTab> {
 
   /// Build store view for other users' products (like Home screen)
   Widget _buildStoreView() {
-    final allProducts = _availableProducts + _sharedProducts + _expiredProducts;
+    final allProducts = _availableProducts + _expiredProducts;
+
+    // Convert ItemDto to ItemModel for filtering
+    List<ItemModel> allItemModels = allProducts.map((product) {
+      return ItemModel(
+        itemId: int.tryParse(product.id) ?? 0,
+        userId: int.tryParse(product.userId) ?? 0,
+        name: product.name,
+        description: product.description ?? '',
+        quantity: product.quantity ?? 1,
+        status: product.status.toLowerCase(),
+        categoryId: int.tryParse(product.categoryId) ?? 0,
+        locationId: 1,
+        expiryDate: product.expiryDate,
+        createdAt: product.createdAt,
+        price: product.price ?? 0,
+        image: product.imageUrl,
+      );
+    }).toList();
 
     // Apply filter by price range
-    List<ItemModel> filteredProducts = allProducts
+    List<ItemModel> filteredProducts = allItemModels
         .where((p) => p.price >= _minPrice && p.price <= _maxPrice)
         .toList();
 
@@ -281,41 +459,6 @@ class _ProfileProductsTabState extends State<ProfileProductsTab> {
         Text('Sản phẩm không khả dụng', style: AppTextStyles.h4),
         const SizedBox(height: 16),
 
-        // Sản phẩm đã chia sẻ subsection
-        if (_sharedProducts.isNotEmpty) ...[
-          Text(
-            'Đã chia sẻ (${_sharedProducts.length})',
-            style: AppTextStyles.label.copyWith(
-              color: AppColors.success,
-            ),
-          ),
-          const SizedBox(height: 12),
-          GridView.builder(
-            shrinkWrap: true,
-            padding: EdgeInsets.zero,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              childAspectRatio: 0.6,
-              crossAxisSpacing: 12,
-              mainAxisSpacing: 12,
-            ),
-            itemCount: _sharedProducts.length,
-            itemBuilder: (context, index) {
-              final product = _sharedProducts[index];
-              return ProfileItemCard(
-                item: product,
-                onTap: () => _showUnavailableProductDetails(product, true),
-                showTimeRemaining: false,
-                isOwnProfile: true,
-                interestedCount: 0,
-                unavailableType: 'shared',
-              );
-            },
-          ),
-          const SizedBox(height: 24),
-        ],
-
         // Sản phẩm hết hạn subsection
         if (_expiredProducts.isNotEmpty) ...[
           Text(
@@ -338,12 +481,27 @@ class _ProfileProductsTabState extends State<ProfileProductsTab> {
             itemCount: _expiredProducts.length,
             itemBuilder: (context, index) {
               final product = _expiredProducts[index];
+              // Convert ItemDto to ItemModel
+              final itemModel = ItemModel(
+                itemId: int.tryParse(product.id) ?? index,
+                userId: int.tryParse(product.userId) ?? 0,
+                name: product.name,
+                description: product.description ?? '',
+                quantity: product.quantity ?? 1,
+                status: 'expired',
+                categoryId: int.tryParse(product.categoryId) ?? 0,
+                locationId: 1,
+                expiryDate: product.expiryDate,
+                createdAt: product.createdAt,
+                price: product.price ?? 0,
+                image: product.imageUrl,
+              );
               return ProfileItemCard(
-                item: product,
-                onTap: () => _showUnavailableProductDetails(product, false),
+                item: itemModel,
+                onTap: () => _showUnavailableProductDetails(itemModel, false),
                 showTimeRemaining: false,
                 isOwnProfile: true,
-                interestedCount: 0,
+                interestedCount: _itemInterestCount[product.id] ?? 0,
                 unavailableType: 'expired',
               );
             },
@@ -351,7 +509,7 @@ class _ProfileProductsTabState extends State<ProfileProductsTab> {
         ],
 
         // Empty state
-        if (_sharedProducts.isEmpty && _expiredProducts.isEmpty)
+        if (_expiredProducts.isEmpty)
           Center(
             child: Padding(
               padding: const EdgeInsets.all(32.0),
@@ -532,7 +690,7 @@ class _ProfileProductsTabState extends State<ProfileProductsTab> {
 
   Widget _buildProductSection({
     required String title,
-    required List<ItemModel> products,
+    required List<ItemDto> products,
     required String statusType,
   }) {
     return Column(
@@ -566,12 +724,27 @@ class _ProfileProductsTabState extends State<ProfileProductsTab> {
             itemCount: products.length,
             itemBuilder: (context, index) {
               final product = products[index];
+              // Convert ItemDto to ItemModel for ProfileItemCard
+              final itemModel = ItemModel(
+                itemId: int.tryParse(product.id) ?? index,
+                userId: int.tryParse(product.userId) ?? 0,
+                name: product.name,
+                description: product.description ?? '',
+                quantity: product.quantity ?? 1,
+                status: product.status.toLowerCase(),
+                categoryId: int.tryParse(product.categoryId) ?? 0,
+                locationId: 1,
+                expiryDate: product.expiryDate,
+                createdAt: product.createdAt,
+                price: product.price ?? 0,
+                image: product.imageUrl,
+              );
               return ProfileItemCard(
-                item: product,
-                onTap: () => _showProductDetails(product),
+                item: itemModel,
+                onTap: () => _showProductDetails(itemModel),
                 showTimeRemaining: false,
                 isOwnProfile: true,
-                interestedCount: 2, // Mock data
+                interestedCount: _itemInterestCount[product.id] ?? 0,
               );
             },
           ),

@@ -236,7 +236,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                               ? 'Gửi lại ($_resendCountdown)'
                               : 'Gửi lại',
                           style: const TextStyle(
-                            color: AppColors.primaryTeal,
+                            color: AppColors.primaryGreen,
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
                           ),

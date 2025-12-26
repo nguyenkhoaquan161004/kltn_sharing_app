@@ -40,7 +40,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       final authProvider = context.read<AuthProvider>();
       final userProvider = context.read<UserProvider>();
 
-      print('[ProfileScreen] Auth token: ${authProvider.accessToken}');
+      print('[ProfileScreen] Access token: ${authProvider.accessToken}');
       print('[ProfileScreen] Is logged in: ${authProvider.isLoggedIn}');
 
       // Set auth token if available
@@ -109,8 +109,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                 SliverToBoxAdapter(
                   child: ProfileHeader(
                     name: user.fullName,
-                    points: user.points,
-                    avatar: user.avatar ?? '',
+                    trustScore: user.trustScore,
+                    avatar: user.avatar,
                   ),
                 ),
 
@@ -120,10 +120,10 @@ class _ProfileScreenState extends State<ProfileScreen>
                   delegate: _SliverTabBarDelegate(
                     TabBar(
                       controller: _tabController,
-                      labelColor: AppColors.primaryTeal,
+                      labelColor: AppColors.primaryGreen,
                       unselectedLabelColor: AppColors.textSecondary,
                       labelStyle: AppTextStyles.label,
-                      indicatorColor: AppColors.primaryTeal,
+                      indicatorColor: AppColors.primaryGreen,
                       indicatorWeight: 3,
                       tabs: const [
                         Tab(text: 'Thông tin'),
@@ -146,7 +146,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                     'address': user.address ?? 'N/A',
                     'phone': user.phoneNumber ?? 'N/A',
                     'avatar': user.avatar ?? '',
-                    'points': user.points,
+                    'points': user.trustScore ?? 0,
                     'productsShared': user.itemsShared,
                     'productsReceived': user.itemsReceived,
                   },

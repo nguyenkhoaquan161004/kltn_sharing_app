@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/models/item_model.dart';
@@ -119,8 +120,9 @@ class _ProfileItemCardState extends State<ProfileItemCard> {
               // Image with tags overlay
               Stack(
                 children: [
-                  // Image placeholder
+                  // Image or placeholder
                   Container(
+                    width: double.infinity,
                     height: 140,
                     decoration: BoxDecoration(
                       borderRadius: const BorderRadius.vertical(
@@ -129,15 +131,33 @@ class _ProfileItemCardState extends State<ProfileItemCard> {
                       color:
                           isExpiredShared ? Colors.grey[300] : Colors.grey[200],
                     ),
-                    child: Center(
-                      child: Icon(
-                        Icons.image,
-                        size: 48,
-                        color: isExpiredShared
-                            ? Colors.grey[400]
-                            : Colors.grey[400],
-                      ),
-                    ),
+                    child: widget.item.image != null &&
+                            widget.item.image!.isNotEmpty
+                        ? CachedNetworkImage(
+                            imageUrl: widget.item.image!,
+                            fit: BoxFit.cover,
+                            placeholder: (context, url) => Center(
+                              child: CircularProgressIndicator(
+                                color: AppColors.primaryGreen,
+                              ),
+                            ),
+                            errorWidget: (context, url, error) => Center(
+                              child: Icon(
+                                Icons.broken_image,
+                                size: 48,
+                                color: Colors.grey[400],
+                              ),
+                            ),
+                          )
+                        : Center(
+                            child: Icon(
+                              Icons.image,
+                              size: 48,
+                              color: isExpiredShared
+                                  ? Colors.grey[400]
+                                  : Colors.grey[400],
+                            ),
+                          ),
                   ),
 
                   // Free tag at top left (for user profile) and interested/time at top right
@@ -183,7 +203,7 @@ class _ProfileItemCardState extends State<ProfileItemCard> {
                                       vertical: 4,
                                     ),
                                     decoration: BoxDecoration(
-                                      color: AppColors.primaryTeal,
+                                      color: AppColors.primaryGreen,
                                       borderRadius: BorderRadius.circular(8),
                                     ),
                                     child: Row(
@@ -313,7 +333,7 @@ class _ProfileItemCardState extends State<ProfileItemCard> {
                           fontWeight: FontWeight.w600,
                           color: isExpiredShared
                               ? Colors.grey[400]
-                              : AppColors.primaryTeal,
+                              : AppColors.primaryGreen,
                         ),
                       ),
 

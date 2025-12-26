@@ -250,7 +250,8 @@ class AuthApiService {
       // Handle specific HTTP status codes
       switch (e.response!.statusCode) {
         case 401:
-          message = 'Token hết hạn hoặc không hợp lệ. Vui lòng đăng nhập lại.';
+          message =
+              'Thông tin không đúng hoặc không hợp lệ. Vui lòng đăng nhập lại.';
           break;
         case 403:
           message = 'Bạn không có quyền thực hiện hành động này.';

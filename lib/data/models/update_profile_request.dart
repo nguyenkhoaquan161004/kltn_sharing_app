@@ -5,6 +5,7 @@ class UpdateProfileRequest {
   final String? avatarUrl;
   final DateTime? birthDate;
   final String? address;
+  final String? phone;
 
   UpdateProfileRequest({
     this.userId,
@@ -13,6 +14,7 @@ class UpdateProfileRequest {
     this.avatarUrl,
     this.birthDate,
     this.address,
+    this.phone,
   });
 
   Map<String, dynamic> toJson() {
@@ -25,6 +27,7 @@ class UpdateProfileRequest {
         'birthDate':
             birthDate?.toIso8601String().split('T').first, // YYYY-MM-DD format
       if (address != null) 'address': address,
+      if (phone != null) 'phone': phone,
     };
   }
 }
