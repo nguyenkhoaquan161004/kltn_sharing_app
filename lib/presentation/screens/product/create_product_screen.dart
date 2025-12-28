@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../..//widgets/custom_text_field.dart';
+import '../../../../data/services/item_api_service.dart';
 
 class CreateProductScreen extends StatefulWidget {
   const CreateProductScreen({super.key});
@@ -21,19 +23,49 @@ class _CreateProductScreenState extends State<CreateProductScreen> {
 
   DateTime? _expiryDate;
   String? _selectedCategory;
+  String? _selectedCategoryId; // Store category ID for API
   bool _useDefaultAddress = true;
   bool _isLoading = false;
+  bool _categoriesLoading = true;
   List<String> _selectedImages = [];
 
-  final List<String> _categories = [
-    'Sách',
-    'Quần áo',
-    'Thực phẩm',
-    'Nội thất',
-    'Thể thao',
-    'Điện tử',
-    'Khác',
-  ];
+  List<Map<String, dynamic>> _categories = [];
+  String? _categoryError;
+
+  @override
+  void initState() {
+    super.initState();
+    // Load categories after frame is built
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadCategories();
+    });
+  }
+
+  Future<void> _loadCategories() async {
+    try {
+      final itemService = context.read<ItemApiService>();
+      final categories = await itemService.getCategories();
+
+      if (mounted) {
+        setState(() {
+          _categories = categories;
+          _categoriesLoading = false;
+          print('[CreateProduct] Loaded ${categories.length} categories');
+          for (var cat in categories) {
+            print('[CreateProduct] Category: ${cat['name']} (${cat['id']})');
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _categoryError = 'Không thể tải danh mục: ${e.toString()}';
+          _categoriesLoading = false;
+          print('[CreateProduct] Error: $e');
+        });
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -83,7 +115,7 @@ class _CreateProductScreenState extends State<CreateProductScreen> {
       return;
     }
 
-    if (_selectedCategory == null) {
+    if (_selectedCategoryId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Vui lòng chọn phân loại'),
@@ -94,6 +126,14 @@ class _CreateProductScreenState extends State<CreateProductScreen> {
     }
 
     setState(() => _isLoading = true);
+
+    // TODO: Call API to create product with _selectedCategoryId
+    // Example:
+    // await itemService.createItem(
+    //   name: _nameController.text,
+    //   categoryId: _selectedCategoryId,
+    //   ...
+    // );
 
     // Simulate API call
     await Future.delayed(const Duration(seconds: 2));
@@ -414,6 +454,37 @@ class _CreateProductScreenState extends State<CreateProductScreen> {
   }
 
   Widget _buildCategoryDropdown() {
+    if (_categoriesLoading) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: AppColors.backgroundGray,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const Center(
+          child: SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+      );
+    }
+
+    if (_categoryError != null) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: AppColors.error.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Text(
+          _categoryError!,
+          style: const TextStyle(color: AppColors.error),
+        ),
+      );
+    }
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
@@ -427,13 +498,19 @@ class _CreateProductScreenState extends State<CreateProductScreen> {
           isExpanded: true,
           icon: const Icon(Icons.keyboard_arrow_down),
           items: _categories.map((category) {
+            final categoryName = category['name'] as String? ?? 'Unknown';
+            final categoryId = category['id'] as String? ?? '';
             return DropdownMenuItem(
-              value: category,
-              child: Text(category),
+              value: categoryId,
+              child: Text(categoryName),
             );
           }).toList(),
           onChanged: (value) {
-            setState(() => _selectedCategory = value);
+            setState(() {
+              _selectedCategoryId = value;
+              _selectedCategory =
+                  _categories.firstWhere((c) => c['id'] == value)['name'];
+            });
           },
         ),
       ),

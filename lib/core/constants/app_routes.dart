@@ -12,7 +12,7 @@ class AppRoutes {
   static const String home = '/home';
   static const String category = '/category';
   static const String search = '/search';
-  static const String searchResults = 'results'; // Child route of /search
+  static const String searchResults = '/search/results'; // Standalone route
 
   // Product routes
   static const String productDetail = '/product/:id';

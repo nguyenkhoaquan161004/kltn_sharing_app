@@ -86,10 +86,14 @@ class ItemApiService {
   Future<PageResponse<ItemDto>> searchItems({
     int page = 0,
     int size = 10,
-    String? search,
+    String? keyword,
     String? category,
     double? minPrice,
     double? maxPrice,
+    String? status,
+    double? latitude,
+    double? longitude,
+    int? radiusKm,
     String? sortBy = 'createdAt',
     String? sortDirection = 'DESC',
   }) async {
@@ -105,11 +109,14 @@ class ItemApiService {
       final queryParams = {
         'page': page + 1, // BE expects 1-based page numbering
         'limit': size,
-        if (search != null && search.isNotEmpty)
-          'name': search, // Use 'name' parameter for BE
-        if (category != null) 'categoryId': category, // Use 'categoryId' for BE
+        if (keyword != null && keyword.isNotEmpty) 'keyword': keyword,
+        if (category != null && category.isNotEmpty) 'categoryId': category,
         if (minPrice != null) 'minPrice': minPrice,
         if (maxPrice != null) 'maxPrice': maxPrice,
+        if (status != null && status.isNotEmpty) 'status': status,
+        if (latitude != null) 'latitude': latitude,
+        if (longitude != null) 'longitude': longitude,
+        if (radiusKm != null) 'radiusKm': radiusKm,
         'sortBy': sortBy,
         'sortOrder':
             sortDirection, // BE expects 'sortOrder' not 'sortDirection'
@@ -414,5 +421,29 @@ class ItemApiService {
     }
 
     return Exception(message);
+  }
+
+  /// Get all categories
+  Future<List<Map<String, dynamic>>> getCategories() async {
+    try {
+      final response = await _dio.get('/api/v2/categories/all');
+
+      if (response.statusCode == 200) {
+        final data = response.data;
+
+        if (data is Map<String, dynamic> && data.containsKey('data')) {
+          final categoriesList = data['data'];
+          if (categoriesList is List) {
+            return categoriesList.cast<Map<String, dynamic>>();
+          }
+        }
+
+        throw Exception('Unexpected response format: $data');
+      } else {
+        throw Exception('Failed to load categories: ${response.statusCode}');
+      }
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
   }
 }

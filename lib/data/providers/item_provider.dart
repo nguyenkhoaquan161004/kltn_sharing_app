@@ -43,6 +43,10 @@ class ItemProvider extends ChangeNotifier {
     String? category,
     double? minPrice,
     double? maxPrice,
+    String? status,
+    double? latitude,
+    double? longitude,
+    int? radiusKm,
   }) async {
     try {
       _isLoading = true;
@@ -52,10 +56,14 @@ class ItemProvider extends ChangeNotifier {
       final response = await _itemApiService.searchItems(
         page: page,
         size: 20,
-        search: search,
+        keyword: search,
         category: category,
         minPrice: minPrice,
         maxPrice: maxPrice,
+        status: status,
+        latitude: latitude,
+        longitude: longitude,
+        radiusKm: radiusKm,
       );
 
       _items = response.content;

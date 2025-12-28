@@ -140,9 +140,11 @@ class _SearchScreenState extends State<SearchScreen> {
     }
   }
 
-  void _navigateToCategory(String category) {
-    context.pushNamed(AppRoutes.searchResultsName,
-        queryParameters: {'category': category});
+  void _navigateToCategoryResults(String categoryId, String categoryName) {
+    context.pushNamed(AppRoutes.searchResultsName, queryParameters: {
+      'categoryId': categoryId,
+      'categoryName': categoryName
+    });
   }
 
   @override
@@ -364,7 +366,8 @@ class _SearchScreenState extends State<SearchScreen> {
                                     : 0,
                           ),
                           child: GestureDetector(
-                            onTap: () => _navigateToCategory(category.name),
+                            onTap: () => _navigateToCategoryResults(
+                                category.id, category.name),
                             child: Container(
                               width: 90,
                               decoration: BoxDecoration(

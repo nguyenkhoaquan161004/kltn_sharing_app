@@ -308,17 +308,23 @@ class _ProfileProductsTabState extends State<ProfileProductsTab>
     List<ItemModel> allItemModels = allProducts.map((product) {
       return ItemModel(
         itemId: int.tryParse(product.id) ?? 0,
+        itemId_str: product.id,
         userId: int.tryParse(product.userId) ?? 0,
+        userId_str: product.userId,
         name: product.name,
         description: product.description ?? '',
         quantity: product.quantity ?? 1,
         status: product.status.toLowerCase(),
         categoryId: int.tryParse(product.categoryId) ?? 0,
+        categoryId_str: product.categoryId,
+        categoryName: product.categoryName,
         locationId: 1,
         expiryDate: product.expiryDate,
         createdAt: product.createdAt,
         price: product.price ?? 0,
         image: product.imageUrl,
+        latitude: product.latitude,
+        longitude: product.longitude,
       );
     }).toList();
 
@@ -434,7 +440,7 @@ class _ProfileProductsTabState extends State<ProfileProductsTab>
               physics: const NeverScrollableScrollPhysics(),
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 2,
-                childAspectRatio: 0.6,
+                childAspectRatio: 0.65,
                 crossAxisSpacing: 12,
                 mainAxisSpacing: 12,
               ),
@@ -484,25 +490,28 @@ class _ProfileProductsTabState extends State<ProfileProductsTab>
               // Convert ItemDto to ItemModel
               final itemModel = ItemModel(
                 itemId: int.tryParse(product.id) ?? index,
+                itemId_str: product.id,
                 userId: int.tryParse(product.userId) ?? 0,
+                userId_str: product.userId,
                 name: product.name,
                 description: product.description ?? '',
                 quantity: product.quantity ?? 1,
                 status: 'expired',
                 categoryId: int.tryParse(product.categoryId) ?? 0,
+                categoryId_str: product.categoryId,
+                categoryName: product.categoryName,
                 locationId: 1,
                 expiryDate: product.expiryDate,
                 createdAt: product.createdAt,
                 price: product.price ?? 0,
                 image: product.imageUrl,
+                latitude: product.latitude,
+                longitude: product.longitude,
               );
               return ProfileItemCard(
                 item: itemModel,
                 onTap: () => _showUnavailableProductDetails(itemModel, false),
                 showTimeRemaining: false,
-                isOwnProfile: true,
-                interestedCount: _itemInterestCount[product.id] ?? 0,
-                unavailableType: 'expired',
               );
             },
           ),
@@ -717,7 +726,7 @@ class _ProfileProductsTabState extends State<ProfileProductsTab>
             physics: const NeverScrollableScrollPhysics(),
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 2,
-              childAspectRatio: 0.6,
+              childAspectRatio: 0.65,
               crossAxisSpacing: 12,
               mainAxisSpacing: 12,
             ),
@@ -727,24 +736,28 @@ class _ProfileProductsTabState extends State<ProfileProductsTab>
               // Convert ItemDto to ItemModel for ProfileItemCard
               final itemModel = ItemModel(
                 itemId: int.tryParse(product.id) ?? index,
+                itemId_str: product.id,
                 userId: int.tryParse(product.userId) ?? 0,
+                userId_str: product.userId,
                 name: product.name,
                 description: product.description ?? '',
                 quantity: product.quantity ?? 1,
                 status: product.status.toLowerCase(),
                 categoryId: int.tryParse(product.categoryId) ?? 0,
+                categoryId_str: product.categoryId,
+                categoryName: product.categoryName,
                 locationId: 1,
                 expiryDate: product.expiryDate,
                 createdAt: product.createdAt,
                 price: product.price ?? 0,
                 image: product.imageUrl,
+                latitude: product.latitude,
+                longitude: product.longitude,
               );
               return ProfileItemCard(
                 item: itemModel,
                 onTap: () => _showProductDetails(itemModel),
                 showTimeRemaining: false,
-                isOwnProfile: true,
-                interestedCount: _itemInterestCount[product.id] ?? 0,
               );
             },
           ),

@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../data/providers/item_provider.dart';
 import '../../../data/providers/auth_provider.dart';
+import '../../../data/providers/location_provider.dart';
 import '../../../data/providers/recommendation_provider.dart';
 import '../../../data/models/item_model.dart';
 import '../../../data/models/recommendation_response_model.dart';
+import '../../dialogs/location_permission_dialog.dart';
 import '../../widgets/bottom_navigation_widget.dart';
 import '../../widgets/item_card.dart';
 import '../../widgets/app_header_bar.dart';
@@ -32,6 +35,7 @@ class _HomeScreenState extends State<HomeScreen>
       final authProvider = context.read<AuthProvider>();
       final itemProvider = context.read<ItemProvider>();
       final recommendationProvider = context.read<RecommendationProvider>();
+      final locationProvider = context.read<LocationProvider>();
 
       // Set auth token if available
       if (authProvider.accessToken != null) {
@@ -43,7 +47,38 @@ class _HomeScreenState extends State<HomeScreen>
       itemProvider.loadItems();
       recommendationProvider.loadRecommendations();
       recommendationProvider.loadTrendingRecommendations();
+
+      // Request location permission if user just logged in
+      _checkAndRequestLocation(locationProvider);
     });
+  }
+
+  /// Check if location permission was already requested, if not show dialog
+  void _checkAndRequestLocation(LocationProvider locationProvider) async {
+    final prefs = await SharedPreferences.getInstance();
+    final hasRequestedLocation =
+        prefs.getBool('location_permission_requested') ?? false;
+
+    if (!hasRequestedLocation && mounted) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => LocationPermissionDialog(
+          onLocationEnabled: () {
+            _markLocationPermissionRequested();
+          },
+          onLocationSkipped: () {
+            _markLocationPermissionRequested();
+          },
+        ),
+      );
+    }
+  }
+
+  /// Mark location permission as requested
+  void _markLocationPermissionRequested() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('location_permission_requested', true);
   }
 
   @override

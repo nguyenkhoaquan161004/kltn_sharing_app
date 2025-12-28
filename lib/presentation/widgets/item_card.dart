@@ -54,10 +54,34 @@ class _ItemCardState extends State<ItemCard> {
 
   String get _formattedTime {
     if (_remainingTime.isNegative) return 'Hết hạn';
+
+    final days = _remainingTime.inDays;
+    if (days > 0) {
+      return '$days ngày';
+    }
+
     final h = _remainingTime.inHours;
     final m = _remainingTime.inMinutes % 60;
     final s = _remainingTime.inSeconds % 60;
     return '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+  }
+
+  String _formatPrice(double price) {
+    if (price == 0) return 'Miễn phí';
+
+    final formatted = price.toStringAsFixed(0);
+    // Add thousand separators with dots
+    final buffer = StringBuffer();
+    final reversed = formatted.split('').reversed.toList();
+
+    for (int i = 0; i < reversed.length; i++) {
+      if (i > 0 && i % 3 == 0) {
+        buffer.write('.');
+      }
+      buffer.write(reversed[i]);
+    }
+
+    return buffer.toString().split('').reversed.join() + ' VNĐ';
   }
 
   @override
@@ -233,9 +257,7 @@ class _ItemCardState extends State<ItemCard> {
 
                     // Price
                     Text(
-                      widget.item.price == 0
-                          ? 'Miễn phí'
-                          : '${widget.item.price.toStringAsFixed(0)} VNĐ',
+                      _formatPrice(widget.item.price),
                       style: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,

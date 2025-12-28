@@ -7,16 +7,19 @@ import '../../../data/models/item_model.dart';
 import '../../../data/models/item_response_model.dart';
 import '../../../data/services/item_api_service.dart';
 import '../../../data/providers/auth_provider.dart';
+import '../../../data/providers/category_provider.dart';
 import '../../widgets/item_card.dart';
 
 class SearchResultsScreen extends StatefulWidget {
   final String keyword;
-  final String? category;
+  final String? categoryId;
+  final String? categoryName;
 
   const SearchResultsScreen({
     super.key,
     this.keyword = '',
-    this.category,
+    this.categoryId,
+    this.categoryName,
   });
 
   @override
@@ -28,7 +31,8 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
   TextEditingController _searchKeywordController = TextEditingController();
   String _sortBy = 'createdAt'; // createdAt (newest), or other sort options
   String _filterByPrice = 'all'; // all, free, paid
-  String _filterByCategory = 'all'; // all, or categoryId
+  String _filterByCategory = categoryId; // all, or categoryId
+  String _filterByStatus = 'AVAILABLE'; // AVAILABLE, RESERVED, SHARED
 
   // Price range filter
   double _minPrice = 0;
@@ -37,6 +41,11 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
   TextEditingController _maxPriceController =
       TextEditingController(text: '1000000');
 
+  // Location filter
+  double? _latitude = 10.7769; // Default Ho Chi Minh City
+  double? _longitude = 106.7009; // Default Ho Chi Minh City
+  int _radiusKm = 10; // Default 10km
+
   bool _isLoading = true;
   String? _errorMessage;
 
@@ -44,8 +53,8 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
   void initState() {
     super.initState();
     _searchKeywordController.text = widget.keyword;
-    if (widget.category != null && widget.category!.isNotEmpty) {
-      _filterByCategory = widget.category!;
+    if (widget.categoryId != null && widget.categoryId!.isNotEmpty) {
+      _filterByCategory = widget.categoryId!;
     }
     _loadItems();
   }
@@ -65,10 +74,14 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
       }
 
       final response = await itemService.searchItems(
-        search: widget.keyword.isNotEmpty ? widget.keyword : null,
+        keyword: widget.keyword.isNotEmpty ? widget.keyword : null,
         category: _filterByCategory != 'all' ? _filterByCategory : null,
         minPrice: _minPrice,
         maxPrice: _maxPrice,
+        status: _filterByStatus,
+        latitude: _latitude,
+        longitude: _longitude,
+        radiusKm: _radiusKm,
         sortBy: _sortBy,
         sortDirection: 'DESC',
       );
@@ -543,21 +556,30 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                         ),
                       ),
                       const SizedBox(height: 12),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          _buildCategoryPill('all', 'Tất cả', setModalState),
-                          _buildCategoryPill('Sách', 'Sách', setModalState),
-                          _buildCategoryPill(
-                              'Quần áo', 'Quần áo', setModalState),
-                          _buildCategoryPill(
-                              'Thực phẩm', 'Thực phẩm', setModalState),
-                          _buildCategoryPill(
-                              'Nội thất', 'Nội thất', setModalState),
-                          _buildCategoryPill(
-                              'Thể thao', 'Thể thao', setModalState),
-                        ],
+                      Consumer<CategoryProvider>(
+                        builder: (context, categoryProvider, _) {
+                          if (categoryProvider.isLoading) {
+                            return const Center(
+                              child: CircularProgressIndicator(),
+                            );
+                          }
+
+                          return Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              _buildCategoryPill(
+                                  'all', 'Tất cả', setModalState),
+                              ...categoryProvider.categories.map((category) {
+                                return _buildCategoryPill(
+                                  category.id,
+                                  category.name,
+                                  setModalState,
+                                );
+                              }).toList(),
+                            ],
+                          );
+                        },
                       ),
                     ],
                   ),

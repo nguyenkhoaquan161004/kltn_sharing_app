@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/models/item_model.dart';
@@ -10,18 +9,12 @@ class ProfileItemCard extends StatefulWidget {
   final ItemModel item;
   final VoidCallback? onTap;
   final bool showTimeRemaining;
-  final bool isOwnProfile;
-  final int interestedCount;
-  final String? unavailableType; // 'shared' or 'expired' for unavailable items
 
   const ProfileItemCard({
     super.key,
     required this.item,
     this.onTap,
     this.showTimeRemaining = true,
-    this.isOwnProfile = false,
-    this.interestedCount = 0,
-    this.unavailableType,
   });
 
   @override
@@ -30,7 +23,7 @@ class ProfileItemCard extends StatefulWidget {
 
 class _ProfileItemCardState extends State<ProfileItemCard> {
   late Duration _remainingTime;
-  Timer? _timer;
+  late Timer? _timer;
 
   @override
   void initState() {
@@ -61,339 +54,241 @@ class _ProfileItemCardState extends State<ProfileItemCard> {
 
   String get _formattedTime {
     if (_remainingTime.isNegative) return 'Hết hạn';
+
+    final days = _remainingTime.inDays;
+    if (days > 0) {
+      return '$days ngày';
+    }
+
     final h = _remainingTime.inHours;
     final m = _remainingTime.inMinutes % 60;
     final s = _remainingTime.inSeconds % 60;
     return '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final isExpired = widget.item.expirationDate != null &&
-        widget.item.expirationDate!.isBefore(DateTime.now());
-    final isShared = widget.item.status == '2'; // 2 = shared status
-    final isExpiredShared = isExpired && isShared && !widget.isOwnProfile;
-    final opacity = isExpiredShared ? 0.6 : 1.0;
+  String _formatPrice(double price) {
+    if (price == 0) return 'Miễn phí';
 
-    // Colors for unavailable items
-    Color? unavailableBorderColor;
-    Color? unavailableBackgroundColor;
-    if (widget.unavailableType == 'shared') {
-      unavailableBorderColor = AppColors.success.withOpacity(0.3);
-      unavailableBackgroundColor = AppColors.success.withOpacity(0.05);
-    } else if (widget.unavailableType == 'expired') {
-      unavailableBorderColor = AppColors.warning.withOpacity(0.3);
-      unavailableBackgroundColor = AppColors.warning.withOpacity(0.05);
+    final formatted = price.toStringAsFixed(0);
+    // Add thousand separators with dots
+    final buffer = StringBuffer();
+    final reversed = formatted.split('').reversed.toList();
+
+    for (int i = 0; i < reversed.length; i++) {
+      if (i > 0 && i % 3 == 0) {
+        buffer.write('.');
+      }
+      buffer.write(reversed[i]);
     }
 
+    return buffer.toString().split('').reversed.join() + ' VNĐ';
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return GestureDetector(
       onTap: widget.onTap ??
           () {
-            context.push('/item/${widget.item.itemId}');
+            final itemId =
+                widget.item.itemId_str ?? widget.item.itemId.toString();
+            context.push('/item/$itemId');
           },
-      child: Opacity(
-        opacity: opacity,
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            color: widget.unavailableType != null
-                ? unavailableBackgroundColor
-                : (isExpiredShared ? Colors.grey[100] : Colors.white),
-            border: Border.all(
-              color: widget.unavailableType != null
-                  ? unavailableBorderColor!
-                  : (isExpiredShared
-                      ? Colors.grey[300]!
-                      : const Color(0xFFE0E0E0)),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          color: Colors.white,
+          border: Border.all(color: const Color(0xFFE0E0E0)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
             ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 4,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Image with tags overlay
-              Stack(
-                children: [
-                  // Image or placeholder
-                  Container(
-                    width: double.infinity,
-                    height: 140,
-                    decoration: BoxDecoration(
-                      borderRadius: const BorderRadius.vertical(
-                        top: Radius.circular(12),
-                      ),
-                      color:
-                          isExpiredShared ? Colors.grey[300] : Colors.grey[200],
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Image with tags overlay
+            Stack(
+              children: [
+                // Image placeholder or actual image
+                Container(
+                  height: 140,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(12),
                     ),
-                    child: widget.item.image != null &&
-                            widget.item.image!.isNotEmpty
-                        ? CachedNetworkImage(
-                            imageUrl: widget.item.image!,
-                            fit: BoxFit.cover,
-                            placeholder: (context, url) => Center(
-                              child: CircularProgressIndicator(
-                                color: AppColors.primaryGreen,
-                              ),
-                            ),
-                            errorWidget: (context, url, error) => Center(
+                    color: Colors.grey[200],
+                  ),
+                  child: widget.item.image != null &&
+                          widget.item.image!.isNotEmpty
+                      ? Image.network(
+                          widget.item.image!,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Center(
                               child: Icon(
-                                Icons.broken_image,
-                                size: 48,
+                                Icons.image_not_supported,
+                                size: 40,
                                 color: Colors.grey[400],
                               ),
+                            );
+                          },
+                          loadingBuilder: (context, child, loadingProgress) {
+                            if (loadingProgress == null) return child;
+                            return Center(
+                              child: CircularProgressIndicator(
+                                value: loadingProgress.expectedTotalBytes !=
+                                        null
+                                    ? loadingProgress.cumulativeBytesLoaded /
+                                        loadingProgress.expectedTotalBytes!
+                                    : null,
+                              ),
+                            );
+                          },
+                        )
+                      : Center(
+                          child: Icon(
+                            Icons.image,
+                            size: 40,
+                            color: Colors.grey[400],
+                          ),
+                        ),
+                ),
+
+                // Free tag at top left (if price is 0) and Time remaining at top right
+                Positioned(
+                  top: 8,
+                  left: 0,
+                  right: 0,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    child: Row(
+                      children: [
+                        // Free tag (if price is 0)
+                        if (widget.item.price == 0)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
                             ),
-                          )
-                        : Center(
-                            child: Icon(
-                              Icons.image,
-                              size: 48,
-                              color: isExpiredShared
-                                  ? Colors.grey[400]
-                                  : Colors.grey[400],
+                            decoration: BoxDecoration(
+                              color: AppColors.badgePink,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Text(
+                              '0đ',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ),
-                  ),
-
-                  // Free tag at top left (for user profile) and interested/time at top right
-                  Positioned(
-                    top: 8,
-                    left: 0,
-                    right: 0,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      child: Row(
-                        children: [
-                          // Free tag (if price is 0 and not own profile - user view)
-                          if (!widget.isOwnProfile && widget.item.price == 0)
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppColors.badgePink,
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: const Text(
-                                '0đ',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w600,
-                                ),
+                        const Spacer(),
+                        // Time remaining tag (if applicable)
+                        if (widget.showTimeRemaining &&
+                            widget.item.expirationDate != null)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: _remainingTime.isNegative
+                                  ? Colors.red
+                                  : Colors.orange,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              _formattedTime,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
-                          const Spacer(),
-                          // Column for interested badge and time for own profile
-                          if (widget.isOwnProfile)
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                // Interested badge for own profile - expanded
-                                if (widget.interestedCount > 0)
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 4,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.primaryGreen,
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        Text(
-                                          '${widget.interestedCount}',
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w700,
-                                          ),
-                                        ),
-                                        const Text(
-                                          ' quan tâm',
-                                          style: TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                // Time remaining for own profile
-                                if (widget.showTimeRemaining &&
-                                    widget.item.expirationDate != null)
-                                  Container(
-                                    margin: const EdgeInsets.only(top: 8),
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 10,
-                                      vertical: 6,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: _remainingTime.isNegative
-                                          ? Colors.red
-                                          : Colors.orange,
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: Text(
-                                      _formattedTime,
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          // Time remaining for user profile (not own profile)
-                          if (!widget.isOwnProfile &&
-                              widget.showTimeRemaining &&
-                              widget.item.expirationDate != null)
-                            Container(
-                              margin: const EdgeInsets.only(left: 8),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 6,
-                              ),
-                              decoration: BoxDecoration(
-                                color: _remainingTime.isNegative
-                                    ? Colors.red
-                                    : Colors.orange,
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                _formattedTime,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
+                          ),
+                      ],
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
+            ),
 
-              // Content
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Item name
-                      Text(
-                        widget.item.name,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: isExpiredShared
-                              ? Colors.grey[600]
-                              : AppColors.textPrimary,
-                        ),
+            // Content
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Item name
+                    Text(
+                      widget.item.name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
                       ),
+                    ),
 
-                      const SizedBox(height: 4),
+                    const SizedBox(height: 3),
 
-                      // Category
-                      Text(
-                        MockData.getCategoryById(widget.item.categoryId)
-                                ?.name ??
-                            'Khác',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: isExpiredShared
-                              ? Colors.grey[500]
-                              : Colors.grey[600],
-                        ),
+                    // Category
+                    Text(
+                      widget.item.categoryName ??
+                          MockData.getCategoryById(widget.item.categoryId)
+                              ?.name ??
+                          'Khác',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: Colors.grey[600],
                       ),
+                    ),
 
-                      const SizedBox(height: 8),
+                    const SizedBox(height: 6),
 
-                      // Price
-                      Text(
-                        widget.item.price == 0
-                            ? 'Miễn phí'
-                            : '${widget.item.price.toStringAsFixed(0)} VNĐ',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: isExpiredShared
-                              ? Colors.grey[400]
-                              : AppColors.primaryGreen,
-                        ),
+                    // Price
+                    Text(
+                      _formatPrice(widget.item.price),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.primaryGreen,
                       ),
+                    ),
 
-                      const SizedBox(height: 6),
+                    const Spacer(),
 
-                      // Expiration date
-                      if (widget.item.expirationDate != null)
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.schedule,
-                              size: 12,
-                              color: isExpiredShared
-                                  ? Colors.grey[500]
-                                  : Colors.grey[600],
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              'Hết hạn: ${widget.item.expirationDate!.day}/${widget.item.expirationDate!.month}',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: isExpiredShared
-                                    ? Colors.grey[500]
-                                    : Colors.grey[600],
-                              ),
-                            ),
-                          ],
+                    // Quantity remaining
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.inventory_2_outlined,
+                          size: 12,
+                          color: Colors.grey[600],
                         ),
-
-                      const Spacer(),
-
-                      // Quantity remaining
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.inventory_2_outlined,
-                            size: 14,
-                            color: isExpiredShared
-                                ? Colors.grey[500]
-                                : Colors.grey[600],
+                        const SizedBox(width: 3),
+                        Text(
+                          'Còn ${widget.item.quantity}',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.grey[700],
                           ),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Còn ${widget.item.quantity}',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w500,
-                              color: isExpiredShared
-                                  ? Colors.grey[500]
-                                  : Colors.grey[700],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

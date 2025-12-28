@@ -8,6 +8,7 @@ import 'data/providers/item_provider.dart';
 import 'data/providers/user_provider.dart';
 import 'data/providers/gamification_provider.dart';
 import 'data/providers/category_provider.dart';
+import 'data/providers/location_provider.dart';
 import 'data/providers/recommendation_provider.dart';
 import 'data/providers/notification_provider.dart';
 import 'data/services/auth_api_service.dart';
@@ -145,6 +146,10 @@ class MyApp extends StatelessWidget {
           create: (_) => CategoryProvider(
             _.read<CategoryApiService>(),
           ),
+        ),
+        // Location Provider
+        ChangeNotifierProvider<LocationProvider>(
+          create: (_) => LocationProvider(),
         ),
         // Recommendation API Service
         ProxyProvider<AuthProvider, RecommendationApiService>(

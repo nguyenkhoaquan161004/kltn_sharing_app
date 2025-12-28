@@ -31,25 +31,21 @@ class _CreateProductModalState extends State<CreateProductModal> {
   late TextEditingController _quantityController;
 
   String _selectedCategory = '';
+  String? _selectedCategoryId;
   DateTime _expirationDate = DateTime.now().add(const Duration(days: 30));
   bool _isLoading = false;
+  bool _categoriesLoading = true;
   String? _selectedImagePath;
   String? _uploadedImageUrl;
   String? _errorMessage;
+  String? _categoryError;
 
   // Location
   double? _latitude;
   double? _longitude;
 
-  // Mock categories - should be fetched from API
-  final List<Map<String, String>> categories = [
-    {'id': '3fa85f64-5717-4562-b3fc-2c963f66afa1', 'name': 'Quần áo'},
-    {'id': '3fa85f64-5717-4562-b3fc-2c963f66afa2', 'name': 'Giày dép'},
-    {'id': '3fa85f64-5717-4562-b3fc-2c963f66afa3', 'name': 'Điện tử'},
-    {'id': '3fa85f64-5717-4562-b3fc-2c963f66afa4', 'name': 'Sách'},
-    {'id': '3fa85f64-5717-4562-b3fc-2c963f66afa5', 'name': 'Đồ chơi'},
-    {'id': '3fa85f64-5717-4562-b3fc-2c963f66afa6', 'name': 'Nội thất'},
-  ];
+  // Categories from API
+  List<Map<String, dynamic>> categories = [];
 
   @override
   void initState() {
@@ -62,14 +58,46 @@ class _CreateProductModalState extends State<CreateProductModal> {
     _priceController = TextEditingController(text: '0');
     _quantityController = TextEditingController(text: '1');
 
-    if (categories.isNotEmpty) {
-      _selectedCategory = categories[0]['id']!;
-    }
-
     // Use default Ho Chi Minh City coordinates
-    // In a real app, you would integrate with location services
     _latitude = 10.7769;
     _longitude = 106.7009;
+
+    // Load categories after frame is built
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadCategories();
+    });
+  }
+
+  Future<void> _loadCategories() async {
+    try {
+      final loadedCategories = await _itemApiService.getCategories();
+
+      if (mounted) {
+        setState(() {
+          categories = loadedCategories;
+          _categoriesLoading = false;
+
+          if (categories.isNotEmpty) {
+            _selectedCategoryId = categories[0]['id'];
+            _selectedCategory = categories[0]['name'] ?? '';
+          }
+
+          print('[CreateProductModal] Loaded ${categories.length} categories');
+          for (var cat in categories) {
+            print(
+                '[CreateProductModal] Category: ${cat['name']} (${cat['id']})');
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _categoryError = 'Không thể tải danh mục: ${e.toString()}';
+          _categoriesLoading = false;
+          print('[CreateProductModal] Error loading categories: $e');
+        });
+      }
+    }
   }
 
   @override
@@ -150,6 +178,16 @@ class _CreateProductModalState extends State<CreateProductModal> {
         return;
       }
 
+      if (_selectedCategoryId == null || _selectedCategoryId!.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Vui lòng chọn danh mục'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+        return;
+      }
+
       setState(() => _isLoading = true);
 
       try {
@@ -160,7 +198,7 @@ class _CreateProductModalState extends State<CreateProductModal> {
           quantity: int.parse(_quantityController.text),
           imageUrl: _uploadedImageUrl!,
           expiryDate: _expirationDate,
-          categoryId: _selectedCategory,
+          categoryId: _selectedCategoryId!,
           latitude: _latitude!,
           longitude: _longitude!,
           price: double.parse(_priceController.text),
@@ -283,27 +321,7 @@ class _CreateProductModalState extends State<CreateProductModal> {
               // Danh mục
               Text('Danh mục *', style: AppTextStyles.label),
               const SizedBox(height: 8),
-              DropdownButtonFormField<String>(
-                value: _selectedCategory,
-                decoration: InputDecoration(
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                ),
-                items: categories.map((category) {
-                  return DropdownMenuItem<String>(
-                    value: category['id']!,
-                    child: Text(category['name']!),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  setState(() => _selectedCategory = value ?? '');
-                },
-              ),
+              _buildCategoryDropdown(),
               const SizedBox(height: 16),
 
               // Số lượng và Giá (side by side)
@@ -578,6 +596,69 @@ class _CreateProductModalState extends State<CreateProductModal> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildCategoryDropdown() {
+    if (_categoriesLoading) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          border: Border.all(color: AppColors.borderLight),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const Center(
+          child: SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+      );
+    }
+
+    if (_categoryError != null) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          border: Border.all(color: AppColors.error),
+          borderRadius: BorderRadius.circular(12),
+          color: AppColors.error.withOpacity(0.1),
+        ),
+        child: Text(
+          _categoryError!,
+          style: const TextStyle(color: AppColors.error),
+        ),
+      );
+    }
+
+    return DropdownButtonFormField<String>(
+      value: _selectedCategoryId,
+      decoration: InputDecoration(
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 12,
+        ),
+      ),
+      items: categories.map((category) {
+        return DropdownMenuItem<String>(
+          value: category['id'] as String,
+          child: Text(category['name'] as String? ?? 'Unknown'),
+        );
+      }).toList(),
+      onChanged: (value) {
+        if (value != null) {
+          setState(() {
+            _selectedCategoryId = value;
+            _selectedCategory = categories
+                    .firstWhere((c) => c['id'] == value)['name'] as String? ??
+                '';
+          });
+        }
+      },
     );
   }
 }
