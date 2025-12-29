@@ -7,6 +7,7 @@ import '../../../../data/models/item_response_model.dart';
 import '../../../../data/models/cart_request_model.dart';
 import '../../../../data/services/cart_api_service.dart';
 import '../../../../data/providers/auth_provider.dart';
+import '../../../../data/providers/order_provider.dart';
 
 class AddToCartModal extends StatefulWidget {
   final ItemDto item;
@@ -217,6 +218,12 @@ class _AddToCartModalState extends State<AddToCartModal> {
       );
 
       await cartService.addToCart(request);
+
+      // Update order count in OrderProvider
+      if (mounted) {
+        context.read<OrderProvider>().incrementOrderCount();
+      }
+
       setState(() => _isLoading = false);
 
       if (mounted) {

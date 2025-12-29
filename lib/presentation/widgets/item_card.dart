@@ -23,7 +23,7 @@ class ItemCard extends StatefulWidget {
 
 class _ItemCardState extends State<ItemCard> {
   late Duration _remainingTime;
-  late Timer? _timer;
+  Timer? _timer;
 
   @override
   void initState() {
@@ -129,6 +129,9 @@ class _ItemCardState extends State<ItemCard> {
                           widget.item.image!,
                           fit: BoxFit.cover,
                           errorBuilder: (context, error, stackTrace) {
+                            print(
+                                '[ItemCard] Image load error for: ${widget.item.image}');
+                            print('[ItemCard] Error: $error');
                             return Center(
                               child: Icon(
                                 Icons.image_not_supported,

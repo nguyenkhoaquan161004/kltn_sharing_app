@@ -18,12 +18,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   final List<OnboardingData> _pages = [
     OnboardingData(
-      title: 'Chia sẻ đồ dùng không còn là\nchuyện riêng lẻ',
+      title: 'Chia sẻ đồ dùng không còn là chuyện riêng lẻ',
       description: 'Mỗi món đồ bạn trao đi đều có thể giúp ích cho cộng đồng',
       illustration: 'assets/svgs/onboarding/pic1.svg',
     ),
     OnboardingData(
-      title: 'Hãy đến với cộng đồng của\nchúng ta',
+      title: 'Hãy đến với cộng đồng của chúng ta',
       description: 'Kết nối với những người cùng tinh thần với bạn',
       illustration: 'assets/svgs/onboarding/pic2.svg',
     ),

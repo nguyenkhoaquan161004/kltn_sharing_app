@@ -8,6 +8,8 @@ import '../../widgets/custom_text_field.dart';
 import '../../widgets/gradient_button.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:kltn_sharing_app/data/providers/auth_provider.dart';
+import 'package:kltn_sharing_app/data/providers/user_provider.dart';
+import 'package:kltn_sharing_app/data/services/fcm_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -32,6 +34,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _handleLogin() async {
     if (_formKey.currentState!.validate()) {
       final authProvider = context.read<AuthProvider>();
+      final userProvider = context.read<UserProvider>();
 
       final success = await authProvider.login(
         usernameOrEmail: _userNameController.text.trim(),
@@ -40,7 +43,41 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (mounted) {
         if (success) {
+          // Load user data from API after successful login
+          try {
+            await userProvider.loadCurrentUser();
+            print('[LoginScreen] ✅ User data loaded successfully');
+          } catch (e) {
+            print('[LoginScreen] ⚠️  Failed to load user data: $e');
+            // Don't prevent navigation even if user data load fails
+          }
+
           context.go(AppRoutes.home);
+          // Update FCM token on backend
+          // TODO: Enable FCM token update later
+          try {
+            final fcmToken = await FCMService().getFCMTokenFromFirebase();
+            final currentUser = userProvider.currentUser;
+
+            if (fcmToken != null &&
+                fcmToken.isNotEmpty &&
+                currentUser != null) {
+              print('[LoginScreen] 📤 Updating FCM token on backend');
+              await userProvider.updateFCMToken(
+                userId: currentUser.id,
+                fcmToken: fcmToken,
+              );
+              print('[LoginScreen] ✅ FCM token updated successfully');
+            } else {
+              print('[LoginScreen] ⚠️  FCM token or user ID is null');
+              print(
+                  '[LoginScreen] - FCM Token: ${fcmToken?.substring(0, 20) ?? 'null'}');
+              print('[LoginScreen] - User ID: ${currentUser?.id ?? 'null'}');
+            }
+          } catch (e) {
+            print('[LoginScreen] ⚠️  Failed to update FCM token: $e');
+            // Don't prevent navigation even if FCM token update fails
+          }
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(

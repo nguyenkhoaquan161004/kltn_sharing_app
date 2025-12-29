@@ -9,12 +9,14 @@ class ProfileItemCard extends StatefulWidget {
   final ItemModel item;
   final VoidCallback? onTap;
   final bool showTimeRemaining;
+  final int interestedCount;
 
   const ProfileItemCard({
     super.key,
     required this.item,
     this.onTap,
     this.showTimeRemaining = true,
+    this.interestedCount = 0,
   });
 
   @override
@@ -23,7 +25,7 @@ class ProfileItemCard extends StatefulWidget {
 
 class _ProfileItemCardState extends State<ProfileItemCard> {
   late Duration _remainingTime;
-  late Timer? _timer;
+  Timer? _timer;
 
   @override
   void initState() {
@@ -114,7 +116,7 @@ class _ProfileItemCardState extends State<ProfileItemCard> {
               children: [
                 // Image placeholder or actual image
                 Container(
-                  height: 140,
+                  height: 120,
                   width: double.infinity,
                   decoration: BoxDecoration(
                     borderRadius: const BorderRadius.vertical(
@@ -167,20 +169,20 @@ class _ProfileItemCardState extends State<ProfileItemCard> {
                     padding: const EdgeInsets.symmetric(horizontal: 8),
                     child: Row(
                       children: [
-                        // Free tag (if price is 0)
-                        if (widget.item.price == 0)
+                        // Interested count badge
+                        if (widget.interestedCount > 0)
                           Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 8,
                               vertical: 4,
                             ),
                             decoration: BoxDecoration(
-                              color: AppColors.badgePink,
+                              color: AppColors.primaryGreen,
                               borderRadius: BorderRadius.circular(6),
                             ),
-                            child: const Text(
-                              '0đ',
-                              style: TextStyle(
+                            child: Text(
+                              '${widget.interestedCount}',
+                              style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 10,
                                 fontWeight: FontWeight.w600,

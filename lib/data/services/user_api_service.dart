@@ -178,6 +178,53 @@ class UserApiService {
     }
   }
 
+  /// Send FCM token to backend after login
+  /// Endpoint: POST /api/v2/users/fcm-token
+  Future<void> updateFCMToken({
+    required String userId,
+    required String fcmToken,
+  }) async {
+    try {
+      print('[UserAPI] 📤 Updating FCM token - userId: $userId');
+      print('[UserAPI] FCM Token: ${fcmToken.substring(0, 50)}...');
+
+      final response = await _dio.post(
+        '/api/v2/users/fcm-token',
+        data: {
+          'userId': userId,
+          'fcmToken': fcmToken,
+        },
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        print('[UserAPI] ✅ FCM token updated successfully');
+      } else {
+        throw Exception('Failed to update FCM token: ${response.statusCode}');
+      }
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  /// Delete FCM token from backend on logout
+  /// Endpoint: DELETE /api/v2/users/fcm-token
+  Future<void> deleteFCMToken() async {
+    try {
+      print('[UserAPI] 🗑️  Deleting FCM token from backend');
+
+      final response = await _dio.delete('/api/v2/users/fcm-token');
+
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        print('[UserAPI] ✅ FCM token deleted successfully');
+      } else {
+        throw Exception('Failed to delete FCM token: ${response.statusCode}');
+      }
+    } on DioException catch (e) {
+      print('[UserAPI] ⚠️  Error deleting FCM token: $e');
+      // Don't throw - logout should succeed even if FCM token delete fails
+    }
+  }
+
   Exception _handleDioException(DioException e) {
     String message;
 

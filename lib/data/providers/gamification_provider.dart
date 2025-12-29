@@ -50,7 +50,12 @@ class GamificationProvider extends ChangeNotifier {
       _isLoading = false;
       notifyListeners();
     } catch (e) {
-      _errorMessage = e.toString().replaceFirst('Exception: ', '');
+      // If 403, silently fail (leaderboard is public and should work)
+      // If other error, log it
+      String errorMsg = e.toString();
+      if (!errorMsg.contains('403')) {
+        _errorMessage = errorMsg.replaceFirst('Exception: ', '');
+      }
       _isLoading = false;
       notifyListeners();
     }
@@ -67,7 +72,11 @@ class GamificationProvider extends ChangeNotifier {
       _isLoading = false;
       notifyListeners();
     } catch (e) {
-      _errorMessage = e.toString().replaceFirst('Exception: ', '');
+      // If 403, silently fail (leaderboard is public and should work)
+      String errorMsg = e.toString();
+      if (!errorMsg.contains('403')) {
+        _errorMessage = errorMsg.replaceFirst('Exception: ', '');
+      }
       _isLoading = false;
       notifyListeners();
     }
@@ -84,7 +93,68 @@ class GamificationProvider extends ChangeNotifier {
       _isLoading = false;
       notifyListeners();
     } catch (e) {
-      _errorMessage = e.toString().replaceFirst('Exception: ', '');
+      // If 403, user not authenticated - that's okay
+      // Leaderboard still works without user stats
+      String errorMsg = e.toString();
+      if (!errorMsg.contains('403')) {
+        _errorMessage = errorMsg.replaceFirst('Exception: ', '');
+      }
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Load leaderboard with scope (GLOBAL or NEARBY)
+  /// For NEARBY, requires currentUserLat and currentUserLon
+  Future<void> loadLeaderboardWithScope({
+    required String scope, // 'GLOBAL' or 'NEARBY'
+    String timeFrame = 'ALL_TIME',
+    double? currentUserLat,
+    double? currentUserLon,
+    double radiusKm = 50.0,
+    int page = 0,
+    int size = 20,
+  }) async {
+    try {
+      _isLoading = true;
+      _errorMessage = null;
+      notifyListeners();
+
+      final response = await _gamificationApiService.getLeaderboardWithScope(
+        scope: scope,
+        timeFrame: timeFrame,
+        currentUserLat: currentUserLat,
+        currentUserLon: currentUserLon,
+        radiusKm: radiusKm,
+        page: page,
+        size: size,
+      );
+
+      // Convert LeaderboardEntryDto to GamificationDto format
+      _leaderboard = response.entries
+          .map((entry) => GamificationDto(
+                id: entry.userId,
+                userId: entry.userId,
+                username: entry.username,
+                avatarUrl: entry.avatarUrl,
+                points: entry.totalPoints,
+                rank: entry.rank,
+                itemsShared: 0,
+                itemsReceived: 0,
+                badge: null,
+              ))
+          .toList();
+
+      _currentPage = response.page;
+      _totalPages = response.totalPages;
+      _isLoading = false;
+      notifyListeners();
+    } catch (e) {
+      // If 403, silently fail (leaderboard is public)
+      String errorMsg = e.toString();
+      if (!errorMsg.contains('403')) {
+        _errorMessage = errorMsg.replaceFirst('Exception: ', '');
+      }
       _isLoading = false;
       notifyListeners();
     }

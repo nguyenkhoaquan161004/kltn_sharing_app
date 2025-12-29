@@ -7,6 +7,7 @@ import '../../../core/constants/app_routes.dart';
 import '../../../data/models/transaction_model.dart';
 import '../../../data/models/transaction_status.dart';
 import '../../../data/services/transaction_api_service.dart';
+import '../../../data/services/message_api_service.dart';
 import '../../../data/providers/auth_provider.dart';
 
 class OrderDetailScreen extends StatefulWidget {
@@ -23,6 +24,7 @@ class OrderDetailScreen extends StatefulWidget {
 
 class _OrderDetailScreenState extends State<OrderDetailScreen> {
   late TransactionApiService _transactionApiService;
+  late MessageApiService _messageApiService;
   TransactionModel? _transaction;
   bool _isLoading = false;
   String? _errorMessage;
@@ -31,6 +33,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   void initState() {
     super.initState();
     _transactionApiService = TransactionApiService();
+    _messageApiService = MessageApiService();
 
     // Setup auth token and load transaction detail
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -38,6 +41,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       if (authProvider.accessToken != null) {
         _transactionApiService.setAuthToken(authProvider.accessToken!);
         _transactionApiService.setGetValidTokenCallback(
+          () async => authProvider.accessToken,
+        );
+
+        _messageApiService.setAuthToken(authProvider.accessToken!);
+        _messageApiService.setGetValidTokenCallback(
           () async => authProvider.accessToken,
         );
       }
@@ -69,6 +77,93 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         _isLoading = false;
       });
       print('[OrderDetailScreen] Error loading transaction: $e');
+    }
+  }
+
+  Future<void> _handleCompleteTransaction() async {
+    if (_transaction == null) return;
+
+    // Show confirmation dialog
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Xác nhận nhận hàng'),
+        content: const Text('Bạn chắc chắn đã nhận được hàng?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Hủy'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Có, đã nhận'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    // Call complete API
+    try {
+      await _transactionApiService.completeTransaction(
+          _transaction!.transactionIdUuid ??
+              _transaction!.transactionId.toString());
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Đơn hàng đã được đánh dấu hoàn thành'),
+            backgroundColor: Colors.green,
+          ),
+        );
+
+        // Reload transaction to update status
+        _loadTransactionDetail();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Lỗi: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _handleSendMessage() async {
+    if (_transaction == null) return;
+
+    try {
+      // Send message to the item owner (sharer/seller)
+      final receiverId =
+          _transaction!.sharerIdUuid ?? _transaction!.sharerId.toString();
+      final itemId =
+          _transaction!.itemIdUuid ?? _transaction!.itemId.toString();
+
+      await _messageApiService.sendMessage(
+        receiverId: receiverId,
+        content: 'Xin chào, tôi đang quan tâm đến đơn hàng này.',
+        messageType: 'TEXT',
+        itemId: itemId,
+      );
+
+      if (mounted) {
+        // Navigate directly to chat screen
+        context.push('/chat/$receiverId');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Lỗi: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      print('[OrderDetailScreen] Error sending message: $e');
     }
   }
 
@@ -345,11 +440,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   Widget _buildTimeline(TransactionStatus status) {
     // Determine which steps are completed based on status
     bool step1Completed = true; // Đã đặt hàng - always completed
-    bool step2Completed = status == TransactionStatus.pending ||
-        status == TransactionStatus.accepted ||
+    bool step2Completed = status == TransactionStatus.accepted ||
         status == TransactionStatus.inProgress ||
         status == TransactionStatus.completed;
-    bool step3Completed = status == TransactionStatus.inProgress ||
+    bool step3Completed = status == TransactionStatus.accepted ||
+        status == TransactionStatus.inProgress ||
         status == TransactionStatus.completed;
     bool step4Completed = status == TransactionStatus.completed;
 
@@ -540,9 +635,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     final txn = _transaction!;
     final status = txn.status;
 
-    // PENDING or ACCEPTED: "Nhắn tin" + "Hủy đơn hàng"
-    if (status == TransactionStatus.pending ||
-        status == TransactionStatus.accepted) {
+    // PENDING: "Hủy đơn hàng" + "Nhắn tin"
+    if (status == TransactionStatus.pending) {
       return Row(
         children: [
           Expanded(
@@ -567,11 +661,53 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           const SizedBox(width: 12),
           Expanded(
             child: ElevatedButton(
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Chức năng đang phát triển')),
-                );
-              },
+              onPressed: _handleSendMessage,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryGreen,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+              child: Text(
+                'Nhắn tin',
+                style: AppTextStyles.bodyMedium.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+    // ACCEPTED: "Nhắn tin" + "Đã nhận được hàng"
+    else if (status == TransactionStatus.accepted) {
+      return Row(
+        children: [
+          Expanded(
+            child: OutlinedButton(
+              onPressed: _handleCompleteTransaction,
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: AppColors.primaryGreen),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+              child: Text(
+                'Đã nhận được hàng',
+                style: AppTextStyles.bodyMedium.copyWith(
+                  color: AppColors.primaryGreen,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: ElevatedButton(
+              onPressed: _handleSendMessage,
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primaryGreen,
                 shape: RoundedRectangleBorder(
@@ -597,11 +733,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         children: [
           Expanded(
             child: OutlinedButton(
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Chức năng đang phát triển')),
-                );
-              },
+              onPressed: _handleCompleteTransaction,
               style: OutlinedButton.styleFrom(
                 side: const BorderSide(color: AppColors.primaryGreen),
                 shape: RoundedRectangleBorder(
@@ -621,11 +753,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           const SizedBox(width: 12),
           Expanded(
             child: ElevatedButton(
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Chức năng đang phát triển')),
-                );
-              },
+              onPressed: _handleSendMessage,
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primaryGreen,
                 shape: RoundedRectangleBorder(

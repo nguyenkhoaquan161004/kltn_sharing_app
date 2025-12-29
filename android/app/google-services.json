@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "597386688956",
+    "project_id": "shareo-78c33",
+    "storage_bucket": "shareo-78c33.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:597386688956:android:cef1f54e2e32b88130d3b9",
+        "android_client_info": {
+          "package_name": "com.example.kltn_sharing_app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "597386688956-m00i8d1doimohtvd4v9g35950hurl199.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAaia0uJUVm4AuE9-Lrdf_HZEQ66hmipl8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "597386688956-m00i8d1doimohtvd4v9g35950hurl199.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

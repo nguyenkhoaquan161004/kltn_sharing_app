@@ -6,8 +6,10 @@ import '../../../../core/constants/app_text_styles.dart';
 import '../../../../data/models/product_model.dart';
 import '../../../../data/models/transaction_request_model.dart';
 import '../../../../data/services/transaction_api_service.dart';
+import '../../../../data/services/cart_api_service.dart';
 import '../../../../data/providers/auth_provider.dart';
 import '../../../../data/providers/user_provider.dart';
+import '../../../../data/providers/order_provider.dart';
 
 class OrderRequestModal extends StatefulWidget {
   final ProductModel product;
@@ -126,10 +128,15 @@ class _OrderRequestModalState extends State<OrderRequestModal> {
         transactionService.setAuthToken(authProvider.accessToken!);
       }
 
-      // Get receiver ID (current user's ID)
-      final receiverId = userProvider.currentUser?.id ?? '';
+      // Get receiverId from AuthProvider username
+      final receiverId = authProvider.username ?? '';
 
-      // Create transaction request with correct format
+      if (receiverId.isEmpty) {
+        throw Exception(
+            'Lỗi: Không tìm thấy thông tin người dùng. Vui lòng đăng nhập lại.');
+      }
+
+      // Create transaction request
       final request = TransactionRequest(
         itemId: widget.product.id,
         message: _reasonController.text,
@@ -139,7 +146,7 @@ class _OrderRequestModalState extends State<OrderRequestModal> {
         shippingNote: _noteController.text,
         paymentMethod: 'CASH',
         transactionFee: 0.0,
-        receiverId: receiverId,
+        receiverId: receiverId, // Use username from auth
       );
 
       print(
@@ -148,16 +155,54 @@ class _OrderRequestModalState extends State<OrderRequestModal> {
       // Call API
       await transactionService.createTransaction(request);
 
+      // Decrement order count once for the transaction creation
+      if (mounted) {
+        context.read<OrderProvider>().decrementOrderCount();
+      }
+
+      // Delete item from cart after successful transaction
+      try {
+        final cartApiService = CartApiService();
+        if (authProvider.accessToken != null) {
+          cartApiService.setAuthToken(authProvider.accessToken!);
+        }
+        // Use cartItemId if available (from cart screen), otherwise use product.id
+        final itemIdToDelete = widget.product.cartItemId ?? widget.product.id;
+        await cartApiService.removeFromCart(itemIdToDelete);
+        print('[OrderRequestModal] Item removed from cart: $itemIdToDelete');
+      } catch (cartError) {
+        print(
+            '[OrderRequestModal] Warning: Failed to remove from cart: $cartError');
+        // Don't throw error, transaction was successful
+      }
+
       setState(() => _isLoading = false);
 
       if (mounted) {
-        context.pop();
+        context.pop(true); // Return true to indicate success
         _showSuccessDialog();
       }
     } catch (e) {
       setState(() {
         _isLoading = false;
-        _errorMessage = e.toString().replaceAll('Exception: ', '');
+        // Parse error message for better UX
+        String errorMessage = e.toString().replaceAll('Exception: ', '');
+
+        // Handle specific error codes
+        if (errorMessage.contains('409')) {
+          _errorMessage =
+              'Bạn đã có yêu cầu pending cho sản phẩm này. Vui lòng check lại danh sách "Chờ duyệt".';
+        } else if (errorMessage.contains('TRANSACTION_ALREADY_EXISTS')) {
+          _errorMessage =
+              'Bạn đã có yêu cầu pending cho sản phẩm này. Vui lòng check lại danh sách "Chờ duyệt".';
+        } else if (errorMessage.contains('ITEM_OWNER_CANNOT_REQUEST')) {
+          _errorMessage =
+              'Bạn không thể tạo yêu cầu cho sản phẩm của chính mình.';
+        } else if (errorMessage.contains('không tìm thấy')) {
+          _errorMessage = 'Sản phẩm không tìm thấy hoặc đã được chia sẻ.';
+        } else {
+          _errorMessage = errorMessage;
+        }
       });
       print('[OrderRequestModal] Error creating transaction: $e');
     }

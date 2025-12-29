@@ -21,6 +21,8 @@ class TransactionModel {
   final String? sharerName;
   final String? sharerAvatar;
   final String? receiverName;
+  final String? receiverPhone;
+  final String? receiverAddress;
   final String? message;
   final int? quantity;
   final double? transactionFee;
@@ -44,6 +46,8 @@ class TransactionModel {
     this.sharerName,
     this.sharerAvatar,
     this.receiverName,
+    this.receiverPhone,
+    this.receiverAddress,
     this.message,
     this.quantity = 1,
     this.transactionFee = 0.0,
@@ -126,6 +130,8 @@ class TransactionModel {
           json['userAvatar'] ??
           json['user_avatar'],
       receiverName: json['receiverName'] ?? json['receiver_name'],
+      receiverPhone: json['receiverPhone'] ?? json['receiver_phone'],
+      receiverAddress: json['receiverAddress'] ?? json['receiver_address'],
       message: json['message'],
       quantity: json['quantity'] ?? 1,
       transactionFee: (json['paymentInfo']?['transactionFee'] ??
@@ -151,6 +157,8 @@ class TransactionModel {
       if (sharerName != null) 'sharerName': sharerName,
       if (sharerAvatar != null) 'sharerAvatar': sharerAvatar,
       if (receiverName != null) 'receiverName': receiverName,
+      if (receiverPhone != null) 'receiverPhone': receiverPhone,
+      if (receiverAddress != null) 'receiverAddress': receiverAddress,
       if (message != null) 'message': message,
       'quantity': quantity,
       'transactionFee': transactionFee,
@@ -176,6 +184,8 @@ class TransactionModel {
     String? sharerName,
     String? sharerAvatar,
     String? receiverName,
+    String? receiverPhone,
+    String? receiverAddress,
     String? message,
     int? quantity,
     double? transactionFee,
@@ -199,6 +209,8 @@ class TransactionModel {
       sharerName: sharerName ?? this.sharerName,
       sharerAvatar: sharerAvatar ?? this.sharerAvatar,
       receiverName: receiverName ?? this.receiverName,
+      receiverPhone: receiverPhone ?? this.receiverPhone,
+      receiverAddress: receiverAddress ?? this.receiverAddress,
       message: message ?? this.message,
       quantity: quantity ?? this.quantity,
       transactionFee: transactionFee ?? this.transactionFee,

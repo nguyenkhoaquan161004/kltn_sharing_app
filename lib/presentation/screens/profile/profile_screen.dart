@@ -69,9 +69,8 @@ class _ProfileScreenState extends State<ProfileScreen>
     return Scaffold(
       backgroundColor: AppColors.backgroundWhite,
       appBar: AppHeaderBar(
-        orderCount: 8,
         onSearchTap: () => context.push('/search'),
-        onSettingsTap: () {},
+        onSettingsTap: () => context.push('/settings'),
         showSettingsButton: widget.isOwnProfile,
       ),
       body: Consumer<UserProvider>(

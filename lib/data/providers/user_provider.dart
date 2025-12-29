@@ -62,4 +62,33 @@ class UserProvider extends ChangeNotifier {
     _errorMessage = null;
     notifyListeners();
   }
+
+  /// Update FCM token on backend
+  Future<void> updateFCMToken({
+    required String userId,
+    required String fcmToken,
+  }) async {
+    try {
+      await _userApiService.updateFCMToken(
+        userId: userId,
+        fcmToken: fcmToken,
+      );
+    } catch (e) {
+      final errorMsg = e.toString().replaceAll('Exception: ', '');
+      _errorMessage = errorMsg;
+      print('[UserProvider] Error updating FCM token: $_errorMessage');
+      rethrow;
+    }
+  }
+
+  /// Delete FCM token on logout
+  Future<void> deleteFCMToken() async {
+    try {
+      await _userApiService.deleteFCMToken();
+    } catch (e) {
+      final errorMsg = e.toString().replaceAll('Exception: ', '');
+      print('[UserProvider] Error deleting FCM token: $errorMsg');
+      // Don't rethrow - logout should succeed even if delete fails
+    }
+  }
 }

@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:kltn_sharing_app/data/models/auth_request_model.dart';
 import 'package:kltn_sharing_app/data/services/auth_api_service.dart';
+import 'package:kltn_sharing_app/data/services/user_api_service.dart';
 
 /// Provider for managing authentication state and tokens
 class AuthProvider extends ChangeNotifier {
   final AuthApiService _authApiService;
+  final UserApiService _userApiService;
   late SharedPreferences _prefs;
 
   static const String _accessTokenKey = 'access_token';
@@ -23,8 +25,11 @@ class AuthProvider extends ChangeNotifier {
   DateTime? _tokenExpiresAt;
   bool _isRefreshing = false; // Prevent multiple refresh attempts
 
-  AuthProvider({required AuthApiService authApiService})
-      : _authApiService = authApiService {
+  AuthProvider({
+    required AuthApiService authApiService,
+    UserApiService? userApiService,
+  })  : _authApiService = authApiService,
+        _userApiService = userApiService ?? UserApiService() {
     _init();
   }
 
@@ -55,6 +60,7 @@ class AuthProvider extends ChangeNotifier {
 
     if (_accessToken != null) {
       _authApiService.setAuthToken(_accessToken!);
+      _userApiService.setAuthToken(_accessToken!);
     }
 
     notifyListeners();
@@ -82,6 +88,7 @@ class AuthProvider extends ChangeNotifier {
     _username = username;
     _tokenExpiresAt = expiresAt;
     _authApiService.setAuthToken(accessToken);
+    _userApiService.setAuthToken(accessToken);
 
     print('[AuthProvider] ✅ Tokens saved to SharedPreferences');
     print('[AuthProvider] - Access Token: ${accessToken.substring(0, 20)}...');
@@ -220,6 +227,17 @@ class AuthProvider extends ChangeNotifier {
         username,
       );
 
+      // Load user data from API /api/v2/users/me after successful login
+      try {
+        final currentUser = await _userApiService.getCurrentUser();
+        print('[AuthProvider] ✅ User data loaded: ${currentUser.fullName}');
+        print('[AuthProvider] - Address: ${currentUser.address}');
+        print('[AuthProvider] - Phone: ${currentUser.phoneNumber}');
+      } catch (e) {
+        print('[AuthProvider] ⚠️  Failed to load user data: $e');
+        // Don't fail login if user data load fails
+      }
+
       _isLoading = false;
       notifyListeners();
       return true;
@@ -329,8 +347,27 @@ class AuthProvider extends ChangeNotifier {
       _isLoading = true;
       notifyListeners();
 
+      // Delete FCM token from backend
+      try {
+        print('[AuthProvider] 🗑️  Deleting FCM token from backend');
+        await _userApiService.deleteFCMToken();
+      } catch (e) {
+        print('[AuthProvider] ⚠️  Failed to delete FCM token: $e');
+        // Continue with logout even if FCM token delete fails
+      }
+
       // Call logout endpoint
       await _authApiService.logout(_refreshToken);
+
+      // Clear cached data (messages, etc.)
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        // Clear message cache
+        await prefs.remove('conversations_cache');
+        print('[AuthProvider] ✅ Cleared cached conversations');
+      } catch (e) {
+        print('[AuthProvider] ⚠️  Failed to clear cache: $e');
+      }
 
       // Clear tokens
       await _clearTokens();

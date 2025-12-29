@@ -36,7 +36,7 @@ class BottomNavigationWidget extends StatelessWidget {
           label: 'Home',
         ),
         BottomNavigationBarItem(
-          icon: Icon(Icons.shopping_bag),
+          icon: Icon(Icons.leaderboard),
           label: 'Xếp hạng',
         ),
         BottomNavigationBarItem(

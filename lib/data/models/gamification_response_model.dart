@@ -86,3 +86,117 @@ class LeaderboardResponse {
     );
   }
 }
+
+/// New Leaderboard Entry DTO from backend /api/v2/gamification/leaderboard
+class LeaderboardEntryDto {
+  final String userId;
+  final String username;
+  final String? avatarUrl;
+  final int totalPoints;
+  final int rank;
+  final int level;
+  final double? distanceKm; // Only for NEARBY scope
+
+  LeaderboardEntryDto({
+    required this.userId,
+    required this.username,
+    this.avatarUrl,
+    required this.totalPoints,
+    required this.rank,
+    required this.level,
+    this.distanceKm,
+  });
+
+  factory LeaderboardEntryDto.fromJson(Map<String, dynamic> json) {
+    return LeaderboardEntryDto(
+      userId: json['userId'] ?? json['user_id'] ?? '',
+      username: json['username'] ?? '',
+      avatarUrl: json['avatarUrl'] ?? json['avatar_url'],
+      totalPoints: json['totalPoints'] ?? json['total_points'] ?? 0,
+      rank: json['rank'] ?? 0,
+      level: json['level'] ?? 0,
+      distanceKm: json['distanceKm'] != null
+          ? double.tryParse(json['distanceKm'].toString())
+          : null,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'userId': userId,
+      'username': username,
+      'avatarUrl': avatarUrl,
+      'totalPoints': totalPoints,
+      'rank': rank,
+      'level': level,
+      if (distanceKm != null) 'distanceKm': distanceKm,
+    };
+  }
+}
+
+/// New Leaderboard Response from backend /api/v2/gamification/leaderboard
+class NewLeaderboardResponse {
+  final List<LeaderboardEntryDto> entries;
+  final LeaderboardEntryDto? currentUserEntry;
+  final int totalUsers;
+  final int page;
+  final int size;
+  final int totalPages;
+  final String timeFrame;
+  final String scope;
+  final double? radiusKm;
+
+  NewLeaderboardResponse({
+    required this.entries,
+    this.currentUserEntry,
+    required this.totalUsers,
+    required this.page,
+    required this.size,
+    required this.totalPages,
+    required this.timeFrame,
+    required this.scope,
+    this.radiusKm,
+  });
+
+  factory NewLeaderboardResponse.fromJson(Map<String, dynamic> json) {
+    List<LeaderboardEntryDto> entries = [];
+
+    if (json['entries'] is List) {
+      entries = (json['entries'] as List)
+          .map((item) =>
+              LeaderboardEntryDto.fromJson(item as Map<String, dynamic>))
+          .toList();
+    }
+
+    return NewLeaderboardResponse(
+      entries: entries,
+      currentUserEntry: json['currentUserEntry'] != null
+          ? LeaderboardEntryDto.fromJson(
+              json['currentUserEntry'] as Map<String, dynamic>)
+          : null,
+      totalUsers: json['totalUsers'] ?? json['total_users'] ?? 0,
+      page: json['page'] ?? 0,
+      size: json['size'] ?? 20,
+      totalPages: json['totalPages'] ?? json['total_pages'] ?? 1,
+      timeFrame: json['timeFrame'] ?? 'ALL_TIME',
+      scope: json['scope'] ?? 'GLOBAL',
+      radiusKm: json['radiusKm'] != null
+          ? double.tryParse(json['radiusKm'].toString())
+          : null,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'entries': entries.map((e) => e.toJson()).toList(),
+      'currentUserEntry': currentUserEntry?.toJson(),
+      'totalUsers': totalUsers,
+      'page': page,
+      'size': size,
+      'totalPages': totalPages,
+      'timeFrame': timeFrame,
+      'scope': scope,
+      if (radiusKm != null) 'radiusKm': radiusKm,
+    };
+  }
+}

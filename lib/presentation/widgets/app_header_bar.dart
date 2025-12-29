@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
 import '../../core/constants/app_routes.dart';
+import '../../data/providers/order_provider.dart';
 
-class AppHeaderBar extends StatelessWidget implements PreferredSizeWidget {
-  final int orderCount;
+class AppHeaderBar extends StatefulWidget implements PreferredSizeWidget {
+  final int? orderCount; // Optional - if null, will auto-calculate
   final VoidCallback? onSearchTap;
   final VoidCallback? onMessagesTap;
   final VoidCallback? onSettingsTap;
@@ -13,7 +15,7 @@ class AppHeaderBar extends StatelessWidget implements PreferredSizeWidget {
 
   const AppHeaderBar({
     super.key,
-    this.orderCount = 0,
+    this.orderCount,
     this.onSearchTap,
     this.onMessagesTap,
     this.onSettingsTap,
@@ -21,14 +23,26 @@ class AppHeaderBar extends StatelessWidget implements PreferredSizeWidget {
   });
 
   @override
+  State<AppHeaderBar> createState() => _AppHeaderBarState();
+
+  @override
+  Size get preferredSize => const Size.fromHeight(56);
+}
+
+class _AppHeaderBarState extends State<AppHeaderBar> {
+  @override
   Widget build(BuildContext context) {
+    // Use provided orderCount if available, otherwise get from OrderProvider
+    final displayCount =
+        widget.orderCount ?? context.watch<OrderProvider>().orderCount;
+
     return AppBar(
       backgroundColor: Colors.transparent,
       elevation: 0,
       leadingWidth: 56,
       leading: IconButton(
         icon: const Icon(Icons.search, color: AppColors.textPrimary),
-        onPressed: onSearchTap ?? () => context.push(AppRoutes.search),
+        onPressed: widget.onSearchTap ?? () => context.push(AppRoutes.search),
       ),
       title: null,
       actions: [
@@ -51,7 +65,7 @@ class AppHeaderBar extends StatelessWidget implements PreferredSizeWidget {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
-                      orderCount.toString(),
+                      displayCount.toString(),
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 12,
@@ -67,13 +81,14 @@ class AppHeaderBar extends StatelessWidget implements PreferredSizeWidget {
         // Messages button
         IconButton(
           icon: const Icon(Icons.mail_outline, color: AppColors.textPrimary),
-          onPressed: onMessagesTap ?? () => context.push(AppRoutes.messages),
+          onPressed:
+              widget.onMessagesTap ?? () => context.push(AppRoutes.messages),
         ),
         // Settings button (optional)
-        if (showSettingsButton)
+        if (widget.showSettingsButton)
           IconButton(
             icon: const Icon(Icons.settings, color: AppColors.textPrimary),
-            onPressed: onSettingsTap ?? () {},
+            onPressed: widget.onSettingsTap ?? () {},
           ),
       ],
     );

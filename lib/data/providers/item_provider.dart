@@ -22,9 +22,27 @@ class ItemProvider extends ChangeNotifier {
   int _totalPages = 0;
   int get totalPages => _totalPages;
 
+  int _totalItems = 0;
+  int get totalItems => _totalItems;
+
   // Filters
   String? _selectedCategory;
   String? get selectedCategory => _selectedCategory;
+
+  // Nearby items state
+  List<ItemDto> _nearbyItems = [];
+  List<ItemDto> get nearbyItems => _nearbyItems;
+
+  bool _isLoadingNearby = false;
+  bool get isLoadingNearby => _isLoadingNearby;
+
+  String? _nearbyErrorMessage;
+  String? get nearbyErrorMessage => _nearbyErrorMessage;
+
+  int _nearbyCurrentPage = 0;
+  int _nearbyTotalPages = 0;
+  int _nearbyTotalItems = 0;
+  int get nearbyTotalItems => _nearbyTotalItems;
 
   /// Set authorization token from AuthProvider
   void setAuthToken(String accessToken) {
@@ -33,20 +51,17 @@ class ItemProvider extends ChangeNotifier {
 
   /// Set token callback from AuthProvider
   void setGetValidTokenCallback(Future<String?> Function() callback) {
+    print('[ItemProvider] setGetValidTokenCallback called');
     _itemApiService.setGetValidTokenCallback(callback);
   }
 
-  /// Load items with pagination
+  /// Load items with pagination - simplified parameters
+  /// Supports keyword search and category filtering
   Future<void> loadItems({
     int page = 0,
     String? search,
     String? category,
-    double? minPrice,
-    double? maxPrice,
     String? status,
-    double? latitude,
-    double? longitude,
-    int? radiusKm,
   }) async {
     try {
       _isLoading = true;
@@ -57,18 +72,14 @@ class ItemProvider extends ChangeNotifier {
         page: page,
         size: 20,
         keyword: search,
-        category: category,
-        minPrice: minPrice,
-        maxPrice: maxPrice,
+        categoryId: category,
         status: status,
-        latitude: latitude,
-        longitude: longitude,
-        radiusKm: radiusKm,
       );
 
       _items = response.content;
       _currentPage = response.currentPage;
       _totalPages = response.totalPages;
+      _totalItems = response.totalElements;
 
       _isLoading = false;
       notifyListeners();
@@ -84,6 +95,28 @@ class ItemProvider extends ChangeNotifier {
   Future<void> loadNextPage() async {
     if (_currentPage < _totalPages - 1) {
       await loadItems(page: _currentPage + 1);
+    }
+  }
+
+  /// Load more items (appends to existing list for infinite scroll)
+  Future<void> loadMoreItems({int page = 0, int limit = 20}) async {
+    try {
+      final response = await _itemApiService.searchItems(
+        page: page,
+        size: limit,
+        status: 'AVAILABLE',
+      );
+
+      _items.addAll(response.content);
+      _currentPage = response.currentPage;
+      _totalPages = response.totalPages;
+      _totalItems = response.totalElements;
+
+      notifyListeners();
+    } catch (e) {
+      _errorMessage = e.toString().replaceAll('Exception: ', '');
+      print('[ItemProvider] Error loading more items: $_errorMessage');
+      notifyListeners();
     }
   }
 
@@ -131,5 +164,101 @@ class ItemProvider extends ChangeNotifier {
     _currentPage = 0;
     _totalPages = 0;
     notifyListeners();
+  }
+
+  /// Load nearby items based on user location
+  Future<void> loadNearbyItems({
+    required double latitude,
+    required double longitude,
+    double radiusKm = 50,
+    int page = 0,
+  }) async {
+    try {
+      print(
+          '[ItemProvider.loadNearbyItems] Starting - lat: $latitude, lon: $longitude, radiusKm: $radiusKm, page: $page');
+      _isLoadingNearby = true;
+      _nearbyErrorMessage = null;
+      notifyListeners();
+      print('[ItemProvider.loadNearbyItems] Calling API...');
+
+      final response = await _itemApiService.searchNearbyItems(
+        latitude: latitude,
+        longitude: longitude,
+        radiusKm: radiusKm,
+        page: page,
+        size: 20,
+        status: 'AVAILABLE',
+      );
+
+      print('[ItemProvider.loadNearbyItems] API response received');
+      print(
+          '[ItemProvider.loadNearbyItems] Response content length: ${response.content.length}');
+      print(
+          '[ItemProvider.loadNearbyItems] Response totalElements: ${response.totalElements}');
+
+      _nearbyItems = response.content;
+      _nearbyCurrentPage = response.currentPage;
+      _nearbyTotalPages = response.totalPages;
+      _nearbyTotalItems = response.totalElements;
+
+      print(
+          '[ItemProvider] Loaded ${_nearbyItems.length} nearby items, total: $_nearbyTotalItems');
+      _isLoadingNearby = false;
+      notifyListeners();
+      print('[ItemProvider.loadNearbyItems] Done - notified listeners');
+    } catch (e) {
+      _isLoadingNearby = false;
+      _nearbyErrorMessage = e.toString().replaceAll('Exception: ', '');
+      print('[ItemProvider] Error loading nearby items: $_nearbyErrorMessage');
+      print('[ItemProvider] Full error: $e');
+      notifyListeners();
+    }
+  }
+
+  /// Load more nearby items (appends to existing list for infinite scroll)
+  Future<void> loadMoreNearbyItems({
+    required double latitude,
+    required double longitude,
+    double radiusKm = 50,
+    int page = 0,
+  }) async {
+    try {
+      final response = await _itemApiService.searchNearbyItems(
+        latitude: latitude,
+        longitude: longitude,
+        radiusKm: radiusKm,
+        page: page,
+        size: 20,
+        status: 'AVAILABLE',
+      );
+
+      _nearbyItems.addAll(response.content);
+      _nearbyCurrentPage = response.currentPage;
+      _nearbyTotalPages = response.totalPages;
+      _nearbyTotalItems = response.totalElements;
+
+      print(
+          '[ItemProvider] Loaded more nearby items, total now: ${_nearbyItems.length}');
+      notifyListeners();
+    } catch (e) {
+      _nearbyErrorMessage = e.toString().replaceAll('Exception: ', '');
+      print(
+          '[ItemProvider] Error loading more nearby items: $_nearbyErrorMessage');
+      notifyListeners();
+    }
+  }
+
+  /// Refresh nearby items (reload first page)
+  Future<void> refreshNearbyItems({
+    required double latitude,
+    required double longitude,
+    double radiusKm = 50,
+  }) async {
+    await loadNearbyItems(
+      latitude: latitude,
+      longitude: longitude,
+      radiusKm: radiusKm,
+      page: 0,
+    );
   }
 }

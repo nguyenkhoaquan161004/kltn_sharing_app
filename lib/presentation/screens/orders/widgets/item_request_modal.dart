@@ -177,8 +177,14 @@ class _ItemRequestModalState extends State<ItemRequestModal> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        '${widget.item.price} VND',
-                        style: AppTextStyles.price,
+                        widget.item.price == 0
+                            ? 'Miễn phí'
+                            : '${widget.item.price} VND',
+                        style: AppTextStyles.price.copyWith(
+                          color: widget.item.price == 0
+                              ? AppColors.success
+                              : AppColors.primaryCyan,
+                        ),
                       ),
                     ],
                   ),

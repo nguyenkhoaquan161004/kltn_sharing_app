@@ -9,9 +9,11 @@ import '../../../data/models/product_model.dart';
 import '../../../data/models/item_model.dart';
 import '../../../data/providers/item_provider.dart';
 import '../../../data/models/item_response_model.dart';
-import '../../../data/models/cart_request_model.dart';
-import '../../../data/services/cart_api_service.dart';
 import '../../../data/providers/auth_provider.dart';
+import '../../../data/providers/user_provider.dart';
+import '../../../data/services/message_api_service.dart';
+import '../../../data/services/user_api_service.dart';
+import '../../../data/services/item_api_service.dart';
 import '../../../data/mock_data.dart';
 import 'widgets/product_image_carousel.dart';
 import 'widgets/order_request_modal.dart';
@@ -38,20 +40,159 @@ class ProductDetailScreen extends StatefulWidget {
 class _ProductDetailScreenState extends State<ProductDetailScreen> {
   Timer? _timer;
   late Duration _remainingTime = Duration.zero;
+  late MessageApiService _messageApiService;
 
   // Product data
   ProductModel? _product;
   ItemDto? _itemDto;
   bool _isLoading = true;
+  bool _isSellerLoading = true; // Track seller info loading state
   String? _errorMessage;
 
   // Mock related products
   late List<ItemModel> _relatedProducts;
 
+  // Pagination for related products
+  int _relatedProductsPage = 0;
+  int _relatedProductsPageSize = 6;
+  int _totalRelatedProducts = 0;
+  bool _isLoadingMoreRelatedProducts = false;
+
+  // Scroll controller for detecting pagination
+  late ScrollController _scrollController;
+
   @override
   void initState() {
     super.initState();
+    _scrollController = ScrollController();
+    _scrollController.addListener(_onScroll);
+    print('[ProductDetail] Scroll listener attached');
+
+    // Initialize MessageApiService with auth
+    _messageApiService = MessageApiService();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final authProvider = context.read<AuthProvider>();
+      if (authProvider.accessToken != null) {
+        _messageApiService.setAuthToken(authProvider.accessToken!);
+        _messageApiService.setGetValidTokenCallback(
+          () async => authProvider.accessToken,
+        );
+      }
+    });
+
     _loadProduct();
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 500) {
+      // Load more products whenever scrolling to the bottom
+      print(
+          '[ProductDetail] Scroll triggered - length: ${_relatedProducts.length}, page: $_relatedProductsPage, loading: $_isLoadingMoreRelatedProducts');
+      if (!_isLoadingMoreRelatedProducts) {
+        print('[ProductDetail] Loading more related products...');
+        _relatedProductsPage++;
+        _loadMoreRelatedProducts();
+      }
+    }
+  }
+
+  void _loadMoreRelatedProducts() {
+    try {
+      setState(() => _isLoadingMoreRelatedProducts = true);
+
+      // Load more products from API instead of MockData
+      if (_itemDto != null) {
+        _loadMoreRelatedProductsFromApi();
+      } else {
+        // Fallback to MockData if no itemDto
+        final moreProducts = MockData.items
+            .where((item) => item.itemId.toString() != widget.productId)
+            .skip(_relatedProducts.length)
+            .take(_relatedProductsPageSize)
+            .toList();
+
+        if (mounted) {
+          setState(() {
+            _relatedProducts.addAll(moreProducts);
+            _isLoadingMoreRelatedProducts = false;
+          });
+        }
+      }
+    } catch (e) {
+      print('[ProductDetail] Error loading more related products: $e');
+      if (mounted) {
+        setState(() => _isLoadingMoreRelatedProducts = false);
+      }
+    }
+  }
+
+  Future<void> _loadMoreRelatedProductsFromApi() async {
+    try {
+      if (_itemDto == null) return;
+
+      // Get ItemApiService to fetch products from API
+      final itemApiService = context.read<ItemApiService>();
+      final authProvider = context.read<AuthProvider>();
+
+      // Set auth token if available
+      if (authProvider.accessToken != null) {
+        itemApiService.setAuthToken(authProvider.accessToken!);
+      }
+
+      // Fetch next page of items from same category
+      final categoryId = _itemDto!.categoryId.toString();
+      final response = await itemApiService.searchItems(
+        categoryId: categoryId,
+        page: _relatedProductsPage,
+        size: _relatedProductsPageSize,
+      );
+
+      if (response != null && response.content != null) {
+        // Convert ItemDto to ItemModel for display
+        final itemModels = response.content!
+            .where(
+                (dto) => dto.id != widget.productId) // Exclude current product
+            .map((dto) {
+          print(
+              '[ProductDetail] More product - Name: ${dto.name}, Image: ${dto.imageUrl}');
+          return ItemModel(
+            itemId: int.tryParse(dto.id) ?? 0,
+            itemId_str: dto.id,
+            name: dto.name,
+            description: dto.description ?? '',
+            image: dto.imageUrl, // Use API image URL
+            price: dto.price?.toDouble() ?? 0,
+            categoryName: dto.categoryName ?? 'Khác',
+            categoryId: int.tryParse(dto.categoryId.toString()) ?? 0,
+            quantity: dto.quantity ?? 1,
+            status: 'AVAILABLE',
+            createdAt: dto.createdAt,
+            expiryDate: dto.expiryDate,
+            userId_str: dto.userId.toString(),
+          );
+        }).toList();
+
+        if (mounted) {
+          setState(() {
+            _relatedProducts.addAll(itemModels);
+            _totalRelatedProducts = response.totalElements ?? 0;
+            _isLoadingMoreRelatedProducts = false;
+          });
+        }
+        print(
+            '[ProductDetail] Loaded ${itemModels.length} more products from API');
+      } else {
+        if (mounted) {
+          setState(() => _isLoadingMoreRelatedProducts = false);
+        }
+      }
+    } catch (e) {
+      print('[ProductDetail] Error loading more products from API: $e');
+      if (mounted) {
+        setState(() => _isLoadingMoreRelatedProducts = false);
+      }
+    }
   }
 
   Future<void> _loadProduct() async {
@@ -67,6 +208,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           _remainingTime = _product!.remainingTime;
         });
         _startTimer();
+
+        // Fetch real seller information from API
+        _loadSellerInfo(itemDto.userId.toString());
       } else {
         setState(() {
           _isLoading = false;
@@ -86,29 +230,143 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     _loadRelatedProducts();
   }
 
+  Future<void> _loadSellerInfo(String userId) async {
+    try {
+      final userApiService = context.read<UserApiService>();
+      final sellerUser = await userApiService.getUserById(userId);
+
+      if (sellerUser != null && _product != null && mounted) {
+        setState(() {
+          _product = _product!.copyWith(
+            owner: UserInfo(
+              id: sellerUser.id,
+              name: sellerUser.fullName,
+              avatar: sellerUser.avatar ?? '',
+              productsShared: sellerUser.itemsShared,
+            ),
+          );
+          _isSellerLoading = false;
+        });
+        print('[ProductDetail] Seller info loaded: ${sellerUser.fullName}');
+      }
+    } catch (e) {
+      print('[ProductDetail] Error loading seller info: $e');
+      // Still mark as done loading even if error
+      if (mounted) {
+        setState(() {
+          _isSellerLoading = false;
+        });
+      }
+    }
+  }
+
   void _loadRelatedProducts() {
     try {
-      _relatedProducts = MockData.items
-          .where((item) => item.itemId.toString() != widget.productId)
-          .take(6)
-          .toList();
+      // First try to load from API using the product's category
+      if (_itemDto != null) {
+        final itemProvider = context.read<ItemProvider>();
+        _loadRelatedProductsFromApi(itemProvider);
+      } else {
+        // Fallback to mock data
+        _relatedProducts = MockData.items
+            .where((item) => item.itemId.toString() != widget.productId)
+            .take(_relatedProductsPageSize)
+            .toList();
+        _totalRelatedProducts =
+            MockData.items.length - 1; // Total minus current product
+      }
     } catch (e) {
+      print('[ProductDetail] Error loading related products: $e');
       _relatedProducts = [];
+      _totalRelatedProducts = 0;
+    }
+  }
+
+  Future<void> _loadRelatedProductsFromApi(ItemProvider itemProvider) async {
+    try {
+      if (_itemDto == null) return;
+
+      // Get ItemApiService to fetch products from API
+      final itemApiService = context.read<ItemApiService>();
+      final authProvider = context.read<AuthProvider>();
+
+      // Set auth token if available
+      if (authProvider.accessToken != null) {
+        itemApiService.setAuthToken(authProvider.accessToken!);
+      }
+
+      // Fetch items from same category using the API
+      final categoryId = _itemDto!.categoryId.toString();
+      final response = await itemApiService.searchItems(
+        categoryId: categoryId,
+        page: 0,
+        size: _relatedProductsPageSize,
+      );
+
+      if (response != null && response.content != null) {
+        // Convert ItemDto to ItemModel for display
+        final itemModels = response.content!
+            .where(
+                (dto) => dto.id != widget.productId) // Exclude current product
+            .map((dto) {
+          print(
+              '[ProductDetail] Related product - Name: ${dto.name}, Image: ${dto.imageUrl}');
+          return ItemModel(
+            itemId: int.tryParse(dto.id) ?? 0,
+            itemId_str: dto.id,
+            name: dto.name,
+            description: dto.description ?? '',
+            image: dto.imageUrl, // Use API image URL
+            price: dto.price?.toDouble() ?? 0,
+            categoryName: dto.categoryName ?? 'Khác',
+            categoryId: int.tryParse(dto.categoryId.toString()) ?? 0,
+            quantity: dto.quantity ?? 1,
+            status: 'AVAILABLE',
+            createdAt: dto.createdAt,
+            expiryDate: dto.expiryDate,
+            userId_str: dto.userId.toString(),
+          );
+        }).toList();
+
+        if (mounted) {
+          setState(() {
+            _relatedProducts = itemModels;
+            _totalRelatedProducts = response.totalElements ?? 0;
+          });
+        }
+        print(
+            '[ProductDetail] Loaded ${itemModels.length} related products from API');
+      } else {
+        // If no response, use fallback
+        _useRelatedProductsFallback();
+      }
+    } catch (e) {
+      print('[ProductDetail] Error loading related products from API: $e');
+      // Fallback to mock data
+      _useRelatedProductsFallback();
+    }
+  }
+
+  void _useRelatedProductsFallback() {
+    _relatedProducts = MockData.items
+        .where((item) => item.itemId.toString() != widget.productId)
+        .take(_relatedProductsPageSize)
+        .toList();
+    _totalRelatedProducts = MockData.items.length - 1;
+
+    if (mounted) {
+      setState(() {});
     }
   }
 
   ProductModel _convertDtoToProduct(ItemDto itemDto) {
-    // Try to find user info in MockData
-    final user = MockData.users.firstWhere(
-      (u) => u.userId.toString() == itemDto.userId,
-      orElse: () => MockData.users[0],
-    );
-
     // Get category name from MockData or use the one from API
     final categoryName = itemDto.categoryName ??
         MockData.getCategoryById(itemDto.categoryId.hashCode)?.name ??
         'Khác';
 
+    // Start with empty seller info to avoid jumping
+    // Real seller info will be loaded by _loadSellerInfo()
     return ProductModel(
       id: itemDto.id,
       name: itemDto.name,
@@ -122,12 +380,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       interestedCount: 0,
       expiryDate:
           itemDto.expiryDate ?? DateTime.now().add(const Duration(days: 30)),
-      createdAt: itemDto.createdAt ?? DateTime.now(),
+      createdAt: itemDto.createdAt,
       owner: UserInfo(
-        id: user.userId.toString(),
-        name: user.name,
-        avatar: user.avatar ?? '',
-        productsShared: MockData.getItemsByUserId(user.userId).length,
+        id: itemDto.userId.toString(),
+        name: '', // Will be filled by _loadSellerInfo
+        avatar: '', // Will be filled by _loadSellerInfo
+        productsShared: 0, // Will be filled by _loadSellerInfo
       ),
       isFree: (itemDto.price ?? 0) == 0,
     );
@@ -148,11 +406,22 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   @override
   void dispose() {
     _timer?.cancel();
+    _scrollController.dispose();
     super.dispose();
   }
 
   String get _formattedTime {
     if (_remainingTime.isNegative) return 'Hết hạn';
+
+    final totalHours = _remainingTime.inHours;
+
+    // If more than 24 hours, show in days format
+    if (totalHours >= 24) {
+      final days = totalHours ~/ 24;
+      return '$days ngày';
+    }
+
+    // If 24 hours or less, show as countdown timer
     final h = _remainingTime.inHours;
     final m = _remainingTime.inMinutes % 60;
     final s = _remainingTime.inSeconds % 60;
@@ -179,6 +448,38 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         item: _itemDto!,
       ),
     );
+  }
+
+  Future<void> _handleSendMessage() async {
+    try {
+      if (_itemDto == null) return;
+
+      // Use the userId from API directly (from itemDto)
+      final receiverId = _itemDto!.userId.toString();
+      print('[ProductDetail] Sending message to user ID: $receiverId');
+
+      // Send message to the owner
+      await _messageApiService.sendMessage(
+        receiverId: receiverId,
+        content: 'Xin chào, tôi quan tâm đến sản phẩm này.',
+        messageType: 'TEXT',
+      );
+
+      if (mounted) {
+        // Navigate directly to chat screen
+        context.push('/chat/$receiverId');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Lỗi: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      print('[ProductDetail] Error sending message: $e');
+    }
   }
 
   @override
@@ -244,6 +545,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     return Scaffold(
       backgroundColor: AppColors.backgroundWhite,
       body: CustomScrollView(
+        controller: _scrollController,
         slivers: [
           // App bar with image
           SliverAppBar(
@@ -376,6 +678,64 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     if (_product == null) {
       return const SizedBox.shrink();
     }
+
+    // Show loading state while seller info is being fetched
+    if (_isSellerLoading) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.backgroundWhite,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.borderLight),
+        ),
+        child: Row(
+          children: [
+            // Avatar skeleton
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.backgroundGray,
+                border: Border.all(color: AppColors.borderLight),
+              ),
+              child: const SizedBox.expand(),
+            ),
+            const SizedBox(width: 12),
+
+            // Info skeleton
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Người cho', style: AppTextStyles.caption),
+                  Container(
+                    width: 120,
+                    height: 20,
+                    margin: const EdgeInsets.symmetric(vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppColors.backgroundGray,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                  Container(
+                    width: 80,
+                    height: 16,
+                    decoration: BoxDecoration(
+                      color: AppColors.backgroundGray,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const Icon(Icons.chevron_right, color: AppColors.textSecondary),
+          ],
+        ),
+      );
+    }
+
     return GestureDetector(
       onTap: () {
         // Navigate to owner profile
@@ -390,7 +750,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         ),
         child: Row(
           children: [
-            // Avatar
+            // Avatar with image or fallback
             Container(
               width: 48,
               height: 48,
@@ -399,7 +759,18 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 color: AppColors.backgroundGray,
                 border: Border.all(color: AppColors.borderLight),
               ),
-              child: const Icon(Icons.person, color: AppColors.textSecondary),
+              child: _product!.owner.avatar.isNotEmpty
+                  ? ClipOval(
+                      child: Image.network(
+                        _product!.owner.avatar,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return const Icon(Icons.person,
+                              color: AppColors.textSecondary);
+                        },
+                      ),
+                    )
+                  : const Icon(Icons.person, color: AppColors.textSecondary),
             ),
             const SizedBox(width: 12),
 
@@ -452,8 +823,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             crossAxisSpacing: 12,
             mainAxisSpacing: 12,
           ),
-          itemCount: _relatedProducts.length,
+          itemCount:
+              _relatedProducts.length + (_isLoadingMoreRelatedProducts ? 1 : 0),
           itemBuilder: (context, index) {
+            if (index == _relatedProducts.length) {
+              return const Center(child: CircularProgressIndicator());
+            }
             return ItemCard(
               item: _relatedProducts[index],
               showTimeRemaining: true,
@@ -488,20 +863,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               ),
               child: IconButton(
                 icon: const Icon(Icons.mail_outline),
-                onPressed: () {},
-              ),
-            ),
-            const SizedBox(width: 12),
-
-            // A/s button
-            Container(
-              decoration: BoxDecoration(
-                border: Border.all(color: AppColors.borderLight),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: IconButton(
-                icon: const Icon(Icons.chat_bubble_outline),
-                onPressed: () {},
+                onPressed: _handleSendMessage,
               ),
             ),
             const SizedBox(width: 12),

@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:kltn_sharing_app/core/config/app_config.dart';
 import 'package:kltn_sharing_app/core/utils/token_refresh_interceptor.dart';
 import 'package:kltn_sharing_app/data/models/item_response_model.dart';
+import 'package:kltn_sharing_app/data/models/transaction_model.dart';
 
 class ItemApiService {
   late Dio _dio;
@@ -83,17 +84,110 @@ class ItemApiService {
     _dio.options.baseUrl = AppConfig.baseUrl;
   }
 
+  /// Search nearby items based on user location
+  /// Requires [latitude], [longitude], and optionally [radiusKm] (default 50km)
+  Future<PageResponse<ItemDto>> searchNearbyItems({
+    required double latitude,
+    required double longitude,
+    double radiusKm = 50,
+    int page = 0,
+    int size = 10,
+    String? status = 'AVAILABLE',
+    String? sortBy = 'createdAt',
+    String? sortDirection = 'DESC',
+  }) async {
+    try {
+      print(
+          '[ItemAPI.searchNearbyItems] Starting - lat: $latitude, lon: $longitude, page: $page');
+
+      // Ensure token is valid before making request
+      if (_getValidTokenCallback != null) {
+        print(
+            '[ItemAPI.searchNearbyItems] Getting valid token from callback...');
+        final validToken = await _getValidTokenCallback!();
+        if (validToken != null) {
+          _dio.options.headers['Authorization'] = 'Bearer $validToken';
+          print(
+              '[ItemAPI.searchNearbyItems] Token set: Bearer ${validToken.substring(0, 20)}...');
+        } else {
+          print(
+              '[ItemAPI.searchNearbyItems] WARNING: validToken is null from callback');
+        }
+      } else {
+        print('[ItemAPI.searchNearbyItems] WARNING: No token callback set!');
+      }
+
+      print(
+          '[ItemAPI.searchNearbyItems] Current Authorization header: ${_dio.options.headers['Authorization']}');
+
+      final queryParams = {
+        'page': page + 1, // BE expects 1-based page numbering
+        'limit': size,
+        'latitude': latitude,
+        'longitude': longitude,
+        'radiusKm': radiusKm,
+        if (status != null && status.isNotEmpty) 'status': status,
+        'sortBy': sortBy,
+        'sortOrder': sortDirection,
+      };
+      print('[ItemAPI] searchNearbyItems called with:');
+      print('[ItemAPI]   latitude: $latitude, longitude: $longitude');
+      print('[ItemAPI]   radiusKm: $radiusKm');
+      print('[ItemAPI]   Final queryParams: $queryParams');
+
+      final response = await _dio.get(
+        '/api/v2/items',
+        queryParameters: queryParams,
+      );
+
+      if (response.statusCode == 200) {
+        final data = response.data;
+
+        if (data is Map<String, dynamic>) {
+          if (data.containsKey('data')) {
+            final pageData = data['data'];
+            if (pageData is Map<String, dynamic>) {
+              print(
+                  '[ItemAPI.searchNearbyItems] Successfully parsed response, got ${pageData['content']?.length ?? 0} items');
+              return PageResponse<ItemDto>.fromJson(
+                pageData,
+                (json) => ItemDto.fromJson(json),
+              );
+            }
+          } else {
+            try {
+              return PageResponse<ItemDto>.fromJson(
+                data,
+                (json) => ItemDto.fromJson(json),
+              );
+            } catch (e) {
+              print('[ItemAPI] Failed to parse response: $e');
+            }
+          }
+        }
+
+        throw Exception('Unexpected response format: $data');
+      } else {
+        throw Exception('Failed to load nearby items: ${response.statusCode}');
+      }
+    } on DioException catch (e) {
+      print(
+          '[ItemAPI.searchNearbyItems] DioException: ${e.response?.statusCode} - ${e.message}');
+      throw _handleDioException(e);
+    }
+  }
+
+  /// Search items with simplified parameters
+  /// Supports:
+  /// 1. Keyword search: provide [keyword]
+  /// 2. Category search: provide [categoryId]
+  /// 3. Combined search: provide both [keyword] and [categoryId]
   Future<PageResponse<ItemDto>> searchItems({
     int page = 0,
     int size = 10,
     String? keyword,
-    String? category,
-    double? minPrice,
-    double? maxPrice,
-    String? status,
-    double? latitude,
-    double? longitude,
-    int? radiusKm,
+    String? categoryId,
+    String? status = 'AVAILABLE',
     String? sortBy = 'createdAt',
     String? sortDirection = 'DESC',
   }) async {
@@ -109,18 +203,20 @@ class ItemApiService {
       final queryParams = {
         'page': page + 1, // BE expects 1-based page numbering
         'limit': size,
-        if (keyword != null && keyword.isNotEmpty) 'keyword': keyword,
-        if (category != null && category.isNotEmpty) 'categoryId': category,
-        if (minPrice != null) 'minPrice': minPrice,
-        if (maxPrice != null) 'maxPrice': maxPrice,
+        if (keyword != null && keyword.isNotEmpty) 'name': keyword,
+        if (categoryId != null && categoryId.isNotEmpty)
+          'categoryId': categoryId,
         if (status != null && status.isNotEmpty) 'status': status,
-        if (latitude != null) 'latitude': latitude,
-        if (longitude != null) 'longitude': longitude,
-        if (radiusKm != null) 'radiusKm': radiusKm,
         'sortBy': sortBy,
         'sortOrder':
             sortDirection, // BE expects 'sortOrder' not 'sortDirection'
       };
+      print('[ItemAPI] searchItems called with:');
+      print('[ItemAPI]   keyword: "$keyword" (isEmpty: ${keyword?.isEmpty})');
+      print(
+          '[ItemAPI]   categoryId: "$categoryId" (isEmpty: ${categoryId?.isEmpty})');
+      print('[ItemAPI]   status: "$status"');
+      print('[ItemAPI]   Final queryParams: $queryParams');
 
       final response = await _dio.get(
         '/api/v2/items',
@@ -346,9 +442,12 @@ class ItemApiService {
 
         if (data is Map<String, dynamic> && data.containsKey('data')) {
           final pageData = data['data'] as Map<String, dynamic>;
-          final contentList = pageData['content'];
+          final contentList = pageData['content'] ?? pageData['data'];
           final transactions = (contentList is List<dynamic> ? contentList : [])
               .cast<Map<String, dynamic>>();
+
+          print('[ItemAPI] pageData keys: ${pageData.keys.toList()}');
+          print('[ItemAPI] Found ${transactions.length} total transactions');
 
           // Count transactions by itemId
           Map<String, int> itemInterestCount = {};
@@ -357,12 +456,76 @@ class ItemApiService {
                 transaction['itemIdUuid']?.toString();
             if (itemId != null) {
               itemInterestCount[itemId] = (itemInterestCount[itemId] ?? 0) + 1;
+              print('[ItemAPI] Transaction itemId: $itemId');
             }
           }
 
           print(
               '[ItemAPI] Loaded ${transactions.length} transactions, ${itemInterestCount.length} unique items');
+          print('[ItemAPI] itemInterestCount map: $itemInterestCount');
           return itemInterestCount;
+        }
+
+        throw Exception('Invalid response format: $data');
+      } else {
+        throw Exception('Failed to load transactions: ${response.statusCode}');
+      }
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  /// Get all requesters (transactions) for a specific item where user is sharer
+  Future<List<TransactionModel>> getSharerTransactionsForItem(
+      String itemId) async {
+    try {
+      // Ensure token is valid before making request
+      if (_getValidTokenCallback != null) {
+        final validToken = await _getValidTokenCallback!();
+        if (validToken != null) {
+          _dio.options.headers['Authorization'] = 'Bearer $validToken';
+        }
+      }
+
+      final response = await _dio.get(
+        '/api/v2/transactions/as-sharer',
+        queryParameters: {
+          'page': 1,
+          'limit': 100,
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = response.data;
+
+        if (data is Map<String, dynamic> && data.containsKey('data')) {
+          final pageData = data['data'] as Map<String, dynamic>;
+          final contentList = pageData['content'] ?? pageData['data'];
+          final transactionsList =
+              (contentList is List<dynamic> ? contentList : [])
+                  .cast<Map<String, dynamic>>();
+
+          // Filter transactions for this specific item
+          final filteredTransactions = transactionsList
+              .where((tx) {
+                final txItemId =
+                    tx['itemId']?.toString() ?? tx['itemIdUuid']?.toString();
+                return txItemId == itemId;
+              })
+              .map((json) {
+                try {
+                  return TransactionModel.fromJson(json);
+                } catch (e) {
+                  print('[ItemAPI] Error parsing transaction: $e');
+                  return null;
+                }
+              })
+              .whereType<TransactionModel>()
+              .toList();
+
+          print(
+              '[ItemAPI] Found ${filteredTransactions.length} requesters for item $itemId');
+          return filteredTransactions;
         }
 
         throw Exception('Invalid response format: $data');
@@ -421,6 +584,41 @@ class ItemApiService {
     }
 
     return Exception(message);
+  }
+
+  /// Update item description (for storing recipient info when accepted)
+  Future<void> updateItemDescription(
+    String itemId,
+    String newDescription,
+  ) async {
+    try {
+      // Ensure token is valid before making request
+      if (_getValidTokenCallback != null) {
+        final validToken = await _getValidTokenCallback!();
+        if (validToken != null) {
+          _dio.options.headers['Authorization'] = 'Bearer $validToken';
+        }
+      }
+
+      final requestBody = {
+        'description': newDescription,
+      };
+
+      print('[ItemAPI] Updating item $itemId description');
+
+      final response = await _dio.put(
+        '/api/v2/items/$itemId',
+        data: requestBody,
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        print('[ItemAPI] Item description updated successfully');
+      } else {
+        throw Exception('Failed to update item: ${response.statusCode}');
+      }
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
   }
 
   /// Get all categories

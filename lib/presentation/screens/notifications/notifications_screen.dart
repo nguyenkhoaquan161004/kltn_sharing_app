@@ -58,14 +58,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(60),
-        child: AppHeaderBar(
-          orderCount: 0,
-          onSearchTap: () {},
-          onMessagesTap: () {},
-        ),
-      ),
+      appBar: const AppHeaderBar(),
       body: Consumer<NotificationProvider>(
         builder: (context, notificationProvider, _) {
           final filteredNotifications =

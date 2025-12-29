@@ -7,7 +7,9 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../../../../data/services/cloudinary_service.dart';
 import '../../../../data/services/user_api_service.dart';
+import '../../../../data/services/address_service.dart';
 import '../../../../data/models/update_profile_request.dart';
+import '../../../../data/models/address_model.dart';
 import '../../../../data/providers/auth_provider.dart';
 
 class EditProfileModal extends StatefulWidget {
@@ -38,7 +40,10 @@ class _EditProfileModalState extends State<EditProfileModal> {
   late TextEditingController _nameController;
   late TextEditingController _firstNameController;
   late TextEditingController _lastNameController;
-  late TextEditingController _addressController;
+  late TextEditingController _streetAddressController;
+  late TextEditingController _wardController;
+  late TextEditingController _districtController;
+  late TextEditingController _provinceController;
   late TextEditingController _phoneController;
   DateTime? _selectedBirthDate;
   String? _avatarUrl;
@@ -48,6 +53,8 @@ class _EditProfileModalState extends State<EditProfileModal> {
   final ImagePicker _imagePicker = ImagePicker();
   final CloudinaryService _cloudinaryService = CloudinaryService();
   bool _isUploadingImage = false;
+  double? _selectedLatitude;
+  double? _selectedLongitude;
 
   @override
   void initState() {
@@ -55,8 +62,10 @@ class _EditProfileModalState extends State<EditProfileModal> {
     _nameController = TextEditingController(text: widget.currentName ?? '');
     _firstNameController = TextEditingController();
     _lastNameController = TextEditingController();
-    _addressController =
-        TextEditingController(text: widget.currentAddress ?? '');
+    _streetAddressController = TextEditingController();
+    _wardController = TextEditingController();
+    _districtController = TextEditingController();
+    _provinceController = TextEditingController();
     _phoneController = TextEditingController(text: widget.currentPhone ?? '');
     _selectedBirthDate = widget.currentBirthDate;
     _avatarUrl = widget.currentAvatar;
@@ -78,7 +87,10 @@ class _EditProfileModalState extends State<EditProfileModal> {
     _nameController.dispose();
     _firstNameController.dispose();
     _lastNameController.dispose();
-    _addressController.dispose();
+    _streetAddressController.dispose();
+    _wardController.dispose();
+    _districtController.dispose();
+    _provinceController.dispose();
     _phoneController.dispose();
     super.dispose();
   }
@@ -161,21 +173,32 @@ class _EditProfileModalState extends State<EditProfileModal> {
         : (widget.currentName?.split(' ').isNotEmpty == true
             ? widget.currentName!.split(' ')[0]
             : '');
-    String address = _addressController.text.isNotEmpty
-        ? _addressController.text
-        : (widget.currentAddress ?? '');
     String phone = _phoneController.text.isNotEmpty
         ? _phoneController.text
         : (widget.currentPhone ?? '');
     DateTime? birthDate = _selectedBirthDate ?? widget.currentBirthDate;
     String? avatarUrl = _avatarUrl ?? widget.currentAvatar;
 
+    // Concatenate address fields
+    final streetAddress = _streetAddressController.text.trim();
+    final ward = _wardController.text.trim();
+    final district = _districtController.text.trim();
+    final province = _provinceController.text.trim();
+
+    final addressParts = <String>[];
+    if (streetAddress.isNotEmpty) addressParts.add(streetAddress);
+    if (ward.isNotEmpty) addressParts.add(ward);
+    if (district.isNotEmpty) addressParts.add(district);
+    if (province.isNotEmpty) addressParts.add(province);
+
+    final fullAddress = addressParts.join(', ');
+
     // Check if all fields are empty
     if (firstName.isEmpty &&
         lastName.isEmpty &&
-        address.isEmpty &&
         phone.isEmpty &&
-        birthDate == null) {
+        birthDate == null &&
+        fullAddress.isEmpty) {
       setState(() =>
           _errorMessage = 'Vui lòng nhập ít nhất một thông tin để cập nhật');
       return;
@@ -190,14 +213,14 @@ class _EditProfileModalState extends State<EditProfileModal> {
       // Get auth provider for token
       final authProvider = context.read<AuthProvider>();
 
-      // Create update request with filled data
+      // Create update request
       final updateRequest = UpdateProfileRequest(
         firstName: firstName.isNotEmpty ? firstName : null,
         lastName: lastName.isNotEmpty ? lastName : null,
         avatarUrl: avatarUrl,
         birthDate: birthDate,
-        address: address.isNotEmpty ? address : null,
         phone: phone.isNotEmpty ? phone : null,
+        address: fullAddress.isNotEmpty ? fullAddress : null,
       );
 
       // Create API service
@@ -429,52 +452,74 @@ class _EditProfileModalState extends State<EditProfileModal> {
             ),
             const SizedBox(height: 16),
 
-            // Birth date
-            const Text('Ngày sinh', style: AppTextStyles.label),
-            const SizedBox(height: 8),
-            GestureDetector(
-              onTap: _selectBirthDate,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
-                ),
-                decoration: BoxDecoration(
-                  color: AppColors.backgroundGray,
+            // Address section
+            const Text('Địa chỉ', style: AppTextStyles.label),
+            const SizedBox(height: 12),
+
+            // Province
+            const Text('Tỉnh / Thành phố', style: AppTextStyles.caption),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _provinceController,
+              decoration: InputDecoration(
+                hintText: 'VD: Hà Nội, TP Hồ Chí Minh',
+                filled: true,
+                fillColor: AppColors.backgroundGray,
+                border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      _selectedBirthDate != null
-                          ? DateFormat('dd/MM/yyyy').format(_selectedBirthDate!)
-                          : 'Chọn ngày sinh',
-                      style: AppTextStyles.bodyMedium.copyWith(
-                        color: _selectedBirthDate != null
-                            ? AppColors.textPrimary
-                            : AppColors.textHint,
-                      ),
-                    ),
-                    const Icon(
-                      Icons.calendar_today,
-                      color: AppColors.textSecondary,
-                      size: 18,
-                    ),
-                  ],
-                ),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
 
-            // Address
-            const Text('Địa chỉ', style: AppTextStyles.label),
-            const SizedBox(height: 8),
+            // District
+            const Text('Quận / Huyện', style: AppTextStyles.caption),
+            const SizedBox(height: 6),
             TextField(
-              controller: _addressController,
-              maxLines: 2,
+              controller: _districtController,
               decoration: InputDecoration(
-                hintText: 'Nhập địa chỉ',
+                hintText: 'VD: Hoàn Kiếm, Quận 1',
+                filled: true,
+                fillColor: AppColors.backgroundGray,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // Ward
+            const Text('Phường / Xã', style: AppTextStyles.caption),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _wardController,
+              decoration: InputDecoration(
+                hintText: 'VD: Hàng Đào, Phường 1',
+                filled: true,
+                fillColor: AppColors.backgroundGray,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // Street address
+            const Text('Số nhà + Tên đường', style: AppTextStyles.caption),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _streetAddressController,
+              decoration: InputDecoration(
+                hintText: 'VD: 123 Đường Tràng Tiền',
                 filled: true,
                 fillColor: AppColors.backgroundGray,
                 border: OutlineInputBorder(

@@ -8,11 +8,13 @@ import '../leaderboard_screen.dart';
 class LeaderboardItem extends StatelessWidget {
   final LeaderboardUser user;
   final bool isCurrentUser;
+  final String? customRankDisplay; // Custom rank display (e.g., "20+")
 
   const LeaderboardItem({
     super.key,
     required this.user,
     this.isCurrentUser = false,
+    this.customRankDisplay,
   });
 
   @override
@@ -46,9 +48,9 @@ class LeaderboardItem extends StatelessWidget {
           children: [
             // Rank number
             SizedBox(
-              width: 30,
+              width: 40,
               child: Text(
-                '${user.rank}',
+                customRankDisplay ?? '${user.rank}',
                 style: AppTextStyles.bodyLarge.copyWith(
                   fontWeight: FontWeight.bold,
                   color: isCurrentUser
@@ -71,7 +73,21 @@ class LeaderboardItem extends StatelessWidget {
               ),
               child: ClipOval(
                 child: user.avatar.isNotEmpty
-                    ? Image.network(user.avatar, fit: BoxFit.cover)
+                    ? Image.network(
+                        user.avatar,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          // Show fallback avatar on error
+                          return Container(
+                            color: AppColors.backgroundGray,
+                            child: const Icon(
+                              Icons.person,
+                              size: 24,
+                              color: AppColors.textSecondary,
+                            ),
+                          );
+                        },
+                      )
                     : Container(
                         color: AppColors.backgroundGray,
                         child: const Icon(

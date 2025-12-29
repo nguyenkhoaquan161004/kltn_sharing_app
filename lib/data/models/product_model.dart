@@ -12,6 +12,7 @@ class ProductModel {
   final UserInfo owner;
   final String status; // available, pending, sold
   final bool isFree;
+  final String? cartItemId; // Original itemId from cart for deletion
 
   ProductModel({
     required this.id,
@@ -27,6 +28,7 @@ class ProductModel {
     required this.owner,
     this.status = 'available',
     this.isFree = false,
+    this.cartItemId,
   });
 
   // Computed properties

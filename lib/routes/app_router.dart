@@ -27,6 +27,7 @@ import '../presentation/screens/orders/proof_of_payment_screen.dart';
 import '../presentation/screens/profile/store_information_screen.dart';
 import '../presentation/screens/sharing/sharing_screen.dart';
 import '../presentation/screens/profile/profile_screen.dart';
+import '../presentation/screens/profile/settings_screen.dart';
 import '../presentation/screens/profile/user_profile_screen.dart';
 import '../presentation/screens/achievements/achievements_list_screen.dart';
 import '../presentation/screens/achievements/badges_list_screen.dart';
@@ -144,11 +145,24 @@ class AppRouter {
         name: 'search',
         routes: [
           GoRoute(
-            path: AppRoutes.searchResults,
+            path: 'results',
             pageBuilder: (context, state) {
+              print('[Router] search-results route pageBuilder called');
+              print('[Router]   Full URI: ${state.uri}');
+              print(
+                  '[Router]   Query parameters: ${state.uri.queryParameters}');
               final keyword = state.uri.queryParameters['keyword'] ?? '';
+              final categoryId = state.uri.queryParameters['categoryId'];
+              final categoryName = state.uri.queryParameters['categoryName'];
+              print('[Router]   Extracted keyword: "$keyword"');
+              print('[Router]   Extracted categoryId: $categoryId');
+              print('[Router]   Extracted categoryName: $categoryName');
               return _buildPageWithTransition(
-                child: SearchResultsScreen(keyword: keyword),
+                child: SearchResultsScreen(
+                  keyword: keyword,
+                  categoryId: categoryId,
+                  categoryName: categoryName,
+                ),
                 state: state,
                 name: 'search-results',
               );
@@ -291,6 +305,17 @@ class AppRouter {
           );
         },
         name: 'profile',
+      ),
+      GoRoute(
+        path: AppRoutes.settings,
+        pageBuilder: (context, state) {
+          return _buildPageWithTransition(
+            child: const SettingsScreen(),
+            state: state,
+            name: 'settings',
+          );
+        },
+        name: 'settings',
       ),
       GoRoute(
         path: '/user/:userId',

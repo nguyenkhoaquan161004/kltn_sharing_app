@@ -106,24 +106,47 @@ class GamificationApiService {
       final queryParams = {
         'page': page,
         'size': size,
+        'scope': 'GLOBAL',
+        'timeFrame': 'ALL_TIME',
         if (sortBy != null) 'sortBy': sortBy,
         if (sortDirection != null) 'sortDirection': sortDirection,
       };
 
       final response = await _dio.get(
-        '/api/v2/gamifications/leaderboard',
+        '/api/v2/gamification/leaderboard',
         queryParameters: queryParams,
       );
 
       if (response.statusCode == 200) {
         final data = response.data;
 
-        // Handle ApiResponse<PageResponse<Gamification>>
+        // Handle ApiResponse<NewLeaderboardResponse>
         if (data is Map<String, dynamic>) {
           if (data.containsKey('data')) {
-            final pageData = data['data'];
-            if (pageData is Map<String, dynamic>) {
-              return LeaderboardResponse.fromJson(pageData);
+            final leaderboardData = data['data'];
+            if (leaderboardData is Map<String, dynamic>) {
+              // Convert NewLeaderboardResponse to LeaderboardResponse format
+              final newResponse =
+                  NewLeaderboardResponse.fromJson(leaderboardData);
+              return LeaderboardResponse(
+                content: newResponse.entries
+                    .map((entry) => GamificationDto(
+                          id: entry.userId,
+                          userId: entry.userId,
+                          username: entry.username,
+                          avatarUrl: entry.avatarUrl,
+                          points: entry.totalPoints,
+                          rank: entry.rank,
+                          itemsShared: 0,
+                          itemsReceived: 0,
+                          badge: null,
+                        ))
+                    .toList(),
+                totalElements: newResponse.totalUsers,
+                totalPages: newResponse.totalPages,
+                currentPage: newResponse.page,
+                pageSize: newResponse.size,
+              );
             }
           }
           // Direct response format
@@ -143,10 +166,12 @@ class GamificationApiService {
   Future<List<GamificationDto>> getTopUsers({int limit = 3}) async {
     try {
       final response = await _dio.get(
-        '/api/v2/gamifications/leaderboard',
+        '/api/v2/gamification/leaderboard',
         queryParameters: {
           'page': 0,
           'size': limit,
+          'scope': 'GLOBAL',
+          'timeFrame': 'ALL_TIME',
           'sortBy': 'points',
           'sortDirection': 'DESC',
         },
@@ -157,10 +182,23 @@ class GamificationApiService {
 
         if (data is Map<String, dynamic>) {
           if (data.containsKey('data')) {
-            final pageData = data['data'];
-            if (pageData is Map<String, dynamic>) {
-              final response = LeaderboardResponse.fromJson(pageData);
-              return response.content;
+            final leaderboardData = data['data'];
+            if (leaderboardData is Map<String, dynamic>) {
+              final newResponse =
+                  NewLeaderboardResponse.fromJson(leaderboardData);
+              return newResponse.entries
+                  .map((entry) => GamificationDto(
+                        id: entry.userId,
+                        userId: entry.userId,
+                        username: entry.username,
+                        avatarUrl: entry.avatarUrl,
+                        points: entry.totalPoints,
+                        rank: entry.rank,
+                        itemsShared: 0,
+                        itemsReceived: 0,
+                        badge: null,
+                      ))
+                  .toList();
             }
           }
           final response = LeaderboardResponse.fromJson(data);
@@ -341,6 +379,62 @@ class GamificationApiService {
       } else {
         throw Exception(
             'Failed to load user achievements: ${response.statusCode}');
+      }
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  /// Get leaderboard with scope filter (GLOBAL or NEARBY)
+  /// For NEARBY scope, requires: currentUserLat, currentUserLon, radiusKm
+  Future<NewLeaderboardResponse> getLeaderboardWithScope({
+    required String scope, // 'GLOBAL' or 'NEARBY'
+    String timeFrame = 'ALL_TIME', // 'ALL_TIME', 'MONTHLY', 'WEEKLY'
+    double? currentUserLat,
+    double? currentUserLon,
+    double radiusKm = 50.0,
+    int page = 0,
+    int size = 20,
+  }) async {
+    try {
+      final queryParams = {
+        'scope': scope,
+        'timeFrame': timeFrame,
+        'page': page,
+        'size': size,
+        if (scope == 'NEARBY') ...{
+          'radiusKm': radiusKm,
+          'currentUserLat': currentUserLat,
+          'currentUserLon': currentUserLon,
+        }
+      };
+
+      print(
+          '[GamificationAPI] Fetching leaderboard with scope=$scope, lat=$currentUserLat, lon=$currentUserLon, radius=$radiusKm');
+
+      final response = await _dio.get(
+        '/api/v2/gamification/leaderboard',
+        queryParameters: queryParams,
+      );
+
+      if (response.statusCode == 200) {
+        final data = response.data;
+
+        // Handle ApiResponse<NewLeaderboardResponse>
+        if (data is Map<String, dynamic>) {
+          if (data.containsKey('data')) {
+            final leaderboardData = data['data'];
+            if (leaderboardData is Map<String, dynamic>) {
+              return NewLeaderboardResponse.fromJson(leaderboardData);
+            }
+          }
+          // Direct response format
+          return NewLeaderboardResponse.fromJson(data);
+        }
+
+        throw Exception('Unexpected response format: $data');
+      } else {
+        throw Exception('Failed to load leaderboard: ${response.statusCode}');
       }
     } on DioException catch (e) {
       throw _handleDioException(e);

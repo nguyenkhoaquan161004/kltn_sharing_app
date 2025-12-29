@@ -298,4 +298,80 @@ class TransactionApiService {
       throw _handleDioException(e);
     }
   }
+
+  /// Accept a transaction request
+  Future<void> acceptTransaction(String transactionId) async {
+    try {
+      print(
+          '[TransactionAPI] REQUEST[PUT] => /api/v2/transactions/$transactionId/accept');
+      final response = await _dio.put(
+        '/api/v2/transactions/$transactionId/accept',
+        data: {},
+        options: Options(
+          headers: {'Content-Type': 'application/json'},
+        ),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        print(
+            '[TransactionAPI] Transaction $transactionId accepted successfully');
+        return;
+      } else {
+        throw Exception('Failed to accept transaction: ${response.statusCode}');
+      }
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  /// Reject a transaction request
+  Future<void> rejectTransaction(String transactionId) async {
+    try {
+      print(
+          '[TransactionAPI] REQUEST[PUT] => /api/v2/transactions/$transactionId/reject');
+      final response = await _dio.put(
+        '/api/v2/transactions/$transactionId/reject',
+        data: {},
+        options: Options(
+          headers: {'Content-Type': 'application/json'},
+        ),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        print(
+            '[TransactionAPI] Transaction $transactionId rejected successfully');
+        return;
+      } else {
+        throw Exception('Failed to reject transaction: ${response.statusCode}');
+      }
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  /// Mark a transaction as completed
+  Future<void> completeTransaction(String transactionId) async {
+    try {
+      print(
+          '[TransactionAPI] REQUEST[PUT] => /api/v2/transactions/$transactionId/complete');
+      final response = await _dio.put(
+        '/api/v2/transactions/$transactionId/complete',
+        data: {},
+        options: Options(
+          headers: {'Content-Type': 'application/json'},
+        ),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        print(
+            '[TransactionAPI] Transaction $transactionId completed successfully');
+        return;
+      } else {
+        throw Exception(
+            'Failed to complete transaction: ${response.statusCode}');
+      }
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
 }

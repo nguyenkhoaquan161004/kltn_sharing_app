@@ -29,41 +29,53 @@ class SearchResultsScreen extends StatefulWidget {
 class _SearchResultsScreenState extends State<SearchResultsScreen> {
   late List<ItemDto> _searchResults = [];
   TextEditingController _searchKeywordController = TextEditingController();
-  String _sortBy = 'createdAt'; // createdAt (newest), or other sort options
-  String _filterByPrice = 'all'; // all, free, paid
-  String _filterByCategory = categoryId; // all, or categoryId
+  String _sortBy = 'createdAt'; // createdAt (newest) or other sort options
+  String _filterByCategory = '';
   String _filterByStatus = 'AVAILABLE'; // AVAILABLE, RESERVED, SHARED
 
-  // Price range filter
-  double _minPrice = 0;
-  double _maxPrice = 1000000;
-  TextEditingController _minPriceController = TextEditingController(text: '0');
-  TextEditingController _maxPriceController =
-      TextEditingController(text: '1000000');
-
-  // Location filter
-  double? _latitude = 10.7769; // Default Ho Chi Minh City
-  double? _longitude = 106.7009; // Default Ho Chi Minh City
-  int _radiusKm = 10; // Default 10km
-
   bool _isLoading = true;
+  bool _isLoadingMore = false;
   String? _errorMessage;
+
+  // Pagination
+  int _currentPage = 0;
+  int _pageSize = 10;
+  int _totalItems = 0;
+  late ScrollController _scrollController;
 
   @override
   void initState() {
     super.initState();
+    _scrollController = ScrollController();
+    _scrollController.addListener(_onScroll);
+
     _searchKeywordController.text = widget.keyword;
     if (widget.categoryId != null && widget.categoryId!.isNotEmpty) {
       _filterByCategory = widget.categoryId!;
+    } else {
+      _filterByCategory = ''; // No category filter by default
     }
-    _loadItems();
+    print(
+        '[SearchResultsScreen] initState - keyword: ${widget.keyword}, categoryId: ${widget.categoryId}, categoryName: ${widget.categoryName}');
+    print(
+        '[SearchResultsScreen] initState - _filterByCategory: $_filterByCategory');
+    _currentPage = 0;
+    _loadItems(isInitial: true);
   }
 
-  Future<void> _loadItems() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+  Future<void> _loadItems({bool isInitial = false}) async {
+    if (isInitial) {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+        _currentPage = 0;
+        _searchResults = [];
+      });
+    } else {
+      setState(() {
+        _isLoadingMore = true;
+      });
+    }
 
     try {
       final authProvider = context.read<AuthProvider>();
@@ -73,37 +85,62 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
         itemService.setAuthToken(authProvider.accessToken!);
       }
 
+      // Simplified API call with only necessary parameters
+      print('[SearchResultsScreen] _loadItems - calling API with:');
+      print(
+          '[SearchResultsScreen]   keyword: ${widget.keyword.isNotEmpty ? widget.keyword : null}');
+      print(
+          '[SearchResultsScreen]   categoryId: ${_filterByCategory.isNotEmpty && _filterByCategory != 'all' ? _filterByCategory : null}');
+      print(
+          '[SearchResultsScreen]   _filterByCategory value: $_filterByCategory');
+
       final response = await itemService.searchItems(
+        page: _currentPage,
+        size: _pageSize,
         keyword: widget.keyword.isNotEmpty ? widget.keyword : null,
-        category: _filterByCategory != 'all' ? _filterByCategory : null,
-        minPrice: _minPrice,
-        maxPrice: _maxPrice,
+        categoryId: _filterByCategory.isNotEmpty && _filterByCategory != 'all'
+            ? _filterByCategory
+            : null,
         status: _filterByStatus,
-        latitude: _latitude,
-        longitude: _longitude,
-        radiusKm: _radiusKm,
         sortBy: _sortBy,
         sortDirection: 'DESC',
       );
 
       setState(() {
-        _searchResults = response.content;
+        if (isInitial) {
+          _searchResults = response.content;
+        } else {
+          _searchResults.addAll(response.content);
+        }
+        _totalItems = response.totalElements;
         _isLoading = false;
+        _isLoadingMore = false;
       });
     } catch (e) {
       setState(() {
         _errorMessage = 'Lỗi: ${e.toString()}';
         _isLoading = false;
+        _isLoadingMore = false;
       });
       print('[SearchResults] Error: $e');
+    }
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 500) {
+      // User is near the bottom, load more if available
+      if (!_isLoadingMore && _searchResults.length < _totalItems) {
+        _currentPage++;
+        _loadItems(isInitial: false);
+      }
     }
   }
 
   @override
   void dispose() {
     _searchKeywordController.dispose();
-    _minPriceController.dispose();
-    _maxPriceController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -242,19 +279,6 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    // Results count
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Text(
-                        'Tìm thấy ${_searchResults.length} sản phẩm',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
                     Expanded(
                       child: _buildProductGrid(),
                     ),
@@ -275,6 +299,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
     }
 
     return GridView.builder(
+      controller: _scrollController,
       padding: const EdgeInsets.all(16),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
@@ -282,9 +307,19 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
         crossAxisSpacing: 12,
         mainAxisSpacing: 12,
       ),
-      itemCount: _searchResults.length,
+      itemCount: _searchResults.length + (_isLoadingMore ? 1 : 0),
       itemBuilder: (context, index) {
+        // Loading indicator at the bottom
+        if (index == _searchResults.length) {
+          return const Center(
+            child: CircularProgressIndicator(),
+          );
+        }
+
         final dto = _searchResults[index];
+        print(
+            '[SearchResultsScreen] Item ${index}: id=${dto.id}, categoryId=${dto.categoryId}, categoryName="${dto.categoryName}"');
+
         // Convert ItemDto to ItemModel for display
         final item = ItemModel(
           itemId: 0, // Will use itemId_str instead
@@ -297,6 +332,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
           status: dto.status,
           categoryId: 0,
           categoryId_str: dto.categoryId,
+          categoryName: dto.categoryName ?? 'Khác',
           locationId: 0,
           expiryDate: dto.expiryDate,
           createdAt: dto.createdAt,
@@ -352,15 +388,10 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                         onTap: () {
                           setModalState(() {
                             _sortBy = 'createdAt';
-                            _filterByPrice = 'all';
-                            _filterByCategory = 'all';
-                            _minPrice = 0;
-                            _maxPrice = 1000000;
-                            _minPriceController.text = '0';
-                            _maxPriceController.text = '1000000';
+                            _filterByCategory = '';
                           });
                           setState(() {});
-                          _loadItems();
+                          _loadItems(isInitial: true);
                         },
                         child: const Text(
                           'Đặt lại',
@@ -405,7 +436,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                                   _sortBy = 'createdAt';
                                 });
                                 setState(() {});
-                                _loadItems();
+                                _loadItems(isInitial: true);
                               },
                               child: Container(
                                 padding: const EdgeInsets.symmetric(
@@ -446,7 +477,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                                   _sortBy = 'default';
                                 });
                                 setState(() {});
-                                _loadItems();
+                                _loadItems(isInitial: true);
                               },
                               child: Container(
                                 padding: const EdgeInsets.symmetric(
@@ -482,71 +513,6 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                         ],
                       ),
                       const SizedBox(height: 32),
-                      // Price range filter section
-                      const Text(
-                        'Giá (VND)',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      // Price input fields
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              controller: _minPriceController,
-                              keyboardType: TextInputType.number,
-                              onChanged: (value) {
-                                setModalState(() {
-                                  _minPrice = double.tryParse(value) ?? 0;
-                                });
-                                setState(() {});
-                              },
-                              decoration: InputDecoration(
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 10,
-                                ),
-                                hintText: '0',
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          const Text(
-                            '—',
-                            style: TextStyle(fontSize: 16),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: TextField(
-                              controller: _maxPriceController,
-                              keyboardType: TextInputType.number,
-                              onChanged: (value) {
-                                setModalState(() {
-                                  _maxPrice = double.tryParse(value) ?? 1000000;
-                                });
-                                setState(() {});
-                              },
-                              decoration: InputDecoration(
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 10,
-                                ),
-                                hintText: '1000000',
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 24),
                       // Category filter section (as pills)
                       const Text(
                         'Phân loại',
@@ -601,7 +567,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
           _filterByCategory = value;
         });
         setState(() {});
-        _loadItems();
+        _loadItems(isInitial: true);
       },
       child: Container(
         padding: const EdgeInsets.symmetric(

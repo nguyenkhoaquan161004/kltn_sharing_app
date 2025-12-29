@@ -141,10 +141,14 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   void _navigateToCategoryResults(String categoryId, String categoryName) {
+    print('[SearchScreen] _navigateToCategoryResults called');
+    print('[SearchScreen]   categoryId: $categoryId');
+    print('[SearchScreen]   categoryName: $categoryName');
+    print('[SearchScreen]   routeName: ${AppRoutes.searchResultsName}');
     context.pushNamed(AppRoutes.searchResultsName, queryParameters: {
       'categoryId': categoryId,
       'categoryName': categoryName
-    });
+    }).then((_) => print('[SearchScreen] Navigation completed'));
   }
 
   @override

@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
+import 'package:geocoding/geocoding.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../../../../data/services/item_api_service.dart';
 import '../../../../data/services/cloudinary_service.dart';
+import '../../../../data/providers/user_provider.dart';
 
 class CreateProductModal extends StatefulWidget {
   final Function(bool) onProductCreated; // true = success, false = error
@@ -58,13 +60,14 @@ class _CreateProductModalState extends State<CreateProductModal> {
     _priceController = TextEditingController(text: '0');
     _quantityController = TextEditingController(text: '1');
 
-    // Use default Ho Chi Minh City coordinates
+    // Use default Ho Chi Minh City coordinates initially
     _latitude = 10.7769;
     _longitude = 106.7009;
 
-    // Load categories after frame is built
+    // Load categories and user address after frame is built
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadCategories();
+      _loadUserAddressAndGeocode();
     });
   }
 
@@ -97,6 +100,43 @@ class _CreateProductModalState extends State<CreateProductModal> {
           print('[CreateProductModal] Error loading categories: $e');
         });
       }
+    }
+  }
+
+  Future<void> _loadUserAddressAndGeocode() async {
+    try {
+      final userProvider = context.read<UserProvider>();
+      final user = userProvider.currentUser;
+
+      if (user == null || (user.address == null || user.address!.isEmpty)) {
+        print(
+            '[CreateProductModal] No user address found, using default coordinates');
+        return;
+      }
+
+      final address = user.address!;
+      print('[CreateProductModal] Geocoding user address: $address');
+
+      // Geocode the address
+      List<Location> locations = await locationFromAddress(address);
+
+      if (locations.isNotEmpty) {
+        final location = locations.first;
+        if (mounted) {
+          setState(() {
+            _latitude = location.latitude;
+            _longitude = location.longitude;
+            print(
+                '[CreateProductModal] Geocoded address - Lat: $_latitude, Long: $_longitude');
+          });
+        }
+      } else {
+        print(
+            '[CreateProductModal] Geocoding failed, using default coordinates');
+      }
+    } catch (e) {
+      print('[CreateProductModal] Error geocoding address: $e');
+      // Silently fail and use default coordinates
     }
   }
 

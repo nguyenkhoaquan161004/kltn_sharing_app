@@ -149,16 +149,22 @@ class CartApiService {
   /// Remove item from cart
   Future<void> removeFromCart(String itemId) async {
     try {
+      print('[CartAPI] Removing item from cart: $itemId');
       final response = await _dio.delete(
-        '/api/v2/cart/$itemId',
+        '/api/v2/cart/items/$itemId',
       );
 
+      print('[CartAPI] Delete response status: ${response.statusCode}');
+      print('[CartAPI] Delete response data: ${response.data}');
+
       if (response.statusCode == 200 || response.statusCode == 204) {
-        print('[CartAPI] Item removed from cart successfully');
+        print('[CartAPI] Item removed from cart successfully: $itemId');
       } else {
         throw Exception('Failed to remove from cart: ${response.statusCode}');
       }
     } on DioException catch (e) {
+      print(
+          '[CartAPI] DioException removing from cart: ${e.response?.statusCode} - ${e.message}');
       throw _handleDioException(e);
     }
   }

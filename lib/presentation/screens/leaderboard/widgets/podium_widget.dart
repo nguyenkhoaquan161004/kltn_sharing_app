@@ -109,7 +109,21 @@ class PodiumWidget extends StatelessWidget {
             ),
             child: ClipOval(
               child: user.avatar.isNotEmpty
-                  ? Image.network(user.avatar, fit: BoxFit.cover)
+                  ? Image.network(
+                      user.avatar,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        // Show fallback avatar on error
+                        return Container(
+                          color: AppColors.backgroundGray,
+                          child: const Icon(
+                            Icons.person,
+                            size: 24,
+                            color: AppColors.textSecondary,
+                          ),
+                        );
+                      },
+                    )
                   : Container(
                       color: AppColors.backgroundGray,
                       child: const Icon(
