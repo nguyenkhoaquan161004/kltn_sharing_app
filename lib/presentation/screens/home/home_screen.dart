@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
+import '../../../core/constants/app_routes.dart';
 import '../../../data/providers/item_provider.dart';
 import '../../../data/providers/auth_provider.dart';
 import '../../../data/providers/location_provider.dart';
@@ -293,6 +295,47 @@ class _HomeScreenState extends State<HomeScreen>
         ],
       ),
       bottomNavigationBar: const BottomNavigationWidget(currentIndex: 0),
+      floatingActionButton: _buildChatFAB(),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endDocked,
+    );
+  }
+
+  Widget _buildChatFAB() {
+    return GestureDetector(
+      onTap: () {
+        context.pushNamed('chatbot');
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 70, right: 16),
+        decoration: BoxDecoration(
+          color: AppColors.primaryGreen,
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.primaryGreen.withOpacity(0.4),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () {
+              context.pushNamed('chatbot');
+            },
+            borderRadius: BorderRadius.circular(50),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Icon(
+                Icons.chat_bubble_outline,
+                color: Colors.white,
+                size: 28,
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 

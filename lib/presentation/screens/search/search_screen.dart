@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'dart:io';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/constants/app_routes.dart';
 import '../../../data/providers/category_provider.dart';
+import '../../../data/providers/auth_provider.dart';
+import '../../../data/services/cloudinary_service.dart';
+import '../../../data/services/item_api_service.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -14,6 +20,9 @@ class SearchScreen extends StatefulWidget {
 
 class _SearchScreenState extends State<SearchScreen> {
   final TextEditingController _searchController = TextEditingController();
+  late ItemApiService _itemApiService;
+  final CloudinaryService _cloudinaryService = CloudinaryService();
+  final ImagePicker _imagePicker = ImagePicker();
 
   // Sample suggested keywords
   final List<String> allSuggestedKeywords = [
@@ -29,11 +38,8 @@ class _SearchScreenState extends State<SearchScreen> {
     'Quần short',
   ];
 
-  final List<Map<String, dynamic>> recentSearches = [
-    {'term': 'Áo thun nam', 'time': '2 giờ trước'},
-    {'term': 'Giày thể thao', 'time': 'Hôm qua'},
-    {'term': 'Mũ lưỡi trai', 'time': '3 ngày trước'},
-  ];
+  List<Map<String, dynamic>> recentSearches = [];
+  bool _isLoadingSearchHistory = false;
 
   // Predefined icon and color mapping for categories by icon name
   final Map<String, Map<String, dynamic>> categoryIconColorMap = {
@@ -110,10 +116,52 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   void initState() {
     super.initState();
+    _itemApiService = ItemApiService();
     // Load categories on init
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<CategoryProvider>().loadCategories();
+      _loadSearchHistory();
     });
+  }
+
+  Future<void> _loadSearchHistory() async {
+    try {
+      final authProvider = context.read<AuthProvider>();
+      final userId = authProvider.userId;
+
+      if (userId == null) {
+        print('[SearchScreen] User ID is null, cannot load search history');
+        return;
+      }
+
+      setState(() {
+        _isLoadingSearchHistory = true;
+      });
+
+      final searchTerms = await _itemApiService.getSearchHistory(
+        userId: userId,
+        limit: 5,
+      );
+
+      setState(() {
+        // Convert search terms to display format
+        recentSearches = searchTerms.map((term) {
+          return {
+            'term': term,
+            'time': 'Gần đây',
+          };
+        }).toList();
+        _isLoadingSearchHistory = false;
+      });
+
+      print(
+          '[SearchScreen] Loaded ${recentSearches.length} search history items');
+    } catch (e) {
+      print('[SearchScreen] Error loading search history: $e');
+      setState(() {
+        _isLoadingSearchHistory = false;
+      });
+    }
   }
 
   @override
@@ -137,6 +185,11 @@ class _SearchScreenState extends State<SearchScreen> {
     if (keyword.isNotEmpty) {
       context.pushNamed(AppRoutes.searchResultsName,
           queryParameters: {'keyword': keyword});
+
+      // Reload search history after search
+      Future.delayed(const Duration(milliseconds: 500), () {
+        _loadSearchHistory();
+      });
     }
   }
 
@@ -149,6 +202,164 @@ class _SearchScreenState extends State<SearchScreen> {
       'categoryId': categoryId,
       'categoryName': categoryName
     }).then((_) => print('[SearchScreen] Navigation completed'));
+  }
+
+  Future<void> _handleImageSearch() async {
+    try {
+      // Request camera permission
+      final status = await Permission.camera.request();
+
+      print('[SearchScreen] Camera permission status: $status');
+
+      if (status.isDenied) {
+        // Permission denied
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Cần cấp quyền truy cập camera')),
+          );
+        }
+        return;
+      } else if (status.isPermanentlyDenied) {
+        // Permission permanently denied, open app settings
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                  'Quyền camera bị từ chối. Vui lòng cấp quyền trong cài đặt.'),
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+        openAppSettings();
+        return;
+      }
+
+      // Show bottom sheet with camera/gallery options
+      if (mounted) {
+        showModalBottomSheet(
+          context: context,
+          builder: (context) => Container(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.camera_alt),
+                  title: const Text('Chụp ảnh'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _captureAndSearchImage();
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.image),
+                  title: const Text('Chọn từ thư viện'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _pickAndSearchImage();
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      print('[SearchScreen] Error in _handleImageSearch: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Lỗi: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _captureAndSearchImage() async {
+    try {
+      final XFile? photo = await _imagePicker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 85,
+      );
+
+      if (photo != null) {
+        await _searchByImage(photo);
+      }
+    } catch (e) {
+      print('[SearchScreen] Error capturing image: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Lỗi: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _pickAndSearchImage() async {
+    try {
+      final XFile? photo = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 85,
+      );
+
+      if (photo != null) {
+        await _searchByImage(photo);
+      }
+    } catch (e) {
+      print('[SearchScreen] Error picking image: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Lỗi: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _searchByImage(XFile imageFile) async {
+    try {
+      if (!mounted) return;
+
+      // Show loading
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+
+      // Upload to Cloudinary
+      print('[SearchScreen] Uploading image to Cloudinary...');
+      final imageUrl = await _cloudinaryService.uploadSearchImage(
+        File(imageFile.path),
+      );
+
+      if (!mounted) return;
+      Navigator.pop(context); // Close loading dialog
+
+      print('[SearchScreen] Image uploaded: $imageUrl');
+
+      // Search by image using the API
+      print('[SearchScreen] Searching by image with URL: $imageUrl');
+      final results = await _itemApiService.searchByImage(imageUrl);
+
+      if (!mounted) return;
+
+      // Navigate to results
+      print('[SearchScreen] Got ${results.length} results');
+      context.pushNamed(
+        AppRoutes.searchResultsName,
+        queryParameters: {'imageUrl': imageUrl},
+        extra: results,
+      );
+    } catch (e) {
+      print('[SearchScreen] Error searching by image: $e');
+      if (mounted) {
+        Navigator.pop(context); // Close loading dialog
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Lỗi tìm kiếm: $e')),
+        );
+      }
+    }
   }
 
   @override
@@ -179,16 +390,26 @@ class _SearchScreenState extends State<SearchScreen> {
             fillColor: AppColors.lightGray,
             prefixIcon:
                 const Icon(Icons.search, color: AppColors.textSecondary),
-            suffixIcon: _searchController.text.isNotEmpty
-                ? IconButton(
+            suffixIcon: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.camera_alt,
+                      color: AppColors.textSecondary),
+                  onPressed: _handleImageSearch,
+                  tooltip: 'Tìm kiếm bằng hình ảnh',
+                ),
+                if (_searchController.text.isNotEmpty)
+                  IconButton(
                     icon:
                         const Icon(Icons.clear, color: AppColors.textSecondary),
                     onPressed: () {
                       _searchController.clear();
                       setState(() {});
                     },
-                  )
-                : null,
+                  ),
+              ],
+            ),
             contentPadding: EdgeInsets.zero,
           ),
           onChanged: (value) => setState(() {}),

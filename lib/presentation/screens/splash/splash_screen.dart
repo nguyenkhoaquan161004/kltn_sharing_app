@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/constants/app_routes.dart';
+import '../../../data/providers/location_provider.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -19,6 +21,9 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   void initState() {
     super.initState();
+
+    // Request location permission immediately
+    _requestLocationPermission();
 
     // Setup animations
     _controller = AnimationController(
@@ -49,6 +54,19 @@ class _SplashScreenState extends State<SplashScreen>
   void dispose() {
     _controller.dispose();
     super.dispose();
+  }
+
+  /// Request location permission at app startup
+  Future<void> _requestLocationPermission() async {
+    try {
+      final locationProvider = context.read<LocationProvider>();
+      print('[SplashScreen] Requesting location permission...');
+      await locationProvider.requestLocationPermissionAndGetLocation();
+      print(
+          '[SplashScreen] Location permission result: ${locationProvider.hasLocation}');
+    } catch (e) {
+      print('[SplashScreen] Error requesting location: $e');
+    }
   }
 
   @override

@@ -5,7 +5,7 @@ import '../../../../data/models/notification_model.dart';
 
 class NotificationCard extends StatelessWidget {
   final NotificationModel notification;
-  final VoidCallback onTap;
+  final Future<void> Function() onTap;
 
   const NotificationCard({
     super.key,
@@ -45,11 +45,11 @@ class NotificationCard extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: notification.readStatus
+          color: notification.isRead
               ? Colors.white
               : AppColors.primaryTeal.withOpacity(0.05),
           border: Border.all(
-            color: notification.readStatus
+            color: notification.isRead
                 ? AppColors.borderLight
                 : AppColors.primaryTeal.withOpacity(0.2),
             width: 1,
@@ -95,7 +95,7 @@ class NotificationCard extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      if (!notification.readStatus)
+                      if (!notification.isRead)
                         Container(
                           width: 8,
                           height: 8,

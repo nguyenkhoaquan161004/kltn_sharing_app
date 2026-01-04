@@ -228,14 +228,15 @@ class FCMService {
   /// Internal method để update token trên backend
   Future<void> _updateTokenOnBackend(String token) async {
     try {
-      // TODO: Thay thế với endpoint thực tế từ BE
-      // Endpoint: POST /api/v2/users/fcm-token
-      // Body: { "fcmToken": "..." }
-
       print(
           '[FCMService] 📤 Updating FCM token on backend: ${token.substring(0, 50)}...');
-      // Await call to backend API here
-      // await _userApiService.updateFCMToken(token);
+
+      // Gửi token lên backend qua UserApiService
+      await _userApiService.updateFCMToken(
+        userId: '', // userId có thể rỗng, backend sẽ lấy từ auth context
+        fcmToken: token,
+      );
+
       print('[FCMService] ✅ FCM token updated on backend');
     } catch (e) {
       print('[FCMService] ❌ Failed to update FCM token on backend: $e');

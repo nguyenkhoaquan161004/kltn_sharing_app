@@ -26,9 +26,12 @@ class MessageModel {
   factory MessageModel.fromJson(Map<String, dynamic> json) {
     return MessageModel(
       id: json['id'] as String? ?? json['message_id']?.toString() ?? '',
-      senderId: json['senderId'] as String? ?? json['sender_id']?.toString() ?? '',
+      senderId:
+          json['senderId'] as String? ?? json['sender_id']?.toString() ?? '',
       senderName: json['senderName'] as String? ?? '',
-      receiverId: json['receiverId'] as String? ?? json['receiver_id']?.toString() ?? '',
+      receiverId: json['receiverId'] as String? ??
+          json['receiver_id']?.toString() ??
+          '',
       receiverName: json['receiverName'] as String? ?? '',
       content: json['content'] as String? ?? '',
       messageType: json['messageType'] as String? ?? 'TEXT',
@@ -91,6 +94,7 @@ class ConversationModel {
   final String lastMessage;
   final DateTime lastMessageAt;
   final int unreadCount;
+  final String? lastMessageSenderId;
 
   ConversationModel({
     required this.otherUserId,
@@ -98,6 +102,7 @@ class ConversationModel {
     required this.lastMessage,
     required this.lastMessageAt,
     required this.unreadCount,
+    this.lastMessageSenderId,
   });
 
   factory ConversationModel.fromJson(Map<String, dynamic> json) {
@@ -109,6 +114,7 @@ class ConversationModel {
           ? DateTime.parse(json['lastMessageAt'] as String)
           : DateTime.now(),
       unreadCount: json['unreadCount'] as int? ?? 0,
+      lastMessageSenderId: json['lastMessageSenderId'] as String?,
     );
   }
 
@@ -119,6 +125,8 @@ class ConversationModel {
       'lastMessage': lastMessage,
       'lastMessageAt': lastMessageAt.toIso8601String(),
       'unreadCount': unreadCount,
+      if (lastMessageSenderId != null)
+        'lastMessageSenderId': lastMessageSenderId,
     };
   }
 }

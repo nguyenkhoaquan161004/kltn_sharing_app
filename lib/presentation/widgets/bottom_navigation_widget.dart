@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 import '../../core/constants/app_routes.dart';
+import '../../data/providers/notification_provider.dart';
 
 class BottomNavigationWidget extends StatelessWidget {
   final int currentIndex;
@@ -30,20 +32,43 @@ class BottomNavigationWidget extends StatelessWidget {
             break;
         }
       },
-      items: const [
-        BottomNavigationBarItem(
+      items: [
+        const BottomNavigationBarItem(
           icon: Icon(Icons.home),
           label: 'Home',
         ),
-        BottomNavigationBarItem(
+        const BottomNavigationBarItem(
           icon: Icon(Icons.leaderboard),
           label: 'Xếp hạng',
         ),
         BottomNavigationBarItem(
-          icon: Icon(Icons.notifications),
+          icon: Consumer<NotificationProvider>(
+            builder: (context, notifProvider, _) {
+              final hasUnread = notifProvider.unreadNotifications.isNotEmpty;
+              return Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  const Icon(Icons.notifications),
+                  if (hasUnread)
+                    Positioned(
+                      top: -4,
+                      right: -4,
+                      child: Container(
+                        width: 10,
+                        height: 10,
+                        decoration: BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
           label: 'Thông báo',
         ),
-        BottomNavigationBarItem(
+        const BottomNavigationBarItem(
           icon: Icon(Icons.account_circle),
           label: 'Tôi',
         ),

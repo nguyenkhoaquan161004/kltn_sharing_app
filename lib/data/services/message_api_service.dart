@@ -53,7 +53,8 @@ class MessageApiService {
   }
 
   /// Set callback to get valid access token
-  void setGetValidTokenCallback(Future<void> Function() onTokenExpiredCallback) {
+  void setGetValidTokenCallback(
+      Future<void> Function() onTokenExpiredCallback) {
     try {
       _tokenRefreshInterceptor.setCallbacks(
         getValidTokenCallback: () async => null, // Not needed
@@ -141,9 +142,20 @@ class MessageApiService {
 
       // Safe cast to Map<String, dynamic>
       final dataMap = Map<String, dynamic>.from(data as Map);
-      return MessageModel.fromJson(dataMap);
+      final message = MessageModel.fromJson(dataMap);
+
+      print('[MessageAPI] ✅ Message parsed successfully');
+      print('[MessageAPI] Message ID: ${message.id}');
+      print('[MessageAPI] Message Type: "${message.messageType}"');
+      final contentPreview = message.content.length > 50
+          ? message.content.substring(0, 50)
+          : message.content;
+      print('[MessageAPI] Message Content: "$contentPreview..."');
+
+      return message;
     } on DioException catch (e) {
       print('[MessageAPI] ERROR[${e.response?.statusCode}] => ${e.message}');
+
       throw Exception(
         'Failed to send message: ${e.response?.statusCode} - ${e.message}',
       );
@@ -208,6 +220,15 @@ class MessageApiService {
       return [];
     } on DioException catch (e) {
       print('[MessageAPI] ERROR[${e.response?.statusCode}] => ${e.message}');
+
+      // Temporary fallback: If 404, return mock conversation for testing
+      if (e.response?.statusCode == 404) {
+        print(
+            '[MessageAPI] Conversation endpoint not found, returning empty list');
+        // Return empty list so chatbot can respond
+        return [];
+      }
+
       throw Exception(
         'Failed to get conversation: ${e.response?.statusCode} - ${e.message}',
       );
@@ -296,6 +317,39 @@ class MessageApiService {
       print('[MessageAPI] ERROR[${e.response?.statusCode}] => ${e.message}');
       throw Exception(
         'Failed to mark conversation as read: ${e.response?.statusCode} - ${e.message}',
+      );
+    }
+  }
+
+  /// Send message to chatbot
+  /// POST /api/v2/chat
+  Future<Map<String, dynamic>> sendChatbotMessage({
+    required String message,
+  }) async {
+    try {
+      print('[ChatAPI] REQUEST[POST] => /api/v2/chat');
+      print('[ChatAPI] Body: {message: $message}');
+
+      final response = await _dio.post(
+        '/api/v2/chat',
+        data: {
+          'message': message,
+        },
+      );
+
+      print(
+          '[ChatAPI] SUCCESS[${response.statusCode}] => Message sent to chatbot');
+      print('[ChatAPI] Response: ${response.data}');
+
+      // Return the response data
+      if (response.data is Map) {
+        return Map<String, dynamic>.from(response.data as Map);
+      }
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      print('[ChatAPI] ERROR[${e.response?.statusCode}] => ${e.message}');
+      throw Exception(
+        'Failed to send chatbot message: ${e.response?.statusCode} - ${e.message}',
       );
     }
   }

@@ -30,6 +30,7 @@ class AppRoutes {
   static const String orderDetailName = 'order-detail';
   static const String cartItemDetailName = 'cart-item-detail';
   static const String searchResultsName = 'search-results';
+  static const String messagesListName = 'messages-list';
 
   // Profile routes
   static const String profile = '/profile';
@@ -40,6 +41,7 @@ class AppRoutes {
   // Social routes
   static const String messages = '/messages';
   static const String chat = '/chat/:userId';
+  static const String chatbot = '/chatbot';
   static const String leaderboard = '/leaderboard';
   static const String achievements = '/achievements';
   static const String achievementDetail = '/achievement/:id';

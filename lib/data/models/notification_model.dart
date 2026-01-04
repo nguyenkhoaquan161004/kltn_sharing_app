@@ -82,7 +82,7 @@ class NotificationModel {
   final NotificationType type;
   final String? referenceId;
   final String? referenceType;
-  final bool readStatus;
+  final bool isRead;
   final DateTime createdAt;
 
   NotificationModel({
@@ -93,7 +93,7 @@ class NotificationModel {
     required this.type,
     this.referenceId,
     this.referenceType,
-    required this.readStatus,
+    required this.isRead,
     required this.createdAt,
   });
 
@@ -107,7 +107,7 @@ class NotificationModel {
       type: NotificationTypeExtension.fromString(json['type'] ?? 'SYSTEM'),
       referenceId: json['referenceId'],
       referenceType: json['referenceType'],
-      readStatus: json['readStatus'] ?? false,
+      isRead: json['isRead'] ?? false,
       createdAt: json['createdAt'] != null
           ? DateTime.parse(json['createdAt'].toString())
           : DateTime.now(),
@@ -168,7 +168,7 @@ class NotificationModel {
     NotificationType? type,
     String? referenceId,
     String? referenceType,
-    bool? readStatus,
+    bool? isRead,
     DateTime? createdAt,
   }) {
     return NotificationModel(
@@ -179,7 +179,7 @@ class NotificationModel {
       type: type ?? this.type,
       referenceId: referenceId ?? this.referenceId,
       referenceType: referenceType ?? this.referenceType,
-      readStatus: readStatus ?? this.readStatus,
+      isRead: isRead ?? this.isRead,
       createdAt: createdAt ?? this.createdAt,
     );
   }

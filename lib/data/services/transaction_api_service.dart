@@ -101,32 +101,44 @@ class TransactionApiService {
   }
 
   Exception _handleDioException(DioException e) {
-    String message;
+    String message = '';
 
     if (e.response != null) {
-      final data = e.response!.data as Map<String, dynamic>?;
+      // Handle response data safely - could be Map or String
+      if (e.response!.data is String &&
+          (e.response!.data as String).isNotEmpty) {
+        // If response is String, use it as message directly
+        message = e.response!.data as String;
+      } else if (e.response!.data is Map<String, dynamic>) {
+        final data = e.response!.data as Map<String, dynamic>;
+        message = data['message'] ?? '';
+      }
 
-      switch (e.response!.statusCode) {
-        case 400:
-          message = data?['message'] ?? 'Yêu cầu không hợp lệ';
-          break;
-        case 401:
-          message = 'Token hết hạn hoặc không hợp lệ. Vui lòng đăng nhập lại.';
-          break;
-        case 403:
-          message = 'Bạn không có quyền thực hiện hành động này.';
-          break;
-        case 404:
-          message = 'Sản phẩm không tìm thấy.';
-          break;
-        case 422:
-          message = 'Dữ liệu không hợp lệ. Vui lòng kiểm tra lại.';
-          break;
-        case 500:
-          message = 'Lỗi máy chủ. Vui lòng thử lại sau.';
-          break;
-        default:
-          message = 'Có lỗi xảy ra: ${e.response!.statusCode}';
+      // If we still don't have a message, use status code specific messages
+      if (message.isEmpty) {
+        switch (e.response!.statusCode) {
+          case 400:
+            message = 'Yêu cầu không hợp lệ';
+            break;
+          case 401:
+            message =
+                'Token hết hạn hoặc không hợp lệ. Vui lòng đăng nhập lại.';
+            break;
+          case 403:
+            message = 'Bạn không có quyền thực hiện hành động này.';
+            break;
+          case 404:
+            message = 'Sản phẩm không tìm thấy.';
+            break;
+          case 422:
+            message = 'Dữ liệu không hợp lệ. Vui lòng kiểm tra lại.';
+            break;
+          case 500:
+            message = 'Lỗi máy chủ. Vui lòng thử lại sau.';
+            break;
+          default:
+            message = 'Có lỗi xảy ra: ${e.response!.statusCode}';
+        }
       }
     } else if (e.type == DioExceptionType.connectionTimeout) {
       message = 'Kết nối timeout. Vui lòng kiểm tra mạng.';
@@ -359,6 +371,92 @@ class TransactionApiService {
         throw Exception(
             'Failed to complete transaction: ${response.statusCode}');
       }
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  /// Get transactions where user is the sharer
+  Future<List<TransactionModel>> getTransactionsAsSharer({
+    int page = 1,
+    int limit = 20,
+  }) async {
+    try {
+      final response = await _dio.get(
+        '/api/v2/transactions/as-sharer',
+        queryParameters: {
+          'page': page,
+          'limit': limit,
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final apiResponse = response.data;
+        final pageResponse = apiResponse['data'];
+
+        if (pageResponse is Map<String, dynamic>) {
+          final transactionsList = pageResponse['data'];
+
+          if (transactionsList is List) {
+            if (transactionsList.isEmpty) {
+              print('[TransactionAPI] Retrieved 0 sharer transactions');
+              return [];
+            }
+
+            final transactions = transactionsList
+                .map((item) =>
+                    TransactionModel.fromJson(item as Map<String, dynamic>))
+                .toList();
+            print(
+                '[TransactionAPI] Retrieved ${transactions.length} sharer transactions');
+            return transactions;
+          }
+        }
+      }
+      return [];
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  /// Get transactions where user is the receiver
+  Future<List<TransactionModel>> getTransactionsAsReceiver({
+    int page = 1,
+    int limit = 20,
+  }) async {
+    try {
+      final response = await _dio.get(
+        '/api/v2/transactions/as-receiver',
+        queryParameters: {
+          'page': page,
+          'limit': limit,
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final apiResponse = response.data;
+        final pageResponse = apiResponse['data'];
+
+        if (pageResponse is Map<String, dynamic>) {
+          final transactionsList = pageResponse['data'];
+
+          if (transactionsList is List) {
+            if (transactionsList.isEmpty) {
+              print('[TransactionAPI] Retrieved 0 receiver transactions');
+              return [];
+            }
+
+            final transactions = transactionsList
+                .map((item) =>
+                    TransactionModel.fromJson(item as Map<String, dynamic>))
+                .toList();
+            print(
+                '[TransactionAPI] Retrieved ${transactions.length} receiver transactions');
+            return transactions;
+          }
+        }
+      }
+      return [];
     } on DioException catch (e) {
       throw _handleDioException(e);
     }

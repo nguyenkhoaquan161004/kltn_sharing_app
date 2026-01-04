@@ -5,6 +5,9 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'firebase_options.dart';
 import 'data/services/fcm_service.dart'
     show FCMService, backgroundMessageHandler;
+import 'data/services/location_service.dart';
+import 'data/services/message_notification_service.dart';
+import 'data/services/firebase_debug_service.dart';
 import 'core/theme/app_theme.dart';
 import 'core/config/app_config.dart';
 import 'routes/app_router.dart';
@@ -32,6 +35,14 @@ import 'data/services/fcm_service.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Initialize Location Service first
+  try {
+    await LocationService().initialize();
+    print('[Main] ✅ Location service initialized');
+  } catch (e) {
+    print('[Main] ⚠️  Location service initialization error: $e');
+  }
+
   // Initialize Firebase
   try {
     await Firebase.initializeApp(
@@ -57,6 +68,21 @@ void main() async {
   } catch (e) {
     print('[Main] ⚠️  FCM initialization error: $e');
   }
+
+  // Initialize Message Notification Service for real-time messaging
+  try {
+    await MessageNotificationService().initialize();
+    print('[Main] ✅ Message notification service initialized');
+  } catch (e) {
+    print('[Main] ⚠️  Message notification service initialization error: $e');
+  }
+
+  // Print Firebase debug info
+  print('\n');
+  print('═' * 60);
+  print('🚀 APP INITIALIZED - Running Firebase Debug Check...');
+  print('═' * 60);
+  FirebaseDebugService.printFullDebugInfo();
 
   AppConfig.initialize();
   runApp(const MyApp());

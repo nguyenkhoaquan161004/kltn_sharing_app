@@ -10,6 +10,7 @@ import '../../../../data/services/cart_api_service.dart';
 import '../../../../data/providers/auth_provider.dart';
 import '../../../../data/providers/user_provider.dart';
 import '../../../../data/providers/order_provider.dart';
+import '../../../widgets/address_autocomplete_field.dart';
 
 class OrderRequestModal extends StatefulWidget {
   final ProductModel product;
@@ -36,6 +37,8 @@ class _OrderRequestModalState extends State<OrderRequestModal> {
 
   bool _isLoading = false;
   String? _errorMessage;
+  double? _selectedLatitude;
+  double? _selectedLongitude;
 
   @override
   void initState() {
@@ -530,26 +533,21 @@ class _OrderRequestModalState extends State<OrderRequestModal> {
             const SizedBox(height: 16),
 
             // Address field
-            const Text('Địa chỉ giao hàng', style: AppTextStyles.label),
-            const SizedBox(height: 8),
-            TextField(
+            AddressAutocompleteField(
               controller: _addressController,
-              enabled: !_useCurrentUserInfo,
-              maxLines: 2,
-              decoration: InputDecoration(
-                hintText: 'Nhập địa chỉ giao hàng',
-                hintStyle: AppTextStyles.bodyMedium.copyWith(
-                  color: AppColors.textDisabled,
-                ),
-                filled: true,
-                fillColor: _useCurrentUserInfo
-                    ? AppColors.backgroundGray.withOpacity(0.5)
-                    : AppColors.backgroundGray,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
-              ),
+              label: 'Địa chỉ giao hàng',
+              hintText: 'Nhập địa chỉ giao hàng (autocomplete)',
+              onAddressSelected: (latitude, longitude, address) {
+                setState(() {
+                  _selectedLatitude = latitude;
+                  _selectedLongitude = longitude;
+                });
+                print(
+                    '[OrderRequest] Selected address: $address (Lat: $latitude, Lon: $longitude)');
+              },
+              initialAddress: _addressController.text.isNotEmpty
+                  ? _addressController.text
+                  : null,
             ),
             const SizedBox(height: 16),
 

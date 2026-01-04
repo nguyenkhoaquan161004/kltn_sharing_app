@@ -1473,8 +1473,6 @@ Lý do chia sẻ: Gia đình mình mua bộ bàn ghế mới nên không còn c�
   /// Hàm trợ giúp: Đếm unread notifications
   /// Note: Notifications are now fetched from API via NotificationApiService
   static int getUnreadNotificationCount(int userId) {
-    return notifications
-        .where((n) => n.userId == userId && !n.readStatus)
-        .length;
+    return notifications.where((n) => n.userId == userId && !n.isRead).length;
   }
 }

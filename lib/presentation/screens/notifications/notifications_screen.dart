@@ -23,7 +23,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   @override
   void initState() {
     super.initState();
-    _loadNotifications();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadNotifications();
+      // Also refresh unread count periodically
+      _refreshUnreadCount();
+    });
   }
 
   void _loadNotifications() {
@@ -36,7 +40,19 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     }
 
     // Fetch notifications
+    print('[NotificationsScreen] Loading notifications...');
     notificationProvider.fetchNotifications();
+  }
+
+  void _refreshUnreadCount() {
+    final notificationProvider = context.read<NotificationProvider>();
+    notificationProvider.refreshUnreadCount();
+  }
+
+  Future<void> _handleRefresh() async {
+    _loadNotifications();
+    // Wait a bit for the fetch to complete
+    await Future.delayed(const Duration(milliseconds: 500));
   }
 
   List<NotificationModel> _getFilteredNotifications(
@@ -47,12 +63,42 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     return notifications.where((n) => n.type.value == _filterType).toList();
   }
 
-  void _markAsRead(String notificationId) {
-    context.read<NotificationProvider>().markAsRead(notificationId);
+  Future<void> _markAsRead(String notificationId) async {
+    try {
+      await context.read<NotificationProvider>().markAsRead(notificationId);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Đã đánh dấu là đã đọc'),
+          duration: Duration(milliseconds: 500),
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Lỗi: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
-  void _markAllAsRead() {
-    context.read<NotificationProvider>().markAllAsRead();
+  Future<void> _markAllAsRead() async {
+    try {
+      await context.read<NotificationProvider>().markAllAsRead();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Đã đánh dấu tất cả là đã đọc'),
+          duration: Duration(milliseconds: 500),
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Lỗi: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   @override
@@ -162,35 +208,53 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                         child: CircularProgressIndicator(),
                       )
                     : filteredNotifications.isEmpty
-                        ? Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(
-                                  Icons.notifications_none,
-                                  size: 64,
-                                  color: AppColors.textHint,
-                                ),
-                                const SizedBox(height: 16),
-                                Text(
-                                  'Không có thông báo',
-                                  style: AppTextStyles.bodyMedium.copyWith(
-                                    color: AppColors.textHint,
+                        ? RefreshIndicator(
+                            onRefresh: _handleRefresh,
+                            child: Center(
+                              child: ListView(
+                                physics: const AlwaysScrollableScrollPhysics(),
+                                children: [
+                                  Center(
+                                    child: Column(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        const SizedBox(height: 100),
+                                        const Icon(
+                                          Icons.notifications_none,
+                                          size: 64,
+                                          color: AppColors.textHint,
+                                        ),
+                                        const SizedBox(height: 16),
+                                        Text(
+                                          'Không có thông báo',
+                                          style:
+                                              AppTextStyles.bodyMedium.copyWith(
+                                            color: AppColors.textHint,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                           )
-                        : ListView.builder(
-                            padding: const EdgeInsets.symmetric(horizontal: 24),
-                            itemCount: filteredNotifications.length,
-                            itemBuilder: (context, index) {
-                              final notification = filteredNotifications[index];
-                              return NotificationCard(
-                                notification: notification,
-                                onTap: () => _markAsRead(notification.id),
-                              );
-                            },
+                        : RefreshIndicator(
+                            onRefresh: _handleRefresh,
+                            child: ListView.builder(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 24),
+                              itemCount: filteredNotifications.length,
+                              itemBuilder: (context, index) {
+                                final notification =
+                                    filteredNotifications[index];
+                                return NotificationCard(
+                                  notification: notification,
+                                  onTap: () => _markAsRead(notification.id),
+                                );
+                              },
+                            ),
                           ),
               ),
             ],

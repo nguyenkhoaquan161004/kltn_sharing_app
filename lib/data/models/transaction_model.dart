@@ -21,6 +21,7 @@ class TransactionModel {
   final String? sharerName;
   final String? sharerAvatar;
   final String? receiverName;
+  final String? receiverAvatar;
   final String? receiverPhone;
   final String? receiverAddress;
   final String? message;
@@ -46,6 +47,7 @@ class TransactionModel {
     this.sharerName,
     this.sharerAvatar,
     this.receiverName,
+    this.receiverAvatar,
     this.receiverPhone,
     this.receiverAddress,
     this.message,
@@ -130,6 +132,7 @@ class TransactionModel {
           json['userAvatar'] ??
           json['user_avatar'],
       receiverName: json['receiverName'] ?? json['receiver_name'],
+      receiverAvatar: json['receiverAvatar'] ?? json['receiver_avatar'],
       receiverPhone: json['receiverPhone'] ?? json['receiver_phone'],
       receiverAddress: json['receiverAddress'] ?? json['receiver_address'],
       message: json['message'],
@@ -157,6 +160,7 @@ class TransactionModel {
       if (sharerName != null) 'sharerName': sharerName,
       if (sharerAvatar != null) 'sharerAvatar': sharerAvatar,
       if (receiverName != null) 'receiverName': receiverName,
+      if (receiverAvatar != null) 'receiverAvatar': receiverAvatar,
       if (receiverPhone != null) 'receiverPhone': receiverPhone,
       if (receiverAddress != null) 'receiverAddress': receiverAddress,
       if (message != null) 'message': message,
@@ -184,6 +188,7 @@ class TransactionModel {
     String? sharerName,
     String? sharerAvatar,
     String? receiverName,
+    String? receiverAvatar,
     String? receiverPhone,
     String? receiverAddress,
     String? message,
@@ -209,6 +214,7 @@ class TransactionModel {
       sharerName: sharerName ?? this.sharerName,
       sharerAvatar: sharerAvatar ?? this.sharerAvatar,
       receiverName: receiverName ?? this.receiverName,
+      receiverAvatar: receiverAvatar ?? this.receiverAvatar,
       receiverPhone: receiverPhone ?? this.receiverPhone,
       receiverAddress: receiverAddress ?? this.receiverAddress,
       message: message ?? this.message,

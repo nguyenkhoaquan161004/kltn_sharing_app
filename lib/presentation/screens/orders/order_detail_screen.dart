@@ -137,15 +137,54 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     if (_transaction == null) return;
 
     try {
-      // Send message to the item owner (sharer/seller)
-      final receiverId =
-          _transaction!.sharerIdUuid ?? _transaction!.sharerId.toString();
-      final itemId =
-          _transaction!.itemIdUuid ?? _transaction!.itemId.toString();
+      final txn = _transaction!;
 
+      // Determine message receiver and content based on current user role
+      String receiverId;
+      String messageContent;
+      bool isSharer;
+
+      // Since we can't reliably determine current user ID, we'll create a simple heuristic:
+      // If this is an inProgress/accepted transaction, the current user viewing it is the SHARER
+      // So send message to RECEIVER
+      if (txn.status == TransactionStatus.accepted ||
+          txn.status == TransactionStatus.inProgress) {
+        // Current user is the sharer (viewing from their orders tab)
+        receiverId = txn.receiverIdUuid ?? txn.receiverId.toString();
+        messageContent = 'Chào bạn, tôi muốn thảo luận về đơn hàng';
+        isSharer = true;
+      } else {
+        // For other statuses, send to sharer (more common scenario)
+        receiverId = txn.sharerIdUuid ?? txn.sharerId.toString();
+        messageContent = 'Xin chào, tôi đang quan tâm đến đơn hàng này.';
+        isSharer = false;
+      }
+
+      final itemId = txn.itemIdUuid ?? txn.itemId.toString();
+
+      // Check if conversation already exists
+      try {
+        final existingMessages = await _messageApiService.getConversation(
+          otherUserId: receiverId,
+          limit: 1,
+        );
+
+        // If conversation exists, just navigate to chat without sending message
+        if (existingMessages.isNotEmpty) {
+          if (mounted) {
+            context.push('/chat/$receiverId');
+          }
+          return;
+        }
+      } catch (e) {
+        // If checking conversation fails, continue to send message
+        print('[OrderDetailScreen] Could not check conversation: $e');
+      }
+
+      // No existing conversation, send new message
       await _messageApiService.sendMessage(
         receiverId: receiverId,
-        content: 'Xin chào, tôi đang quan tâm đến đơn hàng này.',
+        content: messageContent,
         messageType: 'TEXT',
         itemId: itemId,
       );
@@ -241,13 +280,23 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Seller info
-          _buildSellerSection(),
-          const SizedBox(height: 24),
+          // Seller info (hide for accepted/inProgress status - chuẩn bị giao hàng)
+          if (_transaction!.status != TransactionStatus.accepted &&
+              _transaction!.status != TransactionStatus.inProgress) ...[
+            _buildSellerSection(),
+            const SizedBox(height: 24),
+          ],
 
           // Products
           _buildProductSection(),
           const SizedBox(height: 24),
+
+          // Receiver info (for inProgress or accepted status)
+          if (_transaction!.status == TransactionStatus.inProgress ||
+              _transaction!.status == TransactionStatus.accepted) ...[
+            _buildReceiverSection(),
+            const SizedBox(height: 24),
+          ],
 
           // Order timeline
           _buildTimelineSection(),
@@ -255,10 +304,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
           // Payment info
           _buildPaymentSection(),
-          const SizedBox(height: 24),
-
-          // Shipping address
-          _buildShippingSection(),
           const SizedBox(height: 24),
 
           // Action buttons
@@ -321,6 +366,53 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             const Icon(Icons.arrow_forward_ios, size: 16),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildReceiverSection() {
+    final txn = _transaction!;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: AppColors.borderLight),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 50,
+            height: 50,
+            decoration: BoxDecoration(
+              color: AppColors.backgroundGray,
+              borderRadius: BorderRadius.circular(25),
+            ),
+            child: txn.receiverAvatar != null
+                ? Image.network(txn.receiverAvatar!, fit: BoxFit.cover)
+                : const Icon(Icons.person),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  txn.receiverName ?? 'Không rõ',
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Text(
+                  'Người nhận',
+                  style: AppTextStyles.bodySmall.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -586,51 +678,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     );
   }
 
-  Widget _buildShippingSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Địa chỉ lấy hàng',
-          style: AppTextStyles.bodyMedium.copyWith(
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 12),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: AppColors.backgroundGray,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Text(
-                  'Không có thông tin địa chỉ',
-                  style: AppTextStyles.bodySmall.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              ),
-              TextButton(
-                onPressed: () {},
-                child: Text(
-                  'Copy',
-                  style: AppTextStyles.bodySmall.copyWith(
-                    color: AppColors.primaryGreen,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _buildActionButtons() {
     final txn = _transaction!;
     final status = txn.status;
@@ -681,13 +728,13 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         ],
       );
     }
-    // ACCEPTED: "Nhắn tin" + "Đã nhận được hàng"
+    // ACCEPTED: "Nhắn tin" + "Hoàn tất đơn hàng" (người gửi hàng)
     else if (status == TransactionStatus.accepted) {
       return Row(
         children: [
           Expanded(
             child: OutlinedButton(
-              onPressed: _handleCompleteTransaction,
+              onPressed: _handleSendMessage,
               style: OutlinedButton.styleFrom(
                 side: const BorderSide(color: AppColors.primaryGreen),
                 shape: RoundedRectangleBorder(
@@ -696,7 +743,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 padding: const EdgeInsets.symmetric(vertical: 14),
               ),
               child: Text(
-                'Đã nhận được hàng',
+                'Nhắn tin',
                 style: AppTextStyles.bodyMedium.copyWith(
                   color: AppColors.primaryGreen,
                   fontWeight: FontWeight.w600,
@@ -707,7 +754,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           const SizedBox(width: 12),
           Expanded(
             child: ElevatedButton(
-              onPressed: _handleSendMessage,
+              onPressed: _handleCompleteTransaction,
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primaryGreen,
                 shape: RoundedRectangleBorder(
@@ -716,7 +763,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 padding: const EdgeInsets.symmetric(vertical: 14),
               ),
               child: Text(
-                'Nhắn tin',
+                'Hoàn tất đơn hàng',
                 style: AppTextStyles.bodyMedium.copyWith(
                   color: Colors.white,
                   fontWeight: FontWeight.w600,
@@ -727,13 +774,13 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         ],
       );
     }
-    // IN_PROGRESS: "Nhắn tin" + "Đã nhận được hàng"
+    // IN_PROGRESS: "Nhắn tin" + "Hoàn tất đơn hàng"
     else if (status == TransactionStatus.inProgress) {
       return Row(
         children: [
           Expanded(
             child: OutlinedButton(
-              onPressed: _handleCompleteTransaction,
+              onPressed: _handleSendMessage,
               style: OutlinedButton.styleFrom(
                 side: const BorderSide(color: AppColors.primaryGreen),
                 shape: RoundedRectangleBorder(
@@ -742,7 +789,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 padding: const EdgeInsets.symmetric(vertical: 14),
               ),
               child: Text(
-                'Đã nhận được hàng',
+                'Nhắn tin',
                 style: AppTextStyles.bodyMedium.copyWith(
                   color: AppColors.primaryGreen,
                   fontWeight: FontWeight.w600,
@@ -753,7 +800,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           const SizedBox(width: 12),
           Expanded(
             child: ElevatedButton(
-              onPressed: _handleSendMessage,
+              onPressed: _handleCompleteTransaction,
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primaryGreen,
                 shape: RoundedRectangleBorder(
@@ -762,7 +809,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 padding: const EdgeInsets.symmetric(vertical: 14),
               ),
               child: Text(
-                'Nhắn tin',
+                'Hoàn tất đơn hàng',
                 style: AppTextStyles.bodyMedium.copyWith(
                   color: Colors.white,
                   fontWeight: FontWeight.w600,

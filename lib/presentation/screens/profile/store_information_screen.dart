@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/gradient_button.dart';
+import '../../widgets/address_autocomplete_field.dart';
 
 class StoreInformationScreen extends StatefulWidget {
   const StoreInformationScreen({super.key});
@@ -18,6 +19,8 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
   final _addressController = TextEditingController();
   final _phoneController = TextEditingController();
   bool _isLoading = false;
+  double? _selectedLatitude;
+  double? _selectedLongitude;
 
   @override
   void dispose() {
@@ -135,17 +138,17 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
                     color: AppColors.textSecondary),
               ),
               const SizedBox(height: 20),
-              CustomTextField(
-                label: 'Địa chỉ',
-                hint: 'Nhập địa chỉ cửa hàng',
+              AddressAutocompleteField(
                 controller: _addressController,
-                prefixIcon: const Icon(Icons.location_on_outlined,
-                    color: AppColors.textSecondary),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Vui lòng nhập địa chỉ';
-                  }
-                  return null;
+                label: 'Địa chỉ',
+                hintText: 'Nhập địa chỉ cửa hàng (autocomplete)',
+                onAddressSelected: (latitude, longitude, address) {
+                  setState(() {
+                    _selectedLatitude = latitude;
+                    _selectedLongitude = longitude;
+                  });
+                  print(
+                      '[StoreInfo] Selected: $address (Lat: $latitude, Lon: $longitude)');
                 },
               ),
               const SizedBox(height: 20),

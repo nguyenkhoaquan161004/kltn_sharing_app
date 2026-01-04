@@ -13,10 +13,12 @@ class AuthProvider extends ChangeNotifier {
   static const String _accessTokenKey = 'access_token';
   static const String _refreshTokenKey = 'refresh_token';
   static const String _usernameKey = 'username';
+  static const String _userIdKey = 'user_id';
 
   String? _accessToken;
   String? _refreshToken;
   String? _username;
+  String? _userId;
   bool _isLoading = false;
   String? _errorMessage;
 
@@ -32,6 +34,7 @@ class AuthProvider extends ChangeNotifier {
   String? get accessToken => _accessToken;
   String? get refreshToken => _refreshToken;
   String? get username => _username;
+  String? get userId => _userId;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
   bool get isLoggedIn => _accessToken != null && _accessToken!.isNotEmpty;
@@ -47,6 +50,7 @@ class AuthProvider extends ChangeNotifier {
     _accessToken = _prefs.getString(_accessTokenKey);
     _refreshToken = _prefs.getString(_refreshTokenKey);
     _username = _prefs.getString(_usernameKey);
+    _userId = _prefs.getString(_userIdKey);
 
     if (_accessToken != null) {
       _authApiService.setAuthToken(_accessToken!);
@@ -61,18 +65,23 @@ class AuthProvider extends ChangeNotifier {
     String accessToken,
     String refreshToken,
     int expiresInSeconds,
-    String? username,
-  ) async {
+    String? username, {
+    String? userId,
+  }) async {
     // IMPORTANT: Save refreshToken - required for future token refresh!
     await _prefs.setString(_accessTokenKey, accessToken);
     await _prefs.setString(_refreshTokenKey, refreshToken);
     if (username != null) {
       await _prefs.setString(_usernameKey, username);
     }
+    if (userId != null) {
+      await _prefs.setString(_userIdKey, userId);
+    }
 
     _accessToken = accessToken;
     _refreshToken = refreshToken;
     _username = username;
+    _userId = userId;
     _authApiService.setAuthToken(accessToken);
     _userApiService.setAuthToken(accessToken);
 
@@ -81,6 +90,7 @@ class AuthProvider extends ChangeNotifier {
     print(
         '[AuthProvider] - Refresh Token: ${refreshToken.substring(0, 20)}...');
     print('[AuthProvider] - Username: $username');
+    print('[AuthProvider] - User ID: $userId');
 
     notifyListeners();
   }
@@ -137,6 +147,10 @@ class AuthProvider extends ChangeNotifier {
         print('[AuthProvider] ✅ User data loaded: ${currentUser.fullName}');
         print('[AuthProvider] - Address: ${currentUser.address}');
         print('[AuthProvider] - Phone: ${currentUser.phoneNumber}');
+
+        // Save user ID
+        _userId = currentUser.id;
+        await _prefs.setString(_userIdKey, currentUser.id);
       } catch (e) {
         print('[AuthProvider] ⚠️  Failed to load user data: $e');
         // Don't fail login if user data load fails

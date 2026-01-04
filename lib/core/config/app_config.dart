@@ -1,7 +1,7 @@
 /// Application configuration constants
 class AppConfig {
   /// Production backend API URL
-  static const String productionUrl = 'https://shareo.studio';
+  static const String productionUrl = 'https://api.shareo.studio';
 
   /// Development/Local backend API URL
   /// Change this to your local machine IP or server URL

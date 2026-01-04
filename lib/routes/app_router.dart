@@ -25,6 +25,7 @@ import '../presentation/screens/orders/order_detail_screen.dart';
 import '../presentation/screens/orders/order_detail_processing_screen.dart';
 import '../presentation/screens/messages/messages_list_screen.dart';
 import '../presentation/screens/messages/chat_screen.dart';
+import '../presentation/screens/chatbot/chatbot_screen.dart';
 import '../presentation/screens/orders/order_detail_done_screen.dart';
 import '../presentation/screens/orders/proof_of_payment_screen.dart';
 import '../presentation/screens/profile/store_information_screen.dart';
@@ -403,6 +404,17 @@ class AppRouter {
           );
         },
         name: 'chat',
+      ),
+      GoRoute(
+        path: AppRoutes.chatbot,
+        pageBuilder: (context, state) {
+          return _buildPageWithTransition(
+            child: const ChatbotScreen(),
+            state: state,
+            name: 'chatbot',
+          );
+        },
+        name: 'chatbot',
       ),
       GoRoute(
         path: AppRoutes.achievements,

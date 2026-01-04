@@ -1026,6 +1026,25 @@ class _ProfileProductsTabState extends State<ProfileProductsTab>
                   ],
                 ),
               ),
+
+              // Quantity badge
+              if (transaction.quantity != null && transaction.quantity! > 0)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryTeal.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    'x${transaction.quantity}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.primaryTeal,
+                    ),
+                  ),
+                ),
             ],
           ),
           const SizedBox(height: 12),
@@ -1130,6 +1149,23 @@ class _ProfileProductsTabState extends State<ProfileProductsTab>
       await _transactionApiService.acceptTransaction(transactionId);
       print('[ProfileProducts] Transaction accepted successfully');
 
+      // Update product quantity based on requested quantity
+      try {
+        final requestedQuantity = transaction.quantity ?? 1;
+        final currentQuantity = product.quantity ?? 0;
+        final newQuantity = (currentQuantity - requestedQuantity)
+            .clamp(0, double.infinity)
+            .toInt();
+
+        print(
+            '[ProfileProducts] Updating quantity: $currentQuantity - $requestedQuantity = $newQuantity');
+        await _itemApiService.updateItemQuantity(productId, newQuantity);
+        print('[ProfileProducts] Product quantity updated successfully');
+      } catch (e) {
+        print('[ProfileProducts] Error updating product quantity: $e');
+        // Don't block on quantity update failure
+      }
+
       // Update product description with recipient info
       try {
         final recipientName = transaction.receiverName ?? 'Người dùng';
@@ -1160,11 +1196,14 @@ class _ProfileProductsTabState extends State<ProfileProductsTab>
         final receiverId =
             transaction.receiverIdUuid ?? transaction.receiverId.toString();
         final productName = transaction.itemName ?? 'Sản phẩm';
+        final productPrice = product.price ?? 0;
+        final requestedQuantity = transaction.quantity ?? 1;
 
         print('[ProfileProducts] Sending notification to: $receiverId');
         print(
             '[ProfileProducts] Message service type: ${_messageApiService.runtimeType}');
 
+        // Send congratulation message
         final messageResult = await _messageApiService.sendMessage(
           receiverId: receiverId,
           content:
@@ -1173,6 +1212,33 @@ class _ProfileProductsTabState extends State<ProfileProductsTab>
         );
         print(
             '[ProfileProducts] Message sent successfully: ${messageResult.id}');
+
+        // If product has price > 0, send VietQR payment link
+        if (productPrice > 0) {
+          final totalAmount = (productPrice * requestedQuantity).toInt();
+          final addInfo = Uri.encodeComponent('$productName Shario');
+          final accountName =
+              Uri.encodeComponent('Shario'); // Default account name
+
+          // Create VietQR URL
+          final vietqrUrl =
+              'https://img.vietqr.io/image/vietinbank-55102025-compact2.jpg?amount=$totalAmount&addInfo=$addInfo&accountName=$accountName';
+
+          print('[ProfileProducts] VietQR URL: $vietqrUrl');
+
+          // Send VietQR image
+          try {
+            final qrResult = await _messageApiService.sendMessage(
+              receiverId: receiverId,
+              content: vietqrUrl,
+              messageType: 'IMAGE',
+            );
+            print('[ProfileProducts] VietQR image sent: ${qrResult.id}');
+          } catch (e) {
+            print('[ProfileProducts] Error sending VietQR image: $e');
+            // Don't block on VietQR sending failure
+          }
+        }
       } catch (e, st) {
         print('[ProfileProducts] Error sending notification: $e');
         print('[ProfileProducts] Stack trace: $st');

@@ -8,6 +8,7 @@ import '../../../../data/providers/auth_provider.dart';
 import '../../../../data/providers/user_provider.dart';
 import '../../../../data/providers/order_provider.dart';
 import '../../../../data/models/transaction_request_model.dart';
+import '../../../widgets/address_autocomplete_field.dart';
 
 class CartItemRequestModal extends StatefulWidget {
   final Map<String, dynamic> cartItem;
@@ -31,6 +32,8 @@ class _CartItemRequestModalState extends State<CartItemRequestModal> {
   bool _useCurrentUserInfo = true;
   bool _isLoading = false;
   String? _errorMessage;
+  double? _selectedLatitude;
+  double? _selectedLongitude;
 
   @override
   void initState() {
@@ -339,21 +342,21 @@ class _CartItemRequestModalState extends State<CartItemRequestModal> {
               const SizedBox(height: 16),
 
               // Address field
-              Text(
-                'Địa chỉ nhận hàng',
-                style: AppTextStyles.label,
-              ),
-              const SizedBox(height: 8),
-              TextField(
+              AddressAutocompleteField(
                 controller: _addressController,
-                maxLines: 2,
-                decoration: InputDecoration(
-                  hintText: 'Nhập địa chỉ nhận hàng',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  contentPadding: const EdgeInsets.all(12),
-                ),
+                label: 'Địa chỉ nhận hàng',
+                hintText: 'Nhập địa chỉ nhận hàng (autocomplete)',
+                onAddressSelected: (latitude, longitude, address) {
+                  setState(() {
+                    _selectedLatitude = latitude;
+                    _selectedLongitude = longitude;
+                  });
+                  print(
+                      '[CartRequest] Selected address: $address (Lat: $latitude, Lon: $longitude)');
+                },
+                initialAddress: _addressController.text.isNotEmpty
+                    ? _addressController.text
+                    : null,
               ),
               const SizedBox(height: 16),
 

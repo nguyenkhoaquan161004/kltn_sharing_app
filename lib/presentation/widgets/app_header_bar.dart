@@ -5,6 +5,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
 import '../../core/constants/app_routes.dart';
 import '../../data/providers/order_provider.dart';
+import '../../data/providers/notification_provider.dart';
 
 class AppHeaderBar extends StatefulWidget implements PreferredSizeWidget {
   final int? orderCount; // Optional - if null, will auto-calculate
@@ -78,11 +79,44 @@ class _AppHeaderBarState extends State<AppHeaderBar> {
             ),
           ),
         ),
-        // Messages button
-        IconButton(
-          icon: const Icon(Icons.mail_outline, color: AppColors.textPrimary),
-          onPressed:
-              widget.onMessagesTap ?? () => context.push(AppRoutes.messages),
+        // Messages button with badge
+        GestureDetector(
+          onTap: widget.onMessagesTap ?? () => context.push(AppRoutes.messages),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Icon(
+                  Icons.mail_outline,
+                  color: AppColors.textPrimary,
+                  size: 24,
+                ),
+                // Badge for unread messages
+                Consumer<NotificationProvider>(
+                  builder: (context, notifProvider, _) {
+                    final hasUnread =
+                        notifProvider.unreadNotifications.isNotEmpty;
+                    if (!hasUnread) {
+                      return const SizedBox.shrink();
+                    }
+                    return Positioned(
+                      top: -4,
+                      right: -4,
+                      child: Container(
+                        width: 10,
+                        height: 10,
+                        decoration: BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
         ),
         // Settings button (optional)
         if (widget.showSettingsButton)

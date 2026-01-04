@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:kltn_sharing_app/core/config/app_config.dart';
 import 'package:kltn_sharing_app/core/utils/token_refresh_interceptor.dart';
 import 'package:kltn_sharing_app/data/models/item_response_model.dart';
+import 'package:kltn_sharing_app/data/models/item_model.dart';
 import 'package:kltn_sharing_app/data/models/transaction_model.dart';
 
 class ItemApiService {
@@ -51,10 +52,12 @@ class ItemApiService {
   }
 
   /// Set token refresh callback (delegates to TokenRefreshInterceptor)
-  void setGetValidTokenCallback(Future<void> Function() onTokenExpiredCallback) {
+  void setGetValidTokenCallback(
+      Future<void> Function() onTokenExpiredCallback) {
     try {
       _tokenRefreshInterceptor.setCallbacks(
-        getValidTokenCallback: () async => null, // Not needed, interceptor handles it
+        getValidTokenCallback: () async =>
+            null, // Not needed, interceptor handles it
         onTokenExpiredCallback: onTokenExpiredCallback,
       );
     } catch (e) {
@@ -353,7 +356,7 @@ class ItemApiService {
     }
   }
 
-  /// Get interested users for items user shared (as sharer)
+  /// Get interested users for items user shared (as sharer) - Only count PENDING transactions
   Future<Map<String, int>> getSharerTransactions({
     int page = 1,
     int limit = 100,
@@ -379,20 +382,29 @@ class ItemApiService {
           print('[ItemAPI] pageData keys: ${pageData.keys.toList()}');
           print('[ItemAPI] Found ${transactions.length} total transactions');
 
-          // Count transactions by itemId
+          // Count only PENDING transactions by itemId
           Map<String, int> itemInterestCount = {};
           for (final transaction in transactions) {
-            final itemId = transaction['itemId']?.toString() ??
-                transaction['itemIdUuid']?.toString();
-            if (itemId != null) {
-              itemInterestCount[itemId] = (itemInterestCount[itemId] ?? 0) + 1;
-              print('[ItemAPI] Transaction itemId: $itemId');
+            // Only count PENDING transactions (people who want to receive)
+            final status = transaction['status']?.toString() ?? '';
+            if (status.toUpperCase() == 'PENDING') {
+              final itemId = transaction['itemId']?.toString() ??
+                  transaction['itemIdUuid']?.toString();
+              if (itemId != null) {
+                itemInterestCount[itemId] =
+                    (itemInterestCount[itemId] ?? 0) + 1;
+                print('[ItemAPI] PENDING Transaction itemId: $itemId');
+              }
+            } else {
+              print(
+                  '[ItemAPI] Skipping non-PENDING transaction with status: $status');
             }
           }
 
           print(
-              '[ItemAPI] Loaded ${transactions.length} transactions, ${itemInterestCount.length} unique items');
-          print('[ItemAPI] itemInterestCount map: $itemInterestCount');
+              '[ItemAPI] Loaded ${transactions.length} transactions, ${itemInterestCount.length} unique items with PENDING requests');
+          print(
+              '[ItemAPI] itemInterestCount map (PENDING only): $itemInterestCount');
           return itemInterestCount;
         }
 
@@ -535,6 +547,34 @@ class ItemApiService {
     }
   }
 
+  /// Update item quantity
+  Future<void> updateItemQuantity(
+    String itemId,
+    int newQuantity,
+  ) async {
+    try {
+      final requestBody = {
+        'quantity': newQuantity,
+      };
+
+      print('[ItemAPI] Updating item $itemId quantity to $newQuantity');
+
+      final response = await _dio.put(
+        '/api/v2/items/$itemId',
+        data: requestBody,
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        print('[ItemAPI] Item quantity updated successfully');
+      } else {
+        throw Exception(
+            'Failed to update item quantity: ${response.statusCode}');
+      }
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
   /// Get all categories
   Future<List<Map<String, dynamic>>> getCategories() async {
     try {
@@ -556,6 +596,99 @@ class ItemApiService {
       }
     } on DioException catch (e) {
       throw _handleDioException(e);
+    }
+  }
+
+  /// Search items by image
+  /// POST /api/v2/items/search-by-image
+  /// body: { "imageUrl": "string" }
+  Future<List<ItemModel>> searchByImage(String imageUrl) async {
+    try {
+      print('[ItemAPI] Searching items by image: $imageUrl');
+
+      final response = await _dio.post(
+        '/api/v2/items/search-by-image',
+        data: {
+          'imageUrl': imageUrl,
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = response.data;
+        print('[ItemAPI] Search by image response: $data');
+
+        if (data is Map<String, dynamic>) {
+          // Check if response has 'data' field with items
+          if (data.containsKey('data')) {
+            final itemsList = data['data'];
+            if (itemsList is List) {
+              return itemsList
+                  .map((item) =>
+                      ItemModel.fromJson(item as Map<String, dynamic>))
+                  .toList();
+            }
+          }
+        }
+
+        // If response is a direct List
+        if (data is List) {
+          return data
+              .map((item) => ItemModel.fromJson(item as Map<String, dynamic>))
+              .toList();
+        }
+
+        return [];
+      } else {
+        throw Exception('Failed to search by image: ${response.statusCode}');
+      }
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  /// Get search history for a user
+  /// GET /api/v2/admin/redis/search-history/{userId}
+  Future<List<String>> getSearchHistory({
+    required String userId,
+    int limit = 5,
+  }) async {
+    try {
+      print(
+          '[ItemAPI] REQUEST[GET] => /api/v2/admin/redis/search-history/$userId?limit=$limit');
+
+      final response = await _dio.get(
+        '/api/v2/admin/redis/search-history/$userId',
+        queryParameters: {
+          'limit': limit,
+        },
+      );
+
+      print(
+          '[ItemAPI] RESPONSE[${response.statusCode}] => Search history retrieved');
+
+      // Parse response
+      if (response.data is Map) {
+        final data = response.data['data'];
+
+        if (data is List) {
+          // Convert list items to strings
+          return data.map((item) {
+            if (item is String) {
+              return item;
+            } else if (item is Map) {
+              return item['term']?.toString() ?? item.toString();
+            }
+            return item.toString();
+          }).toList();
+        }
+      }
+
+      return [];
+    } on DioException catch (e) {
+      print(
+          '[ItemAPI] ERROR[${e.response?.statusCode}] => Failed to get search history');
+      // Return empty list on error instead of throwing
+      return [];
     }
   }
 }

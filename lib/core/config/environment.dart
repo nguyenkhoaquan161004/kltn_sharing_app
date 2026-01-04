@@ -22,9 +22,9 @@ class EnvironmentConfig {
       case Environment.development:
         return 'http://localhost:8080';
       case Environment.staging:
-        return 'https://staging.shareo.studio';
+        return 'https://api.staging.shareo.studio';
       case Environment.production:
-        return 'https://shareo.studio';
+        return 'https://api.shareo.studio';
     }
   }
 

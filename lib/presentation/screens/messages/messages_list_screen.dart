@@ -21,7 +21,8 @@ class MessagesListScreen extends StatefulWidget {
   State<MessagesListScreen> createState() => _MessagesListScreenState();
 }
 
-class _MessagesListScreenState extends State<MessagesListScreen> {
+class _MessagesListScreenState extends State<MessagesListScreen>
+    with WidgetsBindingObserver {
   late MessageApiService _messageApiService;
   UserApiService? _userApiService;
   late Future<List<ConversationModel>> _conversationsFuture;
@@ -58,6 +59,29 @@ class _MessagesListScreenState extends State<MessagesListScreen> {
 
     // Load conversations from cache first, then from API
     _conversationsFuture = _loadConversationsWithCache();
+
+    // Add observer for app lifecycle
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    // Remove observer
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // Refresh conversations when app is resumed (coming back from chat)
+      print('[MessagesListScreen] App resumed - refreshing conversations');
+      if (mounted) {
+        setState(() {
+          _conversationsFuture = _fetchAndCacheConversations();
+        });
+      }
+    }
   }
 
   Future<List<ConversationModel>> _loadConversationsWithCache() async {
@@ -210,9 +234,24 @@ class _MessagesListScreenState extends State<MessagesListScreen> {
             child: ListView.builder(
               itemCount: conversations.length,
               itemBuilder: (context, index) {
-                return _buildMessageItem(
-                  context,
-                  conversations[index],
+                return GestureDetector(
+                  onTap: () async {
+                    // Navigate to chat screen and wait for result
+                    final shouldRefresh = await context.push(
+                      '/chat/${conversations[index].otherUserId}',
+                    );
+
+                    // If shouldRefresh is true, refresh the list
+                    if (shouldRefresh == true && mounted) {
+                      setState(() {
+                        _conversationsFuture = _fetchAndCacheConversations();
+                      });
+                    }
+                  },
+                  child: _buildMessageItem(
+                    context,
+                    conversations[index],
+                  ),
                 );
               },
             ),
@@ -227,142 +266,175 @@ class _MessagesListScreenState extends State<MessagesListScreen> {
     BuildContext context,
     ConversationModel conversation,
   ) {
-    return GestureDetector(
-      onTap: () {
-        // Navigate to chat screen
-        context.push('/chat/${conversation.otherUserId}');
-      },
-      child: FutureBuilder<UserDto>(
-        future: userApiService.getUserById(conversation.otherUserId),
-        builder: (context, userSnapshot) {
-          final user = userSnapshot.data;
-          final isLoading =
-              userSnapshot.connectionState == ConnectionState.waiting;
-          final hasError = userSnapshot.hasError;
+    return FutureBuilder<UserDto>(
+      future: userApiService.getUserById(conversation.otherUserId),
+      builder: (context, userSnapshot) {
+        final user = userSnapshot.data;
+        final isLoading =
+            userSnapshot.connectionState == ConnectionState.waiting;
+        final hasError = userSnapshot.hasError;
 
-          return Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              border: Border(
-                bottom: BorderSide(
-                  color: Colors.grey[200]!,
-                  width: 1,
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            border: Border(
+              bottom: BorderSide(
+                color: Colors.grey[200]!,
+                width: 1,
+              ),
+            ),
+            color:
+                conversation.unreadCount > 0 ? Colors.grey[50] : Colors.white,
+          ),
+          child: Row(
+            children: [
+              // Avatar
+              if (isLoading)
+                CircleAvatar(
+                  radius: 28,
+                  backgroundColor: Colors.grey[300],
+                )
+              else if (!hasError &&
+                  user?.avatar != null &&
+                  user!.avatar!.isNotEmpty)
+                CircleAvatar(
+                  radius: 28,
+                  backgroundImage: NetworkImage(user.avatar!),
+                  onBackgroundImageError: (exception, stackTrace) {
+                    // Fallback to initials
+                  },
+                )
+              else
+                CircleAvatar(
+                  radius: 28,
+                  backgroundColor: AppColors.primaryTeal,
+                  child: Text(
+                    conversation.otherUserName.isNotEmpty
+                        ? conversation.otherUserName[0].toUpperCase()
+                        : '?',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              const SizedBox(width: 12),
+              // Message info
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      (user != null && !hasError)
+                          ? user.fullName
+                          : conversation.otherUserName,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: conversation.unreadCount > 0
+                            ? FontWeight.w600
+                            : FontWeight.w500,
+                        color: AppColors.textPrimary,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.start,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            _buildLastMessageDisplay(context, conversation),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: conversation.unreadCount > 0
+                                  ? AppColors.textPrimary
+                                  : Colors.grey[600],
+                              fontWeight: conversation.unreadCount > 0
+                                  ? FontWeight.w500
+                                  : FontWeight.w400,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 4), // 👈 đúng 2px
+                        Text(
+                          _formatTime(conversation.lastMessageAt),
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ],
+                    )
+                  ],
                 ),
               ),
-              color:
-                  conversation.unreadCount > 0 ? Colors.grey[50] : Colors.white,
-            ),
-            child: Row(
-              children: [
-                // Avatar
-                if (isLoading)
-                  CircleAvatar(
-                    radius: 28,
-                    backgroundColor: Colors.grey[300],
-                  )
-                else if (!hasError &&
-                    user?.avatar != null &&
-                    user!.avatar!.isNotEmpty)
-                  CircleAvatar(
-                    radius: 28,
-                    backgroundImage: NetworkImage(user.avatar!),
-                    onBackgroundImageError: (exception, stackTrace) {
-                      // Fallback to initials
-                    },
-                  )
-                else
-                  CircleAvatar(
-                    radius: 28,
-                    backgroundColor: AppColors.primaryTeal,
-                    child: Text(
-                      conversation.otherUserName.isNotEmpty
-                          ? conversation.otherUserName[0].toUpperCase()
-                          : '?',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
+              // // Last message with sender attribution
+              // const SizedBox(height: 4),
+              // Text(
+              //   _buildLastMessageDisplay(context, conversation),
+              //   maxLines: 1,
+              //   overflow: TextOverflow.ellipsis,
+              //   style: TextStyle(
+              //     fontSize: 13,
+              //     color: conversation.unreadCount > 0
+              //         ? AppColors.textPrimary
+              //         : Colors.grey[600],
+              //     fontWeight: conversation.unreadCount > 0
+              //         ? FontWeight.w500
+              //         : FontWeight.w400,
+              //   ),
+              // ),
+              // // Unread indicator
+              if (conversation.unreadCount > 0)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
                   ),
-                const SizedBox(width: 12),
-                // Message info
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Expanded(
-                            child: Text(
-                              (user != null && !hasError)
-                                  ? user.fullName
-                                  : conversation.otherUserName,
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: conversation.unreadCount > 0
-                                    ? FontWeight.w600
-                                    : FontWeight.w500,
-                                color: AppColors.textPrimary,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          Text(
-                            _formatTime(conversation.lastMessageAt),
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        conversation.lastMessage,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: conversation.unreadCount > 0
-                              ? AppColors.textPrimary
-                              : Colors.grey[600],
-                          fontWeight: conversation.unreadCount > 0
-                              ? FontWeight.w500
-                              : FontWeight.w400,
-                        ),
-                      ),
-                    ],
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryTeal,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '${conversation.unreadCount}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
-                // Unread indicator
-                if (conversation.unreadCount > 0)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.primaryTeal,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      '${conversation.unreadCount}',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          );
-        },
-      ),
+            ],
+          ),
+        );
+      },
     );
+  }
+
+  String _buildLastMessageDisplay(
+    BuildContext context,
+    ConversationModel conversation,
+  ) {
+    final authProvider = context.read<AuthProvider>();
+    final currentUsername = authProvider.username;
+
+    // Build message with optional "Bạn: " prefix
+    String message = conversation.lastMessage;
+    if (conversation.lastMessageSenderId != null &&
+        conversation.lastMessageSenderId == currentUsername) {
+      message = 'Bạn: $message';
+    }
+
+    // Limit to 30 characters
+    if (message.length > 30) {
+      return '${message.substring(0, 30)}...';
+    }
+
+    return message;
   }
 
   String _formatTime(DateTime dateTime) {

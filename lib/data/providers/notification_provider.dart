@@ -18,7 +18,7 @@ class NotificationProvider extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
 
   List<NotificationModel> get unreadNotifications =>
-      _notifications.where((n) => !n.readStatus).toList();
+      _notifications.where((n) => !n.isRead).toList();
 
   /// Initialize with auth token
   void setAuthToken(String? accessToken) {
@@ -46,8 +46,12 @@ class NotificationProvider extends ChangeNotifier {
               NotificationModel.fromJson(item as Map<String, dynamic>))
           .toList();
 
+      // Update unread count from fetched notifications
+      _unreadCount = _notifications.where((n) => !n.isRead).length;
+
       print(
           '[NotificationProvider] Fetched ${_notifications.length} notifications');
+      print('[NotificationProvider] Unread count: $_unreadCount');
       _isLoading = false;
       notifyListeners();
     } catch (e) {
@@ -92,15 +96,20 @@ class NotificationProvider extends ChangeNotifier {
       // Update local state
       final index = _notifications.indexWhere((n) => n.id == notificationId);
       if (index != -1) {
-        _notifications[index] =
-            _notifications[index].copyWith(readStatus: true);
-        _unreadCount = unreadNotifications.length;
+        _notifications[index] = _notifications[index].copyWith(isRead: true);
+        // Update unread count
+        _unreadCount = _notifications.where((n) => !n.isRead).length;
+        print('[NotificationProvider] Unread count after mark: $_unreadCount');
         notifyListeners();
       }
 
-      print('[NotificationProvider] Marked notification as read');
+      // Refresh to get latest data from server
+      await fetchNotifications();
+      print(
+          '[NotificationProvider] ✅ Marked notification as read and refreshed');
     } catch (e) {
-      print('[NotificationProvider] Error marking as read: $e');
+      print('[NotificationProvider] ❌ Error marking as read: $e');
+      rethrow;
     }
   }
 
@@ -111,13 +120,16 @@ class NotificationProvider extends ChangeNotifier {
 
       // Update local state
       _notifications =
-          _notifications.map((n) => n.copyWith(readStatus: true)).toList();
+          _notifications.map((n) => n.copyWith(isRead: true)).toList();
       _unreadCount = 0;
       notifyListeners();
 
-      print('[NotificationProvider] Marked all as read');
+      // Refresh to get latest data from server
+      await fetchNotifications();
+      print('[NotificationProvider] ✅ Marked all as read and refreshed');
     } catch (e) {
-      print('[NotificationProvider] Error marking all as read: $e');
+      print('[NotificationProvider] ❌ Error marking all as read: $e');
+      rethrow;
     }
   }
 
