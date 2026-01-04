@@ -8,7 +8,6 @@ import 'package:kltn_sharing_app/data/models/transaction_model.dart';
 class TransactionApiService {
   late Dio _dio;
   late TokenRefreshInterceptor _tokenRefreshInterceptor;
-  Future<String?> Function()? _getValidTokenCallback;
 
   TransactionApiService() {
     // Initialize token refresh interceptor FIRST before creating Dio
@@ -52,14 +51,12 @@ class TransactionApiService {
   }
 
   /// Set callback to get valid access token from AuthProvider
-  void setGetValidTokenCallback(Future<String?> Function() callback) {
-    _getValidTokenCallback = callback;
+  void setGetValidTokenCallback(
+      Future<void> Function() onTokenExpiredCallback) {
     try {
       _tokenRefreshInterceptor.setCallbacks(
-        getValidTokenCallback: callback,
-        onTokenExpiredCallback: () async {
-          print('[TransactionAPI] Token refresh failed, user session expired');
-        },
+        getValidTokenCallback: () async => null, // Not needed
+        onTokenExpiredCallback: onTokenExpiredCallback,
       );
     } catch (e) {
       print('[TransactionAPI] Error setting token refresh callback: $e');
@@ -81,14 +78,6 @@ class TransactionApiService {
   Future<Map<String, dynamic>> createTransaction(
       TransactionRequest request) async {
     try {
-      // Ensure token is valid before making request
-      if (_getValidTokenCallback != null) {
-        final validToken = await _getValidTokenCallback!();
-        if (validToken != null) {
-          _dio.options.headers['Authorization'] = 'Bearer $validToken';
-        }
-      }
-
       final response = await _dio.post(
         '/api/v2/transactions',
         data: request.toJson(),

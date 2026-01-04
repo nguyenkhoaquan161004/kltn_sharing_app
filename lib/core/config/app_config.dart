@@ -11,7 +11,8 @@ class AppConfig {
 
   /// Get current base URL
   /// Set to developmentUrl for testing, productionUrl for production
-  static const String baseUrl = productionUrl; // ← Using production URL
+  static const String baseUrl =
+      productionUrl; // ← Using production URL (which is develop server)
 
   /// Initialize - call this once at app startup
   static void initialize() {
@@ -22,7 +23,7 @@ class AppConfig {
   static const String apiVersion = 'v2';
 
   /// Auth endpoint
-  static const String authEndpoint = '/public/$apiVersion/auth';
+  static const String authEndpoint = '/api/public/$apiVersion/auth';
 
   /// Full auth base URL
   static const String authBaseUrl = '$baseUrl$authEndpoint';

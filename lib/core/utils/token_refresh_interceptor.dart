@@ -15,16 +15,12 @@ class TokenRefreshInterceptor extends InterceptorsWrapper {
   bool _isRefreshing = false;
   final List<DioException> _failedRequests = [];
 
-  // Callback to get valid token from AuthProvider
-  Future<String?> Function()? _getValidTokenCallback;
   // Callback when token refresh fails and user needs to re-login
   Future<void> Function()? _onTokenExpiredCallback;
 
   TokenRefreshInterceptor({
-    Future<String?> Function()? getValidTokenCallback,
     Future<void> Function()? onTokenExpiredCallback,
-  })  : _getValidTokenCallback = getValidTokenCallback,
-        _onTokenExpiredCallback = onTokenExpiredCallback {
+  })  : _onTokenExpiredCallback = onTokenExpiredCallback {
     _authDio = Dio(
       BaseOptions(
         baseUrl: AppConfig.authBaseUrl,
@@ -42,7 +38,6 @@ class TokenRefreshInterceptor extends InterceptorsWrapper {
     required Future<String?> Function() getValidTokenCallback,
     required Future<void> Function() onTokenExpiredCallback,
   }) {
-    _getValidTokenCallback = getValidTokenCallback;
     _onTokenExpiredCallback = onTokenExpiredCallback;
   }
 
@@ -52,11 +47,9 @@ class TokenRefreshInterceptor extends InterceptorsWrapper {
 
   /// Static method to easily add this interceptor to a Dio instance
   static TokenRefreshInterceptor create({
-    Future<String?> Function()? getValidTokenCallback,
     Future<void> Function()? onTokenExpiredCallback,
   }) {
     return TokenRefreshInterceptor(
-      getValidTokenCallback: getValidTokenCallback,
       onTokenExpiredCallback: onTokenExpiredCallback,
     );
   }

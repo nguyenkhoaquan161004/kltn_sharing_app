@@ -213,6 +213,86 @@ class AuthApiService {
     }
   }
 
+  /// Step 1: Request password reset OTP
+  Future<void> forgotPassword(String email) async {
+    try {
+      final response = await _dio.post(
+        '/forgot-password',
+        data: {'email': email},
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception(
+            'Forgot password request failed with status code: ${response.statusCode}');
+      }
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  /// Step 2: Verify password reset OTP and get reset token
+  Future<String> verifyPasswordResetOtp(String email, String otpCode) async {
+    try {
+      final response = await _dio.post(
+        '/verify-password-reset-otp',
+        data: {
+          'email': email,
+          'otpCode': otpCode,
+        },
+      );
+
+      if (response.statusCode == 200) {
+        if (response.data is Map<String, dynamic>) {
+          final data = response.data as Map<String, dynamic>;
+          if (data['success'] == true && data['data'] != null) {
+            final resetData = data['data'] as Map<String, dynamic>;
+            return resetData['resetToken'] ?? '';
+          } else {
+            throw Exception(data['message'] ?? 'OTP verification failed');
+          }
+        } else {
+          throw Exception('Invalid OTP verification response format');
+        }
+      } else {
+        throw Exception(
+            'OTP verification failed with status code: ${response.statusCode}');
+      }
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  /// Step 3: Reset password using reset token
+  Future<String> resetPassword(String resetToken, String newPassword) async {
+    try {
+      final response = await _dio.post(
+        '/reset-password',
+        data: {
+          'resetToken': resetToken,
+          'newPassword': newPassword,
+        },
+      );
+
+      if (response.statusCode == 200) {
+        if (response.data is Map<String, dynamic>) {
+          final data = response.data as Map<String, dynamic>;
+          if (data['success'] == true) {
+            return data['message'] ?? 'Password reset successfully';
+          } else {
+            throw Exception(data['message'] ?? 'Password reset failed');
+          }
+        } else {
+          throw Exception('Invalid reset password response format');
+        }
+      } else {
+        throw Exception(
+            'Password reset failed with status code: ${response.statusCode}');
+      }
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
   /// Logout endpoint
   Future<void> logout(String? refreshToken) async {
     try {
@@ -221,6 +301,45 @@ class AuthApiService {
     } on DioException catch (e) {
       // Don't throw on logout errors, just log them
       print('Logout error: ${e.message}');
+    }
+  }
+
+  /// Google login endpoint
+  Future<TokenResponse> googleLogin({
+    String? idToken,
+    String? code,
+    String? redirectUri,
+    String? codeVerifier,
+  }) async {
+    try {
+      final data = <String, dynamic>{};
+      if (idToken != null) data['idToken'] = idToken;
+      if (code != null) data['code'] = code;
+      if (redirectUri != null) data['redirectUri'] = redirectUri;
+      if (codeVerifier != null) data['codeVerifier'] = codeVerifier;
+
+      final response = await _dio.post(
+        '/google',
+        data: data,
+      );
+
+      if (response.statusCode == 200) {
+        if (response.data is Map<String, dynamic>) {
+          final responseData = response.data as Map<String, dynamic>;
+          if (responseData['success'] == true && responseData['data'] != null) {
+            return TokenResponse.fromJson(responseData['data']);
+          } else {
+            throw Exception(responseData['message'] ?? 'Google login failed');
+          }
+        } else {
+          throw Exception('Invalid google login response format');
+        }
+      } else {
+        throw Exception(
+            'Google login failed with status code: ${response.statusCode}');
+      }
+    } on DioException catch (e) {
+      throw _handleDioException(e);
     }
   }
 

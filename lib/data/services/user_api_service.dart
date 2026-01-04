@@ -6,7 +6,6 @@ import 'package:kltn_sharing_app/data/models/update_profile_request.dart';
 
 class UserApiService {
   late Dio _dio;
-  Future<String?> Function()? _getValidTokenCallback;
   late TokenRefreshInterceptor _tokenRefreshInterceptor;
 
   UserApiService() {
@@ -52,15 +51,11 @@ class UserApiService {
   }
 
   /// Set callback to get valid access token from AuthProvider
-  void setGetValidTokenCallback(Future<String?> Function() callback) {
-    _getValidTokenCallback = callback;
+  void setGetValidTokenCallback(Future<void> Function() onTokenExpiredCallback) {
     try {
       _tokenRefreshInterceptor.setCallbacks(
-        getValidTokenCallback: callback,
-        onTokenExpiredCallback: () async {
-          // Token refresh failed, user needs to re-login
-          print('[UserAPI] Token refresh failed, user session expired');
-        },
+        getValidTokenCallback: () async => null, // Not needed
+        onTokenExpiredCallback: onTokenExpiredCallback,
       );
     } catch (e) {
       print('[UserAPI] Error setting token refresh callback: $e');

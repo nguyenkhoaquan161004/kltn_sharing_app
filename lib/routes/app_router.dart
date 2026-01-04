@@ -7,6 +7,9 @@ import '../presentation/screens/auth/register_screen.dart';
 import '../presentation/screens/auth/terms_screen.dart';
 import '../presentation/screens/auth/email_input_screen.dart';
 import '../presentation/screens/auth/email_verification_screen.dart';
+import '../presentation/screens/auth/forgot_password_screen.dart';
+import '../presentation/screens/auth/verify_password_reset_otp_screen.dart';
+import '../presentation/screens/auth/reset_password_screen.dart';
 import '../presentation/screens/otp_screen.dart';
 import '../presentation/screens/home/home_screen.dart';
 import '../presentation/screens/search/search_screen.dart';
@@ -129,6 +132,39 @@ class AppRouter {
         pageBuilder: (context, state) => _buildPageWithTransition(
             child: const OtpScreen(), state: state, name: 'otp'),
         name: 'otp',
+      ),
+      GoRoute(
+        path: AppRoutes.forgotPassword,
+        pageBuilder: (context, state) => _buildPageWithTransition(
+            child: const ForgotPasswordScreen(),
+            state: state,
+            name: 'forgot-password'),
+        name: 'forgot-password',
+      ),
+      GoRoute(
+        path: AppRoutes.verifyPasswordResetOtp,
+        pageBuilder: (context, state) {
+          final email = (state.extra as Map<String, dynamic>?)?['email'] ?? '';
+          return _buildPageWithTransition(
+            child: VerifyPasswordResetOtpScreen(email: email),
+            state: state,
+            name: 'verify-password-reset-otp',
+          );
+        },
+        name: 'verify-password-reset-otp',
+      ),
+      GoRoute(
+        path: AppRoutes.resetPassword,
+        pageBuilder: (context, state) {
+          final resetToken =
+              (state.extra as Map<String, dynamic>?)?['resetToken'] ?? '';
+          return _buildPageWithTransition(
+            child: ResetPasswordScreen(resetToken: resetToken),
+            state: state,
+            name: 'reset-password',
+          );
+        },
+        name: 'reset-password',
       ),
 
       // Main routes

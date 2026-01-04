@@ -6,7 +6,6 @@ import 'package:kltn_sharing_app/core/utils/token_refresh_interceptor.dart';
 class MessageApiService {
   late Dio _dio;
   late TokenRefreshInterceptor _tokenRefreshInterceptor;
-  Future<String?> Function()? _getValidTokenCallback;
 
   MessageApiService({Dio? dio}) {
     if (dio != null) {
@@ -54,14 +53,11 @@ class MessageApiService {
   }
 
   /// Set callback to get valid access token
-  void setGetValidTokenCallback(Future<String?> Function() callback) {
-    _getValidTokenCallback = callback;
+  void setGetValidTokenCallback(Future<void> Function() onTokenExpiredCallback) {
     try {
       _tokenRefreshInterceptor.setCallbacks(
-        getValidTokenCallback: callback,
-        onTokenExpiredCallback: () async {
-          print('[MessageAPI] Token refresh failed, user session expired');
-        },
+        getValidTokenCallback: () async => null, // Not needed
+        onTokenExpiredCallback: onTokenExpiredCallback,
       );
     } catch (e) {
       print('[MessageAPI] Error setting token refresh callback: $e');

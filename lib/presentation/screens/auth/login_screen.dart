@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:kltn_sharing_app/core/constants/app_text_styles.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/constants/app_routes.dart';
@@ -23,12 +24,90 @@ class _LoginScreenState extends State<LoginScreen> {
   final _userNameController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
+  final _googleSignIn = GoogleSignIn();
 
   @override
   void dispose() {
     _userNameController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+
+  Future<void> _handleGoogleSignIn() async {
+    try {
+      final authProvider = context.read<AuthProvider>();
+      final userProvider = context.read<UserProvider>();
+
+      // Sign in with Google
+      final googleUser = await _googleSignIn.signIn();
+      if (googleUser == null) {
+        // User cancelled the sign-in
+        return;
+      }
+
+      // Get authentication details
+      final googleAuth = await googleUser.authentication;
+      final idToken = googleAuth.idToken;
+
+      if (idToken == null) {
+        throw Exception('Failed to get Google ID token');
+      }
+
+      // Call Google login API
+      final success = await authProvider.googleLogin(
+        idToken: idToken,
+      );
+
+      if (mounted) {
+        if (success) {
+          // Load user data
+          try {
+            await userProvider.loadCurrentUser();
+            print('[LoginScreen] ✅ User data loaded successfully');
+          } catch (e) {
+            print('[LoginScreen] ⚠️  Failed to load user data: $e');
+          }
+
+          // Update FCM token
+          try {
+            final fcmToken = await FCMService().getFCMTokenFromFirebase();
+            final currentUser = userProvider.currentUser;
+
+            if (fcmToken != null &&
+                fcmToken.isNotEmpty &&
+                currentUser != null) {
+              print('[LoginScreen] 📤 Updating FCM token on backend');
+              await userProvider.updateFCMToken(
+                userId: currentUser.id,
+                fcmToken: fcmToken,
+              );
+              print('[LoginScreen] ✅ FCM token updated successfully');
+            }
+          } catch (e) {
+            print('[LoginScreen] ⚠️  Failed to update FCM token: $e');
+          }
+
+          context.go(AppRoutes.home);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(authProvider.errorMessage ?? 'Google login failed'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Google login error: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      print('Google sign-in error: $e');
+    }
   }
 
   Future<void> _handleLogin() async {
@@ -183,7 +262,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         onPressed: authProvider.isLoading
                             ? null
                             : () {
-                                // TODO: Navigate to forgot password
+                                context.push(AppRoutes.forgotPassword);
                               },
                         child: const Text(
                           'Quên mật khẩu?',
@@ -213,13 +292,46 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ),
                       ),
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 16),
                     GradientButton(
                       text: 'Đăng nhập',
                       onPressed: authProvider.isLoading ? null : _handleLogin,
                       isLoading: authProvider.isLoading,
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 12),
+                    // Google Sign-In Button
+                    GestureDetector(
+                      onTap:
+                          authProvider.isLoading ? null : _handleGoogleSignIn,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: AppColors.borderGray,
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            SvgPicture.asset(
+                              'assets/svgs/logo/icon.svg',
+                              width: 24,
+                              height: 24,
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              'Đăng nhập bằng Google',
+                              style: AppTextStyles.bodyMedium.copyWith(
+                                color: AppColors.textPrimary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [

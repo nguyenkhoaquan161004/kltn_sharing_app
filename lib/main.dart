@@ -92,23 +92,8 @@ class MyApp extends StatelessWidget {
               ),
         ),
         // Item API Service with token refresh callback
-        ProxyProvider<AuthProvider, ItemApiService>(
-          create: (context) {
-            final authProvider = context.read<AuthProvider>();
-            final service = ItemApiService();
-            service.setGetValidTokenCallback(
-              () => authProvider.getValidAccessToken(),
-            );
-            return service;
-          },
-          update: (context, authProvider, previous) {
-            if (previous != null) {
-              previous.setGetValidTokenCallback(
-                () => authProvider.getValidAccessToken(),
-              );
-            }
-            return previous ?? ItemApiService();
-          },
+        Provider<ItemApiService>(
+          create: (context) => ItemApiService(),
         ),
         // Item Provider
         ChangeNotifierProxyProvider<ItemApiService, ItemProvider>(
@@ -120,47 +105,17 @@ class MyApp extends StatelessWidget {
             return previous ?? ItemProvider(itemApiService: itemApiService);
           },
         ),
-        // User API Service - Setup token refresh callback
-        ProxyProvider<AuthProvider, UserApiService>(
-          create: (context) {
-            final authProvider = context.read<AuthProvider>();
-            final service = context.read<UserApiService>();
-            service.setGetValidTokenCallback(
-              () => authProvider.getValidAccessToken(),
-            );
-            return service;
-          },
-          update: (context, authProvider, previous) {
-            if (previous != null) {
-              previous.setGetValidTokenCallback(
-                () => authProvider.getValidAccessToken(),
-              );
-            }
-            return previous ?? UserApiService();
-          },
+        // User API Service
+        Provider<UserApiService>(
+          create: (context) => UserApiService(),
         ),
         // User Provider
         ChangeNotifierProvider<UserProvider>(
           create: (_) => UserProvider(),
         ),
         // Gamification API Service
-        ProxyProvider<AuthProvider, GamificationApiService>(
-          create: (context) {
-            final authProvider = context.read<AuthProvider>();
-            final service = GamificationApiService();
-            service.setGetValidTokenCallback(
-              () => authProvider.getValidAccessToken(),
-            );
-            return service;
-          },
-          update: (context, authProvider, previous) {
-            if (previous != null) {
-              previous.setGetValidTokenCallback(
-                () => authProvider.getValidAccessToken(),
-              );
-            }
-            return previous ?? GamificationApiService();
-          },
+        Provider<GamificationApiService>(
+          create: (context) => GamificationApiService(),
         ),
         // Gamification Provider
         ChangeNotifierProvider<GamificationProvider>(
@@ -169,23 +124,8 @@ class MyApp extends StatelessWidget {
           ),
         ),
         // Category API Service
-        ProxyProvider<AuthProvider, CategoryApiService>(
-          create: (context) {
-            final authProvider = context.read<AuthProvider>();
-            final service = CategoryApiService();
-            service.setGetValidTokenCallback(
-              () => authProvider.getValidAccessToken(),
-            );
-            return service;
-          },
-          update: (context, authProvider, previous) {
-            if (previous != null) {
-              previous.setGetValidTokenCallback(
-                () => authProvider.getValidAccessToken(),
-              );
-            }
-            return previous ?? CategoryApiService();
-          },
+        Provider<CategoryApiService>(
+          create: (context) => CategoryApiService(),
         ),
         // Category Provider
         ChangeNotifierProvider<CategoryProvider>(
@@ -198,23 +138,8 @@ class MyApp extends StatelessWidget {
           create: (_) => LocationProvider(),
         ),
         // Recommendation API Service
-        ProxyProvider<AuthProvider, RecommendationApiService>(
-          create: (context) {
-            final authProvider = context.read<AuthProvider>();
-            final service = RecommendationApiService();
-            service.setGetValidTokenCallback(
-              () => authProvider.getValidAccessToken(),
-            );
-            return service;
-          },
-          update: (context, authProvider, previous) {
-            if (previous != null) {
-              previous.setGetValidTokenCallback(
-                () => authProvider.getValidAccessToken(),
-              );
-            }
-            return previous ?? RecommendationApiService();
-          },
+        Provider<RecommendationApiService>(
+          create: (context) => RecommendationApiService(),
         ),
         // Recommendation Provider
         ChangeNotifierProvider<RecommendationProvider>(
@@ -223,78 +148,24 @@ class MyApp extends StatelessWidget {
           ),
         ),
         // Notification API Service
-        ProxyProvider<AuthProvider, NotificationApiService>(
-          create: (context) {
-            final authProvider = context.read<AuthProvider>();
-            final service = NotificationApiService();
-            service.setGetValidTokenCallback(
-              () => authProvider.getValidAccessToken(),
-            );
-            return service;
-          },
-          update: (context, authProvider, previous) {
-            if (previous != null) {
-              previous.setGetValidTokenCallback(
-                () => authProvider.getValidAccessToken(),
-              );
-            }
-            return previous ?? NotificationApiService();
-          },
+        Provider<NotificationApiService>(
+          create: (context) => NotificationApiService(),
         ),
         // Notification Provider
         ChangeNotifierProvider<NotificationProvider>(
           create: (_) => NotificationProvider(),
         ),
         // Cart API Service
-        ProxyProvider<AuthProvider, CartApiService>(
-          create: (context) {
-            final authProvider = context.read<AuthProvider>();
-            final service = CartApiService();
-            service.setGetValidTokenCallback(
-              () => authProvider.getValidAccessToken(),
-            );
-            return service;
-          },
-          update: (context, authProvider, previous) {
-            if (previous != null) {
-              previous.setGetValidTokenCallback(
-                () => authProvider.getValidAccessToken(),
-              );
-            }
-            return previous ?? CartApiService();
-          },
+        Provider<CartApiService>(
+          create: (context) => CartApiService(),
         ),
         // Transaction API Service
-        ProxyProvider<AuthProvider, TransactionApiService>(
-          create: (context) {
-            final authProvider = context.read<AuthProvider>();
-            final service = TransactionApiService();
-            service.setGetValidTokenCallback(
-              () => authProvider.getValidAccessToken(),
-            );
-            return service;
-          },
-          update: (context, authProvider, previous) {
-            if (previous != null) {
-              previous.setGetValidTokenCallback(
-                () => authProvider.getValidAccessToken(),
-              );
-            }
-            return previous ?? TransactionApiService();
-          },
+        Provider<TransactionApiService>(
+          create: (context) => TransactionApiService(),
         ),
         // Message API Service
-        ProxyProvider<AuthProvider, MessageApiService>(
-          create: (context) {
-            final authProvider = context.read<AuthProvider>();
-            final service = MessageApiService();
-            // Note: MessageApiService handles token refresh internally
-            // via TokenRefreshInterceptor
-            return service;
-          },
-          update: (context, authProvider, previous) {
-            return previous ?? MessageApiService();
-          },
+        Provider<MessageApiService>(
+          create: (context) => MessageApiService(),
         ),
         // Order Provider - initialize with auth token and load order count
         ChangeNotifierProxyProvider2<AuthProvider, TransactionApiService,

@@ -7,6 +7,9 @@ class AppRoutes {
   static const String emailInput = '/email-input';
   static const String emailVerification = '/email-verification';
   static const String terms = '/terms';
+  static const String forgotPassword = '/forgot-password';
+  static const String verifyPasswordResetOtp = '/verify-password-reset-otp';
+  static const String resetPassword = '/reset-password';
 
   // Main routes
   static const String home = '/home';

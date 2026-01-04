@@ -6,11 +6,9 @@ import 'package:kltn_sharing_app/data/models/transaction_model.dart';
 
 class ItemApiService {
   late Dio _dio;
-  Future<String?> Function()? _getValidTokenCallback;
   late TokenRefreshInterceptor _tokenRefreshInterceptor;
 
-  ItemApiService({Future<String?> Function()? getValidTokenCallback})
-      : _getValidTokenCallback = getValidTokenCallback {
+  ItemApiService() {
     // Initialize token refresh interceptor FIRST before creating Dio
     _tokenRefreshInterceptor = TokenRefreshInterceptor();
 
@@ -52,16 +50,12 @@ class ItemApiService {
     );
   }
 
-  /// Set getValidToken callback (from AuthProvider)
-  void setGetValidTokenCallback(Future<String?> Function() callback) {
-    _getValidTokenCallback = callback;
+  /// Set token refresh callback (delegates to TokenRefreshInterceptor)
+  void setGetValidTokenCallback(Future<void> Function() onTokenExpiredCallback) {
     try {
       _tokenRefreshInterceptor.setCallbacks(
-        getValidTokenCallback: callback,
-        onTokenExpiredCallback: () async {
-          // Token refresh failed, user needs to re-login
-          print('[ItemAPI] Token refresh failed, user session expired');
-        },
+        getValidTokenCallback: () async => null, // Not needed, interceptor handles it
+        onTokenExpiredCallback: onTokenExpiredCallback,
       );
     } catch (e) {
       print('[ItemAPI] Error setting token refresh callback: $e');
@@ -99,26 +93,6 @@ class ItemApiService {
     try {
       print(
           '[ItemAPI.searchNearbyItems] Starting - lat: $latitude, lon: $longitude, page: $page');
-
-      // Ensure token is valid before making request
-      if (_getValidTokenCallback != null) {
-        print(
-            '[ItemAPI.searchNearbyItems] Getting valid token from callback...');
-        final validToken = await _getValidTokenCallback!();
-        if (validToken != null) {
-          _dio.options.headers['Authorization'] = 'Bearer $validToken';
-          print(
-              '[ItemAPI.searchNearbyItems] Token set: Bearer ${validToken.substring(0, 20)}...');
-        } else {
-          print(
-              '[ItemAPI.searchNearbyItems] WARNING: validToken is null from callback');
-        }
-      } else {
-        print('[ItemAPI.searchNearbyItems] WARNING: No token callback set!');
-      }
-
-      print(
-          '[ItemAPI.searchNearbyItems] Current Authorization header: ${_dio.options.headers['Authorization']}');
 
       final queryParams = {
         'page': page + 1, // BE expects 1-based page numbering
@@ -192,14 +166,6 @@ class ItemApiService {
     String? sortDirection = 'DESC',
   }) async {
     try {
-      // Ensure token is valid before making request
-      if (_getValidTokenCallback != null) {
-        final validToken = await _getValidTokenCallback!();
-        if (validToken != null) {
-          _dio.options.headers['Authorization'] = 'Bearer $validToken';
-        }
-      }
-
       final queryParams = {
         'page': page + 1, // BE expects 1-based page numbering
         'limit': size,
@@ -261,14 +227,6 @@ class ItemApiService {
   /// Get single item by ID
   Future<ItemDto> getItem(String itemId) async {
     try {
-      // Ensure token is valid before making request
-      if (_getValidTokenCallback != null) {
-        final validToken = await _getValidTokenCallback!();
-        if (validToken != null) {
-          _dio.options.headers['Authorization'] = 'Bearer $validToken';
-        }
-      }
-
       final response = await _dio.get('/api/v2/items/$itemId');
 
       if (response.statusCode == 200) {
@@ -296,18 +254,6 @@ class ItemApiService {
     String? sortOrder = 'DESC',
   }) async {
     try {
-      // Ensure token is valid before making request
-      if (_getValidTokenCallback != null) {
-        final validToken = await _getValidTokenCallback!();
-        if (validToken != null) {
-          _dio.options.headers['Authorization'] = 'Bearer $validToken';
-          print(
-              '[ItemAPI] Token set for getUserItems: Bearer ${validToken.substring(0, 20)}...');
-        }
-      } else {
-        print('[ItemAPI] WARNING: No token callback set for getUserItems');
-      }
-
       final Map<String, dynamic> queryParams = {
         'page': page,
         'limit': size,
@@ -377,14 +323,6 @@ class ItemApiService {
     required double price,
   }) async {
     try {
-      // Ensure token is valid before making request
-      if (_getValidTokenCallback != null) {
-        final validToken = await _getValidTokenCallback!();
-        if (validToken != null) {
-          _dio.options.headers['Authorization'] = 'Bearer $validToken';
-        }
-      }
-
       final requestBody = {
         'name': name,
         'description': description,
@@ -421,14 +359,6 @@ class ItemApiService {
     int limit = 100,
   }) async {
     try {
-      // Ensure token is valid before making request
-      if (_getValidTokenCallback != null) {
-        final validToken = await _getValidTokenCallback!();
-        if (validToken != null) {
-          _dio.options.headers['Authorization'] = 'Bearer $validToken';
-        }
-      }
-
       final response = await _dio.get(
         '/api/v2/transactions/as-sharer',
         queryParameters: {
@@ -479,14 +409,6 @@ class ItemApiService {
   Future<List<TransactionModel>> getSharerTransactionsForItem(
       String itemId) async {
     try {
-      // Ensure token is valid before making request
-      if (_getValidTokenCallback != null) {
-        final validToken = await _getValidTokenCallback!();
-        if (validToken != null) {
-          _dio.options.headers['Authorization'] = 'Bearer $validToken';
-        }
-      }
-
       final response = await _dio.get(
         '/api/v2/transactions/as-sharer',
         queryParameters: {
@@ -592,14 +514,6 @@ class ItemApiService {
     String newDescription,
   ) async {
     try {
-      // Ensure token is valid before making request
-      if (_getValidTokenCallback != null) {
-        final validToken = await _getValidTokenCallback!();
-        if (validToken != null) {
-          _dio.options.headers['Authorization'] = 'Bearer $validToken';
-        }
-      }
-
       final requestBody = {
         'description': newDescription,
       };

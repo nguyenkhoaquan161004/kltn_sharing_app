@@ -12,18 +12,13 @@ class AuthProvider extends ChangeNotifier {
 
   static const String _accessTokenKey = 'access_token';
   static const String _refreshTokenKey = 'refresh_token';
-  static const String _tokenExpiresAtKey = 'token_expires_at';
   static const String _usernameKey = 'username';
-  static const int _tokenExpiryBufferSeconds =
-      60; // Refresh 1 min before expiry
 
   String? _accessToken;
   String? _refreshToken;
   String? _username;
   bool _isLoading = false;
   String? _errorMessage;
-  DateTime? _tokenExpiresAt;
-  bool _isRefreshing = false; // Prevent multiple refresh attempts
 
   AuthProvider({
     required AuthApiService authApiService,
@@ -53,11 +48,6 @@ class AuthProvider extends ChangeNotifier {
     _refreshToken = _prefs.getString(_refreshTokenKey);
     _username = _prefs.getString(_usernameKey);
 
-    final expiresAtStr = _prefs.getString(_tokenExpiresAtKey);
-    if (expiresAtStr != null) {
-      _tokenExpiresAt = DateTime.tryParse(expiresAtStr);
-    }
-
     if (_accessToken != null) {
       _authApiService.setAuthToken(_accessToken!);
       _userApiService.setAuthToken(_accessToken!);
@@ -73,12 +63,9 @@ class AuthProvider extends ChangeNotifier {
     int expiresInSeconds,
     String? username,
   ) async {
-    final expiresAt = DateTime.now().add(Duration(seconds: expiresInSeconds));
-
     // IMPORTANT: Save refreshToken - required for future token refresh!
     await _prefs.setString(_accessTokenKey, accessToken);
     await _prefs.setString(_refreshTokenKey, refreshToken);
-    await _prefs.setString(_tokenExpiresAtKey, expiresAt.toIso8601String());
     if (username != null) {
       await _prefs.setString(_usernameKey, username);
     }
@@ -86,7 +73,6 @@ class AuthProvider extends ChangeNotifier {
     _accessToken = accessToken;
     _refreshToken = refreshToken;
     _username = username;
-    _tokenExpiresAt = expiresAt;
     _authApiService.setAuthToken(accessToken);
     _userApiService.setAuthToken(accessToken);
 
@@ -94,7 +80,6 @@ class AuthProvider extends ChangeNotifier {
     print('[AuthProvider] - Access Token: ${accessToken.substring(0, 20)}...');
     print(
         '[AuthProvider] - Refresh Token: ${refreshToken.substring(0, 20)}...');
-    print('[AuthProvider] - Expires At: $expiresAt');
     print('[AuthProvider] - Username: $username');
 
     notifyListeners();
@@ -104,95 +89,14 @@ class AuthProvider extends ChangeNotifier {
   Future<void> _clearTokens() async {
     await _prefs.remove(_accessTokenKey);
     await _prefs.remove(_refreshTokenKey);
-    await _prefs.remove(_tokenExpiresAtKey);
     await _prefs.remove(_usernameKey);
 
     _accessToken = null;
     _refreshToken = null;
     _username = null;
-    _tokenExpiresAt = null;
-    _isRefreshing = false; // Reset refresh flag
     _authApiService.removeAuthToken();
 
     notifyListeners();
-  }
-
-  /// Check if access token needs refresh (expires within buffer time)
-  bool _shouldRefreshToken() {
-    if (_tokenExpiresAt == null || _refreshToken == null) {
-      return false;
-    }
-
-    final bufferTime =
-        DateTime.now().add(Duration(seconds: _tokenExpiryBufferSeconds));
-    return _tokenExpiresAt!.isBefore(bufferTime);
-  }
-
-  /// Refresh access token using refresh token
-  Future<bool> refreshAccessToken() async {
-    // Prevent multiple simultaneous refresh attempts
-    if (_isRefreshing) {
-      print('[AuthProvider] ⏳ Token refresh already in progress, waiting...');
-      // Wait a bit and return the current token state
-      await Future.delayed(Duration(milliseconds: 500));
-      return _accessToken != null && _accessToken!.isNotEmpty;
-    }
-
-    if (_refreshToken == null || _refreshToken!.isEmpty) {
-      print('[AuthProvider] ❌ No refresh token available in memory');
-      return false;
-    }
-
-    _isRefreshing = true;
-
-    try {
-      print('[AuthProvider] 🔄 Refreshing access token using refresh token...');
-      final request = RefreshTokenRequest(refreshToken: _refreshToken!);
-      final tokenResponse = await _authApiService.refreshToken(request);
-
-      // Check if backend returned valid refresh token
-      if (tokenResponse.refreshToken.isEmpty) {
-        print('[AuthProvider] ❌ Backend returned empty refresh token');
-        await _clearTokens();
-        _isRefreshing = false;
-        return false;
-      }
-
-      print('[AuthProvider] ✅ Got new tokens from backend');
-      print(
-          '[AuthProvider] New refresh token: ${tokenResponse.refreshToken.substring(0, 20)}...');
-
-      await _saveTokens(
-        tokenResponse.accessToken,
-        tokenResponse.refreshToken,
-        tokenResponse.expiresIn,
-        _username,
-      );
-
-      print('[AuthProvider] ✅ Token refreshed successfully');
-      _isRefreshing = false;
-      return true;
-    } catch (e) {
-      print('[AuthProvider] ❌ Token refresh failed: $e');
-      // If refresh fails, user needs to login again
-      await _clearTokens();
-      _isRefreshing = false;
-      return false;
-    }
-  }
-
-  /// Get valid access token (refresh if needed)
-  Future<String?> getValidAccessToken() async {
-    if (_accessToken == null) {
-      return null;
-    }
-
-    if (_shouldRefreshToken()) {
-      final refreshed = await refreshAccessToken();
-      return refreshed ? _accessToken : null;
-    }
-
-    return _accessToken;
   }
 
   /// Login with username/email and password
@@ -329,6 +233,53 @@ class AuthProvider extends ChangeNotifier {
 
       final request = SendOtpRequest(email: email);
       await _authApiService.sendOtp(request);
+
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _isLoading = false;
+      _errorMessage = e.toString().replaceAll('Exception: ', '');
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Login with Google
+  Future<bool> googleLogin({
+    String? idToken,
+    String? code,
+    String? redirectUri,
+    String? codeVerifier,
+  }) async {
+    try {
+      _isLoading = true;
+      _errorMessage = null;
+      notifyListeners();
+
+      final tokenResponse = await _authApiService.googleLogin(
+        idToken: idToken,
+        code: code,
+        redirectUri: redirectUri,
+        codeVerifier: codeVerifier,
+      );
+
+      await _saveTokens(
+        tokenResponse.accessToken,
+        tokenResponse.refreshToken,
+        tokenResponse.expiresIn,
+        'google_user', // Default username for Google login
+      );
+
+      // Load user data from API
+      try {
+        final currentUser = await _userApiService.getCurrentUser();
+        print(
+            '[AuthProvider] ✅ Google login successful: ${currentUser.fullName}');
+      } catch (e) {
+        print('[AuthProvider] ⚠️  Failed to load user data: $e');
+        // Don't fail login if user data load fails
+      }
 
       _isLoading = false;
       notifyListeners();

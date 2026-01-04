@@ -30,6 +30,7 @@ class PinInput extends StatelessWidget {
         fieldWidth: 48,
         activeFillColor: AppColors.white,
         selectedFillColor: AppColors.white,
+        inactiveFillColor: AppColors.white,
         activeColor: AppColors.primaryGreen,
         inactiveColor: AppColors.borderGray,
         selectedColor: AppColors.primaryGreen,

@@ -313,9 +313,7 @@ class _HomeScreenState extends State<HomeScreen>
                 const SizedBox(height: 16),
                 ElevatedButton(
                   onPressed: () async {
-                    // Refresh token first, then retry
-                    final authProvider = context.read<AuthProvider>();
-                    await authProvider.refreshAccessToken();
+                    // Retry loading recommendations
                     if (mounted) {
                       recommendationProvider.loadRecommendations();
                     }
