@@ -461,4 +461,30 @@ class TransactionApiService {
       throw _handleDioException(e);
     }
   }
+
+  /// Get transaction statistics for current user
+  Future<Map<String, dynamic>> getTransactionStats() async {
+    try {
+      final response = await _dio.get('/api/v2/transactions/stats');
+
+      if (response.statusCode == 200) {
+        final data = response.data;
+
+        if (data is Map<String, dynamic>) {
+          final statsData = data['data'];
+          if (statsData is Map<String, dynamic>) {
+            print('[TransactionAPI] Retrieved transaction stats successfully');
+            return statsData;
+          }
+        }
+
+        throw Exception('Unexpected response format: $data');
+      } else {
+        throw Exception(
+            'Failed to get transaction stats: ${response.statusCode}');
+      }
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
 }

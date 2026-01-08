@@ -280,20 +280,68 @@ class _CartItemRequestModalState extends State<CartItemRequestModal> {
               ),
               const SizedBox(height: 20),
 
-              // Use current user info toggle
-              Row(
-                children: [
-                  Checkbox(
-                    value: _useCurrentUserInfo,
-                    onChanged: (value) {
-                      setState(() => _useCurrentUserInfo = value ?? true);
-                    },
-                  ),
-                  Text(
-                    'Sử dụng thông tin hiện tại',
-                    style: AppTextStyles.bodyMedium,
-                  ),
-                ],
+              // Receiver info section title
+              const Text('Thông tin người nhận', style: AppTextStyles.h4),
+              const SizedBox(height: 12),
+
+              // Toggle: Thông tin người nhận khác
+              GestureDetector(
+                onTap: () {
+                  setState(() => _useCurrentUserInfo = !_useCurrentUserInfo);
+                  if (!_useCurrentUserInfo) {
+                    // Clear fields when switching to "other person"
+                    _fullNameController.clear();
+                    _phoneController.clear();
+                    _addressController.clear();
+                  } else {
+                    // Load current user info when switching back
+                    _loadCurrentUserInfo();
+                  }
+                },
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: Checkbox(
+                        value: !_useCurrentUserInfo,
+                        onChanged: (value) {
+                          setState(
+                              () => _useCurrentUserInfo = !(value ?? false));
+                          if (!_useCurrentUserInfo) {
+                            _fullNameController.clear();
+                            _phoneController.clear();
+                            _addressController.clear();
+                          } else {
+                            _loadCurrentUserInfo();
+                          }
+                        },
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        side: BorderSide(
+                          color: AppColors.primaryTeal,
+                          width: 1.5,
+                        ),
+                        fillColor: MaterialStateProperty.resolveWith((states) {
+                          if (states.contains(MaterialState.selected)) {
+                            return AppColors.primaryTeal;
+                          }
+                          return Colors.transparent;
+                        }),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      'Thông tin người nhận khác',
+                      style: AppTextStyles.bodyMedium.copyWith(
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ],
+                ),
               ),
               const SizedBox(height: 16),
 
@@ -345,7 +393,7 @@ class _CartItemRequestModalState extends State<CartItemRequestModal> {
               AddressAutocompleteField(
                 controller: _addressController,
                 label: 'Địa chỉ nhận hàng',
-                hintText: 'Nhập địa chỉ nhận hàng (autocomplete)',
+                hintText: 'Nhập địa chỉ nhận hàng',
                 onAddressSelected: (latitude, longitude, address) {
                   setState(() {
                     _selectedLatitude = latitude;

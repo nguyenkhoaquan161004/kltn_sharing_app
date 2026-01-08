@@ -4,10 +4,13 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../../../../data/providers/gamification_provider.dart';
 import '../../../../data/providers/user_provider.dart';
+import '../../../../data/providers/auth_provider.dart';
+import '../../../../data/providers/item_provider.dart';
 import '../../../../data/services/address_service.dart';
 import '../../../../data/services/user_api_service.dart';
 import '../../widgets/bottom_navigation_widget.dart';
 import '../../widgets/app_header_bar.dart';
+import '../profile/widgets/create_product_modal.dart';
 import 'widgets/podium_widget.dart';
 import 'widgets/leaderboard_item.dart';
 
@@ -21,7 +24,7 @@ class LeaderboardScreen extends StatefulWidget {
 class _LeaderboardScreenState extends State<LeaderboardScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  String _selectedMonth = 'Tháng 10.2025';
+  String _selectedTimeFrame = 'ALL_TIME'; // ALL_TIME, MONTHLY, WEEKLY
   final Map<String, String> _userNameCache = {}; // Cache userId -> username
   late UserApiService _userApiService;
 
@@ -33,22 +36,40 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
     _userApiService = UserApiService();
 
     // Load leaderboard data on init
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       final gamificationProvider = context.read<GamificationProvider>();
       final userProvider = context.read<UserProvider>();
+      final authProvider = context.read<AuthProvider>();
 
-      // Don't set auth token - leaderboard should work without auth
-      // The API will use userDetails if available, otherwise show public leaderboard
+      print('[Leaderboard] initState - isLoggedIn: ${authProvider.isLoggedIn}');
+      print('[Leaderboard] initState - userPoints: ${authProvider.userPoints}');
+
+      // Set auth token if user is logged in
+      if (authProvider.isLoggedIn && authProvider.accessToken != null) {
+        print('[Leaderboard] Setting auth token on gamification provider');
+        gamificationProvider.setAuthToken(authProvider.accessToken!);
+        _userApiService.setAuthToken(authProvider.accessToken!);
+      }
 
       // Load current user first
       if (userProvider.currentUser == null) {
-        userProvider.loadCurrentUser();
+        print('[Leaderboard] Loading current user...');
+        await userProvider.loadCurrentUser();
       }
 
       // Load leaderboard data with correct size
-      gamificationProvider.loadTopUsers(limit: 3);
-      gamificationProvider.loadLeaderboard(page: 0, size: 20);
-      gamificationProvider.loadCurrentUserStats();
+      print('[Leaderboard] Loading leaderboard data...');
+      gamificationProvider.loadTopUsers(
+          limit: 3, timeFrame: _selectedTimeFrame);
+      gamificationProvider.loadLeaderboardWithScope(
+        scope: 'GLOBAL',
+        timeFrame: _selectedTimeFrame,
+        page: 0,
+        size: 20,
+      );
+
+      // Current user stats will be extracted from leaderboard API response
+      // No need to call separate API
 
       // Load nearby leaderboard if user has address
       _loadNearbyLeaderboard();
@@ -187,7 +208,28 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
           _buildCurrentUserRanking(),
         ],
       ),
-      bottomNavigationBar: const BottomNavigationWidget(currentIndex: 1),
+      bottomNavigationBar: BottomNavigationWidget(
+        currentIndex: 1,
+        onAddPressed: _showAddItemModal,
+      ),
+    );
+  }
+
+  void _showAddItemModal() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => CreateProductModal(
+        onProductCreated: (success) {
+          if (success) {
+            final itemProvider = context.read<ItemProvider>();
+            itemProvider.loadItems();
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Tạo sản phẩm thành công!')),
+            );
+          }
+        },
+      ),
     );
   }
 
@@ -223,7 +265,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
               const SizedBox(height: 6),
 
               // Month selector
-              _buildMonthSelector(),
+              _buildTimeFrameSelector(),
               // const SizedBox(height: 12),
 
               // Podium - show top 3 or placeholders
@@ -322,6 +364,11 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
                 style: AppTextStyles.bodyMedium,
                 textAlign: TextAlign.center,
               ),
+              const SizedBox(height: 6),
+
+              // Time frame selector
+              _buildTimeFrameSelector(),
+
               const SizedBox(height: 32),
               if (gamificationProvider.leaderboard.isEmpty)
                 const Padding(
@@ -360,6 +407,73 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
     );
   }
 
+  Widget _buildTimeFrameSelector() {
+    final timeFrames = [
+      ('ALL_TIME', 'Mọi lúc'),
+      ('MONTHLY', 'Tháng này'),
+      ('WEEKLY', 'Tuần này'),
+    ];
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            const SizedBox(width: 24),
+            ...timeFrames.map((item) {
+              final value = item.$1;
+              final label = item.$2;
+              final isSelected = _selectedTimeFrame == value;
+
+              return Padding(
+                padding: const EdgeInsets.only(right: 12),
+                child: GestureDetector(
+                  onTap: () {
+                    setState(() => _selectedTimeFrame = value);
+                    // Reload leaderboard with new timeframe
+                    final gamificationProvider =
+                        context.read<GamificationProvider>();
+                    gamificationProvider.loadTopUsers(
+                      limit: 3,
+                      timeFrame: value,
+                    );
+                    gamificationProvider.loadLeaderboardWithScope(
+                      scope: 'GLOBAL',
+                      timeFrame: value,
+                      page: 0,
+                      size: 20,
+                    );
+                  },
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? AppColors.primaryTeal
+                          : AppColors.backgroundGray,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color:
+                            isSelected ? Colors.white : AppColors.textPrimary,
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+            const SizedBox(width: 12),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildMonthSelector() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -367,14 +481,14 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
         IconButton(
           icon: const Icon(Icons.chevron_left),
           onPressed: () {
-            setState(() => _selectedMonth = 'Tháng 09.2025');
+            setState(() => _selectedTimeFrame = 'MONTHLY');
           },
         ),
-        Text(_selectedMonth, style: AppTextStyles.bodyMedium),
+        Text(_selectedTimeFrame, style: AppTextStyles.bodyMedium),
         IconButton(
           icon: const Icon(Icons.chevron_right),
           onPressed: () {
-            setState(() => _selectedMonth = 'Tháng 10.2025');
+            setState(() => _selectedTimeFrame = 'MONTHLY');
           },
         ),
       ],
@@ -382,18 +496,35 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
   }
 
   Widget _buildCurrentUserRanking() {
-    return Consumer2<GamificationProvider, UserProvider>(
-      builder: (context, gamificationProvider, userProvider, _) {
+    return Consumer3<GamificationProvider, UserProvider, AuthProvider>(
+      builder: (context, gamificationProvider, userProvider, authProvider, _) {
         final userStats = gamificationProvider.currentUserStats;
+        final currentUserEntry =
+            gamificationProvider.currentUserEntryFromLeaderboard;
         final currentUser = userProvider.currentUser;
 
-        // Use user info if available, fallback to userStats
-        final userId = currentUser?.id ?? userStats?.userId ?? '';
+        // Use currentUserEntry from leaderboard API (preferred)
+        // Fallback to userStats if not available
+        final userId = currentUser?.id ??
+            currentUserEntry?.userId ??
+            userStats?.userId ??
+            '';
+        final userName = currentUser?.fullName ??
+            currentUserEntry?.username ??
+            userStats?.username ??
+            'Tên người dùng';
         final userAvatar = currentUser?.avatar ??
+            currentUserEntry?.avatarUrl ??
             userStats?.avatarUrl ??
             'https://i.pravatar.cc/150?u=$userId';
-        final points = userStats?.points ?? 0;
-        final rank = userStats?.rank ?? 0;
+
+        // Get points from currentUserEntry (from leaderboard API)
+        final points =
+            currentUserEntry?.totalPoints ?? authProvider.userPoints ?? 0;
+        final rank = currentUserEntry?.rank ?? userStats?.rank ?? 0;
+
+        print(
+            '[Leaderboard] _buildCurrentUserRanking - Using entry from leaderboard API, points: $points, rank: $rank');
 
         return Container(
           padding: const EdgeInsets.all(16),
@@ -436,9 +567,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
                             color: AppColors.success, size: 16),
                         const SizedBox(width: 4),
                         Text(
-                          userStats != null
-                              ? '${userStats.points} điểm'
-                              : 'Chưa có dữ liệu',
+                          points > 0 ? '$points điểm' : 'Chưa có dữ liệu',
                           style: AppTextStyles.bodySmall
                               .copyWith(color: AppColors.success),
                         ),
@@ -448,15 +577,8 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
                 ),
                 const SizedBox(height: 12),
                 if (currentUser != null || userStats != null)
-                  // Use FutureBuilder to fetch user name from API
-                  FutureBuilder<String>(
-                    future: _getUserName(userId),
-                    builder: (context, snapshot) {
-                      final userName = snapshot.data ??
-                          currentUser?.username ??
-                          userStats?.username ??
-                          'Tên người dùng';
-
+                  Builder(
+                    builder: (context) {
                       // Calculate rank based on comparison with top 20
                       final leaderboard = gamificationProvider.leaderboard;
                       final calculatedRank = _getUserRank(points, leaderboard);

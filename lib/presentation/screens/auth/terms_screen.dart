@@ -130,7 +130,71 @@ class TermsScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 24),
                     const Text(
-                      '4. Quyền sở hữu trí tuệ',
+                      '4. Chính sách ủng hộ từ thiện',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Toàn bộ lợi nhuận từ các giao dịch trên nền tảng Shareo sẽ được góp vào quỹ của Mặt trận Tổ quốc Việt Nam để hỗ trợ các hoạt động từ thiện. Bạn có thể xem thông tin tài khoản công khai dưới đây:',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: AppColors.textSecondary,
+                        height: 1.6,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.backgroundGray,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '🇻🇳 Ngân hàng TMCP Công Thương Việt Nam (VietinBank)',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textPrimary,
+                              height: 1.5,
+                            ),
+                          ),
+                          Text(
+                            'Tên tài khoản: Ban Vận động cứu trợ Trung ương',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: AppColors.textSecondary,
+                              height: 1.5,
+                            ),
+                          ),
+                          Text(
+                            'Số tài khoản: 55102025',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: AppColors.textSecondary,
+                              height: 1.5,
+                            ),
+                          ),
+                          Text(
+                            'Chi nhánh: Đông Hà Nội',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: AppColors.textSecondary,
+                              height: 1.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    const Text(
+                      '5. Quyền sở hữu trí tuệ',
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,

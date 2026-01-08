@@ -33,9 +33,9 @@ class AppHeaderBar extends StatefulWidget implements PreferredSizeWidget {
 class _AppHeaderBarState extends State<AppHeaderBar> {
   @override
   Widget build(BuildContext context) {
-    // Use provided orderCount if available, otherwise get from OrderProvider
+    // Use provided orderCount if available, otherwise get cart count from OrderProvider
     final displayCount =
-        widget.orderCount ?? context.watch<OrderProvider>().orderCount;
+        widget.orderCount ?? context.watch<OrderProvider>().cartCount;
 
     return AppBar(
       backgroundColor: Colors.transparent,
@@ -47,7 +47,7 @@ class _AppHeaderBarState extends State<AppHeaderBar> {
       ),
       title: null,
       actions: [
-        // Orders section with badge
+        // Cart section with badge
         GestureDetector(
           onTap: () => context.push(AppRoutes.orders),
           child: Padding(
@@ -56,24 +56,24 @@ class _AppHeaderBarState extends State<AppHeaderBar> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text('Đơn hàng', style: AppTextStyles.bodyLarge),
+                  const Text('Giỏ hàng', style: AppTextStyles.bodyLarge),
                   const SizedBox(width: 8),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: AppColors.badgePink,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      displayCount.toString(),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
+                  // Container(
+                  //   padding:
+                  //       const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  //   decoration: BoxDecoration(
+                  //     color: AppColors.badgePink,
+                  //     borderRadius: BorderRadius.circular(12),
+                  //   ),
+                  //   child: Text(
+                  //     displayCount.toString(),
+                  //     style: const TextStyle(
+                  //       color: Colors.white,
+                  //       fontSize: 12,
+                  //       fontWeight: FontWeight.bold,
+                  //     ),
+                  //   ),
+                  // ),
                 ],
               ),
             ),

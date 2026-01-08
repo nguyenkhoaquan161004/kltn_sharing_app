@@ -17,6 +17,7 @@ class ItemDto {
   final double? price;
   final bool? isCharityItem;
   final String? donationAmountFormatted;
+  final int? interestedCount;
 
   ItemDto({
     required this.id,
@@ -37,6 +38,7 @@ class ItemDto {
     this.price,
     this.isCharityItem,
     this.donationAmountFormatted,
+    this.interestedCount,
   });
 
   factory ItemDto.fromJson(Map<String, dynamic> json) {
@@ -65,6 +67,7 @@ class ItemDto {
       price: (json['price'] as num?)?.toDouble(),
       isCharityItem: json['isCharityItem'] as bool?,
       donationAmountFormatted: json['donationAmountFormatted'] as String?,
+      interestedCount: json['interestedCount'] as int?,
     );
   }
 }

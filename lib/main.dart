@@ -20,6 +20,7 @@ import 'data/providers/location_provider.dart';
 import 'data/providers/recommendation_provider.dart';
 import 'data/providers/notification_provider.dart';
 import 'data/providers/order_provider.dart';
+import 'data/providers/websocket_provider.dart';
 import 'data/services/auth_api_service.dart';
 import 'data/services/item_api_service.dart';
 import 'data/services/user_api_service.dart';
@@ -193,6 +194,10 @@ class MyApp extends StatelessWidget {
         Provider<MessageApiService>(
           create: (context) => MessageApiService(),
         ),
+        // WebSocket Provider for real-time messaging
+        ChangeNotifierProvider<WebSocketProvider>(
+          create: (_) => WebSocketProvider(),
+        ),
         // Order Provider - initialize with auth token and load order count
         ChangeNotifierProxyProvider2<AuthProvider, TransactionApiService,
             OrderProvider>(
@@ -226,11 +231,61 @@ class MyApp extends StatelessWidget {
           },
         ),
       ],
-      child: MaterialApp.router(
-        title: 'KLTN Sharing App',
-        theme: AppTheme.lightTheme,
-        routerConfig: AppRouter.router,
+      child: _AppInitializer(
+        child: MaterialApp.router(
+          title: 'KLTN Sharing App',
+          theme: AppTheme.lightTheme,
+          routerConfig: AppRouter.router,
+        ),
       ),
     );
+  }
+}
+
+/// Initialize app and restore session
+class _AppInitializer extends StatefulWidget {
+  final Widget child;
+
+  const _AppInitializer({required this.child});
+
+  @override
+  State<_AppInitializer> createState() => _AppInitializerState();
+}
+
+class _AppInitializerState extends State<_AppInitializer> {
+  @override
+  void initState() {
+    super.initState();
+    _initializeApp();
+  }
+
+  Future<void> _initializeApp() async {
+    try {
+      // Wait a moment for providers to be ready
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      if (mounted) {
+        final authProvider = context.read<AuthProvider>();
+        print('[AppInitializer] 🔄 Restoring session...');
+        await authProvider.restoreSession();
+        print('[AppInitializer] ✅ Session restoration complete');
+
+        // Load user profile if user is logged in
+        if (authProvider.isLoggedIn && authProvider.accessToken != null) {
+          print('[AppInitializer] 🔄 Loading user profile...');
+          final userProvider = context.read<UserProvider>();
+          userProvider.setAuthToken(authProvider.accessToken!);
+          await userProvider.loadCurrentUser();
+          print('[AppInitializer] ✅ User profile loaded');
+        }
+      }
+    } catch (e) {
+      print('[AppInitializer] ❌ Error initializing app: $e');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return widget.child;
   }
 }

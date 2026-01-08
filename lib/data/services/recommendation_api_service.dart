@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:kltn_sharing_app/core/config/app_config.dart';
 import 'package:kltn_sharing_app/core/utils/token_refresh_interceptor.dart';
 import 'package:kltn_sharing_app/data/models/recommendation_response_model.dart';
@@ -9,7 +10,7 @@ class RecommendationApiService {
   late TokenRefreshInterceptor _tokenRefreshInterceptor;
 
   RecommendationApiService() {
-    // Initialize token refresh interceptor FIRST before creating Dio
+    // Initialize token refresh interceptor FIRST
     _tokenRefreshInterceptor = TokenRefreshInterceptor();
 
     _dio = Dio(
@@ -24,7 +25,7 @@ class RecommendationApiService {
       ),
     );
 
-    // Add token refresh interceptor for handling 401/403 errors
+    // Add token refresh interceptor (recommendations require authentication)
     _dio.interceptors.add(_tokenRefreshInterceptor);
 
     // Add logging interceptor
@@ -53,11 +54,8 @@ class RecommendationApiService {
   void setGetValidTokenCallback(Future<String?> Function() callback) {
     try {
       _tokenRefreshInterceptor.setCallbacks(
-        getValidTokenCallback: callback,
-        onTokenExpiredCallback: () async {
-          print(
-              '[RecommendationAPI] Token refresh failed, user session expired');
-        },
+        getValidTokenCallback: () async => null,
+        onTokenExpiredCallback: callback,
       );
     } catch (e) {
       print('[RecommendationAPI] Error setting token refresh callback: $e');
@@ -75,12 +73,42 @@ class RecommendationApiService {
     _dio.options.headers.remove('Authorization');
   }
 
+  /// Ensure token is loaded from SharedPreferences before making API calls
+  /// This prevents "No refresh token available" errors when token was set earlier
+  Future<void> _ensureTokenLoaded() async {
+    try {
+      // Check if we already have a token set
+      final currentAuth = _dio.options.headers['Authorization'];
+      if (currentAuth != null && currentAuth.toString().isNotEmpty) {
+        return;
+      }
+
+      // Load token from SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      final savedToken = prefs.getString('access_token');
+
+      if (savedToken != null && savedToken.isNotEmpty) {
+        setAuthToken(savedToken);
+        print('[RecommendationAPI] ✅ Token loaded from SharedPreferences');
+      } else {
+        print(
+            '[RecommendationAPI] ⚠️  No saved token found in SharedPreferences');
+      }
+    } catch (e) {
+      print(
+          '[RecommendationAPI] ⚠️  Error loading token from SharedPreferences: $e');
+    }
+  }
+
   /// Get recommendations (Đề xuất)
   Future<RecommendationsResponse> getRecommendations({
     int page = 0,
     int size = 20,
   }) async {
     try {
+      // Ensure token is loaded from SharedPreferences before making the request
+      await _ensureTokenLoaded();
+
       final response = await _dio.get(
         '/api/v2/recommendations',
         queryParameters: {
@@ -118,6 +146,9 @@ class RecommendationApiService {
     int size = 20,
   }) async {
     try {
+      // Ensure token is loaded from SharedPreferences before making the request
+      await _ensureTokenLoaded();
+
       final response = await _dio.get(
         '/api/v2/recommendations/trending',
         queryParameters: {

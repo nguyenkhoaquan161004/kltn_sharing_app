@@ -68,7 +68,6 @@ class MessageApiService {
   /// Set authorization header with bearer token
   void setAuthToken(String accessToken) {
     _dio.options.headers['Authorization'] = 'Bearer $accessToken';
-    print('[MessageAPI] Token set');
   }
 
   /// Remove authorization header
@@ -85,22 +84,36 @@ class MessageApiService {
     String? itemId,
   }) async {
     try {
-      print('[MessageAPI] REQUEST[POST] => /api/v2/messages');
-      print('[MessageAPI] Body: {receiverId: $receiverId, content: $content}');
+      final requestBody = {
+        'receiverId': receiverId,
+        'content': content,
+        'messageType': messageType,
+        'itemId': itemId,
+      };
+
+      // Log auth header and request details
+      final authHeader =
+          _dio.options.headers['Authorization']?.toString() ?? 'NOT SET';
+      final headerPreview = authHeader.length > 50
+          ? '${authHeader.substring(0, 50)}...'
+          : authHeader;
+
+      print('[MessageAPI] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      print('[MessageAPI] 📤 SENDING MESSAGE');
+      print('[MessageAPI] Authorization: $headerPreview');
+      print('[MessageAPI] ReceiverID: $receiverId');
+      print('[MessageAPI] Request Body: $requestBody');
+      print('[MessageAPI] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
       final response = await _dio.post(
         '/api/v2/messages',
-        data: {
-          'receiverId': receiverId,
-          'content': content,
-          'messageType': messageType,
-          if (itemId != null) 'itemId': itemId,
-        },
+        data: requestBody,
       );
 
-      print('[MessageAPI] SUCCESS[${response.statusCode}] => Message sent');
-      print('[MessageAPI] Response data: ${response.data}');
-      print('[MessageAPI] Response data type: ${response.data.runtimeType}');
+      print('[MessageAPI] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      print('[MessageAPI] 📥 RESPONSE RECEIVED (${response.statusCode})');
+      print('[MessageAPI] Response Data: ${response.data}');
+      print('[MessageAPI] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
       final responseData = response.data;
       dynamic data;
@@ -110,12 +123,10 @@ class MessageApiService {
         // Try to get data from nested structure
         if (responseData.containsKey('data')) {
           data = responseData['data'];
-          print('[MessageAPI] First level data type: ${data.runtimeType}');
 
           // If data is still a Map with 'data' inside, dig deeper
           if (data is Map && data.containsKey('data')) {
             var innerData = data['data'];
-            print('[MessageAPI] Inner data type: ${innerData.runtimeType}');
             // Only dig deeper if it's still a Map
             if (innerData is Map) {
               data = innerData;
@@ -125,17 +136,11 @@ class MessageApiService {
           data = responseData;
         }
       } else {
-        print(
-            '[MessageAPI] Response data is not a Map: ${responseData.runtimeType}');
         data = responseData;
       }
 
-      print(
-          '[MessageAPI] Final data type before parsing: ${data.runtimeType}, value: $data');
-
       // Ensure data is a Map before casting
       if (data is! Map) {
-        print('[MessageAPI] ERROR: data is not Map, got ${data.runtimeType}');
         throw Exception(
             'Invalid response format: expected Map, got ${data.runtimeType}. Value: $data');
       }
@@ -144,23 +149,42 @@ class MessageApiService {
       final dataMap = Map<String, dynamic>.from(data as Map);
       final message = MessageModel.fromJson(dataMap);
 
-      print('[MessageAPI] ✅ Message parsed successfully');
-      print('[MessageAPI] Message ID: ${message.id}');
-      print('[MessageAPI] Message Type: "${message.messageType}"');
-      final contentPreview = message.content.length > 50
-          ? message.content.substring(0, 50)
-          : message.content;
-      print('[MessageAPI] Message Content: "$contentPreview..."');
+      print(
+          '[MessageAPI] ✅ Message parsed - ID: ${message.id}, itemId: ${message.itemId}');
 
       return message;
     } on DioException catch (e) {
-      print('[MessageAPI] ERROR[${e.response?.statusCode}] => ${e.message}');
+      print('[MessageAPI] ❌ ERROR: ${e.response?.statusCode} - ${e.message}');
+      print('[MessageAPI] Error Response Body: ${e.response?.data}');
 
-      throw Exception(
-        'Failed to send message: ${e.response?.statusCode} - ${e.message}',
-      );
+      // Log full response headers for 403
+      if (e.response?.statusCode == 403) {
+        print('[MessageAPI] 🔒 403 Forbidden - Request Headers:');
+        print(
+            '[MessageAPI]   Authorization: ${_dio.options.headers['Authorization']?.toString().substring(0, 50) ?? 'NOT SET'}');
+        print('[MessageAPI]   ContentType: ${_dio.options.contentType}');
+      }
+
+      // Try to extract error message from response
+      String errorMessage = 'Failed to send message: ${e.response?.statusCode}';
+      if (e.response?.data is Map) {
+        final errorData = e.response!.data as Map;
+        if (errorData.containsKey('message')) {
+          errorMessage = errorData['message'].toString();
+        } else if (errorData.containsKey('error')) {
+          errorMessage = errorData['error'].toString();
+        } else if (errorData.containsKey('errors')) {
+          // Check nested errors array
+          final errors = errorData['errors'];
+          if (errors is List && errors.isNotEmpty) {
+            errorMessage = errors[0].toString();
+          }
+        }
+      }
+
+      throw Exception(errorMessage);
     } catch (e) {
-      print('[MessageAPI] UNEXPECTED ERROR: $e');
+      print('[MessageAPI] 💥 UNEXPECTED ERROR: $e');
       rethrow;
     }
   }
@@ -173,9 +197,6 @@ class MessageApiService {
     int limit = 50,
   }) async {
     try {
-      print(
-          '[MessageAPI] REQUEST[GET] => /api/v2/messages/conversation/$otherUserId');
-
       final response = await _dio.get(
         '/api/v2/messages/conversation/$otherUserId',
         queryParameters: {
@@ -183,10 +204,6 @@ class MessageApiService {
           'limit': limit,
         },
       );
-
-      print(
-          '[MessageAPI] SUCCESS[${response.statusCode}] => Messages retrieved');
-      print('[MessageAPI] Response data: ${response.data}');
 
       final data = response.data;
 
@@ -219,13 +236,8 @@ class MessageApiService {
 
       return [];
     } on DioException catch (e) {
-      print('[MessageAPI] ERROR[${e.response?.statusCode}] => ${e.message}');
-
       // Temporary fallback: If 404, return mock conversation for testing
       if (e.response?.statusCode == 404) {
-        print(
-            '[MessageAPI] Conversation endpoint not found, returning empty list');
-        // Return empty list so chatbot can respond
         return [];
       }
 
@@ -239,14 +251,10 @@ class MessageApiService {
   /// GET /api/v2/messages/conversations
   Future<List<ConversationModel>> getAllConversations() async {
     try {
-      print('[MessageAPI] REQUEST[GET] => /api/v2/messages/conversations');
-
       final response = await _dio.get(
         '/api/v2/messages/conversations',
       );
 
-      print(
-          '[MessageAPI] SUCCESS[${response.statusCode}] => Conversations retrieved');
       final data = response.data['data'] as List<dynamic>;
 
       return data
@@ -254,7 +262,6 @@ class MessageApiService {
               ConversationModel.fromJson(conv as Map<String, dynamic>))
           .toList();
     } on DioException catch (e) {
-      print('[MessageAPI] ERROR[${e.response?.statusCode}] => ${e.message}');
       throw Exception(
         'Failed to get conversations: ${e.response?.statusCode} - ${e.message}',
       );
@@ -265,14 +272,10 @@ class MessageApiService {
   /// GET /api/v2/messages/unread/count
   Future<int> getUnreadCount() async {
     try {
-      print('[MessageAPI] REQUEST[GET] => /api/v2/messages/unread/count');
-
       final response = await _dio.get(
         '/api/v2/messages/unread/count',
       );
 
-      print(
-          '[MessageAPI] SUCCESS[${response.statusCode}] => Unread count retrieved');
       return response.data['data'] as int;
     } on DioException catch (e) {
       print('[MessageAPI] ERROR[${e.response?.statusCode}] => ${e.message}');
@@ -286,15 +289,10 @@ class MessageApiService {
   /// PUT /api/v2/messages/{messageId}/read
   Future<void> markMessageAsRead(String messageId) async {
     try {
-      print('[MessageAPI] REQUEST[PUT] => /api/v2/messages/$messageId/read');
-
       await _dio.put(
         '/api/v2/messages/$messageId/read',
       );
-
-      print('[MessageAPI] SUCCESS[200] => Message marked as read');
     } on DioException catch (e) {
-      print('[MessageAPI] ERROR[${e.response?.statusCode}] => ${e.message}');
       throw Exception(
         'Failed to mark message as read: ${e.response?.statusCode} - ${e.message}',
       );
@@ -305,16 +303,10 @@ class MessageApiService {
   /// PUT /api/v2/messages/conversation/{otherUserId}/read
   Future<void> markConversationAsRead(String otherUserId) async {
     try {
-      print(
-          '[MessageAPI] REQUEST[PUT] => /api/v2/messages/conversation/$otherUserId/read');
-
       await _dio.put(
         '/api/v2/messages/conversation/$otherUserId/read',
       );
-
-      print('[MessageAPI] SUCCESS[200] => Conversation marked as read');
     } on DioException catch (e) {
-      print('[MessageAPI] ERROR[${e.response?.statusCode}] => ${e.message}');
       throw Exception(
         'Failed to mark conversation as read: ${e.response?.statusCode} - ${e.message}',
       );
@@ -327,9 +319,6 @@ class MessageApiService {
     required String message,
   }) async {
     try {
-      print('[ChatAPI] REQUEST[POST] => /api/v2/chat');
-      print('[ChatAPI] Body: {message: $message}');
-
       final response = await _dio.post(
         '/api/v2/chat',
         data: {
@@ -337,17 +326,11 @@ class MessageApiService {
         },
       );
 
-      print(
-          '[ChatAPI] SUCCESS[${response.statusCode}] => Message sent to chatbot');
-      print('[ChatAPI] Response: ${response.data}');
-
-      // Return the response data
       if (response.data is Map) {
         return Map<String, dynamic>.from(response.data as Map);
       }
       return response.data as Map<String, dynamic>;
     } on DioException catch (e) {
-      print('[ChatAPI] ERROR[${e.response?.statusCode}] => ${e.message}');
       throw Exception(
         'Failed to send chatbot message: ${e.response?.statusCode} - ${e.message}',
       );

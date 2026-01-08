@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 import '../presentation/screens/welcome_screen.dart';
 import '../presentation/screens/onboarding/onboarding_screen.dart';
 import '../presentation/screens/auth/login_screen.dart';
@@ -39,6 +40,7 @@ import '../presentation/screens/leaderboard/leaderboard_screen.dart';
 import '../presentation/screens/notifications/notifications_screen.dart';
 import '../presentation/screens/error/error_404_screen.dart';
 import '../core/constants/app_routes.dart';
+import '../data/providers/auth_provider.dart';
 
 class AppRouter {
   // Helper function để tạo smooth page transition
@@ -73,9 +75,52 @@ class AppRouter {
     );
   }
 
+  /// Redirect logic to check authentication status
+  static String? _redirect(BuildContext context, GoRouterState state) {
+    try {
+      final authProvider = context.read<AuthProvider>();
+      final isLoggedIn = authProvider.isLoggedIn;
+      final isGoingToAuth = state.matchedLocation == AppRoutes.splash ||
+          state.matchedLocation == AppRoutes.onboarding ||
+          state.matchedLocation == AppRoutes.login ||
+          state.matchedLocation == AppRoutes.register ||
+          state.matchedLocation.startsWith(AppRoutes.emailInput) ||
+          state.matchedLocation.startsWith('/email-verification') ||
+          state.matchedLocation.startsWith('/forgot-password') ||
+          state.matchedLocation.startsWith('/reset-password') ||
+          state.matchedLocation.startsWith('/otp');
+
+      // If logged in and trying to access auth pages, go to home
+      if (isLoggedIn &&
+          isGoingToAuth &&
+          state.matchedLocation != AppRoutes.splash) {
+        print('[Router] ✅ User is logged in, redirecting to home');
+        return AppRoutes.home;
+      }
+
+      // If not logged in and trying to access protected pages, go to login
+      if (!isLoggedIn && !isGoingToAuth) {
+        print('[Router] ⚠️  User not logged in, redirecting to login');
+        return AppRoutes.login;
+      }
+
+      // If on splash screen and already logged in, go to home
+      if (isLoggedIn && state.matchedLocation == AppRoutes.splash) {
+        print('[Router] ✅ User already logged in, skipping to home');
+        return AppRoutes.home;
+      }
+
+      return null;
+    } catch (e) {
+      print('[Router] Error in redirect: $e');
+      return null;
+    }
+  }
+
   static final GoRouter router = GoRouter(
     initialLocation: AppRoutes.splash,
     errorBuilder: (context, state) => const Error404Screen(),
+    redirect: _redirect,
     routes: [
       // Auth routes
       GoRoute(

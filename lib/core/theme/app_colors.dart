@@ -44,9 +44,9 @@ class AppColors {
 
   // Achievement colors
   static const Color achievementGold = Color(0xFFFDD835);
-  static const Color achievementSilver = Color(0xFFBDBDBD);
+  static const Color achievementSilver = Color.fromARGB(255, 255, 255, 255);
   static const Color achievementBronze = Color(0xFFFF8A65);
-  static const Color achievementLocked = Color(0xFFE0E0E0);
+  static const Color achievementLocked = Color.fromARGB(255, 237, 237, 237);
 
   // Chat colors
   static const Color chatSender = Color(0xFF455A64);

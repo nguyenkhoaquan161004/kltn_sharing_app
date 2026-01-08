@@ -1,16 +1,11 @@
 import 'package:dio/dio.dart';
 import 'package:kltn_sharing_app/core/config/app_config.dart';
-import 'package:kltn_sharing_app/core/utils/token_refresh_interceptor.dart';
 import 'package:kltn_sharing_app/data/models/category_response_model.dart';
 
 class CategoryApiService {
   late Dio _dio;
-  late TokenRefreshInterceptor _tokenRefreshInterceptor;
 
   CategoryApiService() {
-    // Initialize token refresh interceptor FIRST before creating Dio
-    _tokenRefreshInterceptor = TokenRefreshInterceptor();
-
     _dio = Dio(
       BaseOptions(
         baseUrl: AppConfig.baseUrl,
@@ -23,10 +18,7 @@ class CategoryApiService {
       ),
     );
 
-    // Add token refresh interceptor for handling 401/403 errors
-    _dio.interceptors.add(_tokenRefreshInterceptor);
-
-    // Add logging interceptor
+    // Add logging interceptor only (categories are public API)
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) {
@@ -49,16 +41,8 @@ class CategoryApiService {
 
   /// Set callback to get valid access token from AuthProvider
   void setGetValidTokenCallback(Future<String?> Function() callback) {
-    try {
-      _tokenRefreshInterceptor.setCallbacks(
-        getValidTokenCallback: callback,
-        onTokenExpiredCallback: () async {
-          print('[CategoryAPI] Token refresh failed, user session expired');
-        },
-      );
-    } catch (e) {
-      print('[CategoryAPI] Error setting token refresh callback: $e');
-    }
+    // Not needed for public categories API
+    print('[CategoryAPI] setGetValidTokenCallback called (not needed)');
   }
 
   /// Update Dio baseUrl when backend switches

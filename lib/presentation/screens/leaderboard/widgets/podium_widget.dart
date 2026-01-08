@@ -73,131 +73,126 @@ class PodiumWidget extends StatelessWidget {
     required Color podiumColor,
     Color? crownColor,
   }) {
-    return GestureDetector(
-      onTap: () {
-        context.push(AppRoutes.getUserProfileRoute(user.id));
-      },
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          // Crown for 1st place
-          if (crownColor != null)
-            Icon(
-              Icons.workspace_premium,
-              color: crownColor,
-              size: 24,
-            ),
-          const SizedBox(height: 2),
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
+        // Crown for 1st place
+        if (crownColor != null)
+          Icon(
+            Icons.workspace_premium,
+            color: crownColor,
+            size: 24,
+          ),
+        const SizedBox(height: 2),
 
-          // Avatar
-          Container(
-            width: rank == 1 ? 70 : 56,
-            height: rank == 1 ? 70 : 56,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: _getRankColor(rank),
-                width: 2.5,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: _getRankColor(rank).withOpacity(0.3),
-                  blurRadius: 8,
-                  spreadRadius: 1,
-                ),
-              ],
+        // Avatar
+        Container(
+          width: rank == 1 ? 70 : 56,
+          height: rank == 1 ? 70 : 56,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: _getRankColor(rank),
+              width: 2.5,
             ),
-            child: ClipOval(
-              child: user.avatar.isNotEmpty
-                  ? Image.network(
-                      user.avatar,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        // Show fallback avatar on error
-                        return Container(
-                          color: AppColors.backgroundGray,
-                          child: const Icon(
-                            Icons.person,
-                            size: 24,
-                            color: AppColors.textSecondary,
-                          ),
-                        );
-                      },
-                    )
-                  : Container(
-                      color: AppColors.backgroundGray,
-                      child: const Icon(
-                        Icons.person,
-                        size: 24,
-                        color: AppColors.textSecondary,
-                      ),
+            boxShadow: [
+              BoxShadow(
+                color: _getRankColor(rank).withOpacity(0.3),
+                blurRadius: 8,
+                spreadRadius: 1,
+              ),
+            ],
+          ),
+          child: ClipOval(
+            child: user.avatar.isNotEmpty
+                ? Image.network(
+                    user.avatar,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) {
+                      // Show fallback avatar on error
+                      return Container(
+                        color: AppColors.backgroundGray,
+                        child: const Icon(
+                          Icons.person,
+                          size: 24,
+                          color: AppColors.textSecondary,
+                        ),
+                      );
+                    },
+                  )
+                : Container(
+                    color: AppColors.backgroundGray,
+                    child: const Icon(
+                      Icons.person,
+                      size: 24,
+                      color: AppColors.textSecondary,
                     ),
+                  ),
+          ),
+        ),
+        const SizedBox(height: 6),
+
+        // Name
+        SizedBox(
+          width: 70,
+          child: Text(
+            user.name,
+            style: AppTextStyles.caption.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+
+        // Points
+        Text(
+          '${user.points}',
+          style: TextStyle(
+            fontSize: 11,
+            color: Colors.grey[600],
+          ),
+        ),
+        const SizedBox(height: 6),
+
+        // Podium
+        Container(
+          width: rank == 1 ? 90 : 70,
+          height: podiumHeight,
+          decoration: BoxDecoration(
+            color: podiumColor,
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(10),
+              topRight: Radius.circular(10),
             ),
           ),
-          const SizedBox(height: 6),
-
-          // Name
-          SizedBox(
-            width: 70,
-            child: Text(
-              user.name,
-              style: AppTextStyles.caption.copyWith(
-                fontWeight: FontWeight.w600,
+          child: Center(
+            child: Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: _getRankColor(rank).withOpacity(0.2),
+                border: Border.all(
+                  color: _getRankColor(rank),
+                  width: 2,
+                ),
               ),
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-
-          // Points
-          Text(
-            '${user.points}',
-            style: TextStyle(
-              fontSize: 11,
-              color: Colors.grey[600],
-            ),
-          ),
-          const SizedBox(height: 6),
-
-          // Podium
-          Container(
-            width: rank == 1 ? 90 : 70,
-            height: podiumHeight,
-            decoration: BoxDecoration(
-              color: podiumColor,
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(10),
-                topRight: Radius.circular(10),
-              ),
-            ),
-            child: Center(
-              child: Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: _getRankColor(rank).withOpacity(0.2),
-                  border: Border.all(
+              child: Center(
+                child: Text(
+                  '$rank',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
                     color: _getRankColor(rank),
-                    width: 2,
-                  ),
-                ),
-                child: Center(
-                  child: Text(
-                    '$rank',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: _getRankColor(rank),
-                    ),
                   ),
                 ),
               ),
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 

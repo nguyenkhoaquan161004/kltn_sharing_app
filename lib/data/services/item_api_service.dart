@@ -1,4 +1,6 @@
 import 'package:dio/dio.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 import 'package:kltn_sharing_app/core/config/app_config.dart';
 import 'package:kltn_sharing_app/core/utils/token_refresh_interceptor.dart';
 import 'package:kltn_sharing_app/data/models/item_response_model.dart';
@@ -7,6 +9,8 @@ import 'package:kltn_sharing_app/data/models/transaction_model.dart';
 
 class ItemApiService {
   late Dio _dio;
+  late Dio
+      _dioNoAuth; // Dio instance without token refresh for public endpoints
   late TokenRefreshInterceptor _tokenRefreshInterceptor;
 
   ItemApiService() {
@@ -49,6 +53,40 @@ class ItemApiService {
         },
       ),
     );
+
+    // Create a separate Dio instance for public endpoints (no token refresh)
+    _dioNoAuth = Dio(
+      BaseOptions(
+        baseUrl: AppConfig.baseUrl,
+        connectTimeout: Duration(seconds: AppConfig.requestTimeoutSeconds),
+        receiveTimeout: Duration(seconds: AppConfig.requestTimeoutSeconds),
+        contentType: 'application/json',
+        headers: {
+          'Accept': 'application/json',
+        },
+      ),
+    );
+
+    // Add logging interceptor to _dioNoAuth
+    _dioNoAuth.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (options, handler) {
+          print(
+              '[ItemAPI-NoAuth] REQUEST[${options.method}] => ${options.path}');
+          return handler.next(options);
+        },
+        onResponse: (response, handler) {
+          print(
+              '[ItemAPI-NoAuth] RESPONSE[${response.statusCode}] => ${response.requestOptions.path}');
+          return handler.next(response);
+        },
+        onError: (e, handler) {
+          print(
+              '[ItemAPI-NoAuth] ERROR[${e.response?.statusCode}] => ${e.requestOptions.path}');
+          return handler.next(e);
+        },
+      ),
+    );
   }
 
   /// Set token refresh callback (delegates to TokenRefreshInterceptor)
@@ -76,6 +114,33 @@ class ItemApiService {
     _dio.options.headers.remove('Authorization');
   }
 
+  /// Ensure token is loaded from SharedPreferences before making API calls
+  /// This prevents "No refresh token available" errors when token was set earlier
+  Future<void> _ensureTokenLoaded() async {
+    try {
+      // Check if we already have a token set
+      final currentAuth = _dio.options.headers['Authorization'];
+      if (currentAuth != null && currentAuth.toString().isNotEmpty) {
+        print(
+            '[ItemAPI] Token already set: ${currentAuth.toString().substring(0, 30)}...');
+        return;
+      }
+
+      // Load token from SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      final savedToken = prefs.getString('access_token');
+
+      if (savedToken != null && savedToken.isNotEmpty) {
+        setAuthToken(savedToken);
+        print('[ItemAPI] ✅ Token loaded from SharedPreferences');
+      } else {
+        print('[ItemAPI] ⚠️  No saved token found in SharedPreferences');
+      }
+    } catch (e) {
+      print('[ItemAPI] ⚠️  Error loading token from SharedPreferences: $e');
+    }
+  }
+
   /// Update Dio baseUrl when backend switches
   void _updateDioBaseUrl() {
     _dio.options.baseUrl = AppConfig.baseUrl;
@@ -91,21 +156,41 @@ class ItemApiService {
     int size = 10,
     String? status = 'AVAILABLE',
     String? sortBy = 'createdAt',
-    String? sortDirection = 'DESC',
+    String? sortDirection = 'ASC',
   }) async {
     try {
+      // Validate coordinates
+      if (latitude.isNaN ||
+          latitude.isInfinite ||
+          longitude.isNaN ||
+          longitude.isInfinite) {
+        throw Exception('Invalid coordinates: lat=$latitude, lon=$longitude');
+      }
+      if (latitude < -90 ||
+          latitude > 90 ||
+          longitude < -180 ||
+          longitude > 180) {
+        throw Exception(
+            'Coordinates out of range: lat=$latitude, lon=$longitude');
+      }
+
+      // Ensure token is loaded from SharedPreferences before making the request
+      await _ensureTokenLoaded();
+
       print(
           '[ItemAPI.searchNearbyItems] Starting - lat: $latitude, lon: $longitude, page: $page');
 
       final queryParams = {
         'page': page + 1, // BE expects 1-based page numbering
         'limit': size,
-        'latitude': latitude,
-        'longitude': longitude,
-        'radiusKm': radiusKm,
+        'userLat': latitude,
+        'userLon': longitude,
+        'maxDistanceKm':
+            radiusKm, // Backend bug: causes 500 error with geo query
         if (status != null && status.isNotEmpty) 'status': status,
-        'sortBy': sortBy,
-        'sortOrder': sortDirection,
+        // TODO: Backend may not support sort + geo filter together
+        // 'sortBy': sortBy,
+        // 'sortOrder': sortDirection,
       };
       print('[ItemAPI] searchNearbyItems called with:');
       print('[ItemAPI]   latitude: $latitude, longitude: $longitude');
@@ -116,6 +201,8 @@ class ItemApiService {
         '/api/v2/items',
         queryParameters: queryParams,
       );
+
+      print('[ItemAPI] searchNearbyItems URL: ${response.requestOptions.uri}');
 
       if (response.statusCode == 200) {
         final data = response.data;
@@ -150,6 +237,11 @@ class ItemApiService {
     } on DioException catch (e) {
       print(
           '[ItemAPI.searchNearbyItems] DioException: ${e.response?.statusCode} - ${e.message}');
+      // Print error response for debugging
+      if (e.response?.statusCode == 500) {
+        print(
+            '[ItemAPI.searchNearbyItems] Server error response: ${e.response?.data}');
+      }
       throw _handleDioException(e);
     }
   }
@@ -166,9 +258,12 @@ class ItemApiService {
     String? categoryId,
     String? status = 'AVAILABLE',
     String? sortBy = 'createdAt',
-    String? sortDirection = 'DESC',
+    String? sortDirection = 'ASC',
   }) async {
     try {
+      // Ensure token is loaded from SharedPreferences before making the request
+      await _ensureTokenLoaded();
+
       final queryParams = {
         'page': page + 1, // BE expects 1-based page numbering
         'limit': size,
@@ -230,6 +325,9 @@ class ItemApiService {
   /// Get single item by ID
   Future<ItemDto> getItem(String itemId) async {
     try {
+      // Ensure token is loaded from SharedPreferences before making the request
+      await _ensureTokenLoaded();
+
       final response = await _dio.get('/api/v2/items/$itemId');
 
       if (response.statusCode == 200) {
@@ -257,6 +355,9 @@ class ItemApiService {
     String? sortOrder = 'DESC',
   }) async {
     try {
+      // Ensure token is loaded from SharedPreferences before making the request
+      await _ensureTokenLoaded();
+
       final Map<String, dynamic> queryParams = {
         'page': page,
         'limit': size,
@@ -689,6 +790,89 @@ class ItemApiService {
           '[ItemAPI] ERROR[${e.response?.statusCode}] => Failed to get search history');
       // Return empty list on error instead of throwing
       return [];
+    }
+  }
+
+  /// Get recent search history
+  /// GET /api/v2/search/history/recent (Requires authentication)
+  Future<List<String>> getRecentSearchHistory({int limit = 5}) async {
+    try {
+      print(
+          '[ItemAPI] REQUEST[GET] => /api/v2/search/history/recent?limit=$limit');
+
+      final response = await _dio.get(
+        '/api/v2/search/history/recent',
+        queryParameters: {
+          'limit': limit,
+        },
+      );
+
+      print(
+          '[ItemAPI] RESPONSE[${response.statusCode}] => Recent search history retrieved');
+
+      // Parse response
+      if (response.data is Map) {
+        var data = response.data['data'];
+        print('[ItemAPI] DATA TYPE: ${data.runtimeType}');
+        print('[ItemAPI] DATA VALUE: $data');
+
+        if (data is List) {
+          print('[ItemAPI] Processing List with ${data.length} items');
+          final result = <String>[];
+
+          for (var item in data) {
+            print('[ItemAPI] Item type: ${item.runtimeType}, value: $item');
+
+            Map<String, dynamic> itemMap;
+
+            // If item is a String, parse it as JSON
+            if (item is String) {
+              itemMap = jsonDecode(item);
+            } else if (item is Map) {
+              itemMap = Map<String, dynamic>.from(item);
+            } else {
+              continue;
+            }
+
+            final query = itemMap['query']?.toString();
+            if (query != null && query.isNotEmpty) {
+              print('[ItemAPI] Extracted query: $query');
+              result.add(query);
+            }
+          }
+
+          print('[ItemAPI] Final result: $result');
+          return result;
+        }
+      }
+
+      return [];
+    } on DioException catch (e) {
+      print(
+          '[ItemAPI] ERROR[${e.response?.statusCode}] => Failed to get recent search history');
+      print('[ItemAPI] ERROR MESSAGE: ${e.message}');
+      return [];
+    }
+  }
+
+  /// Delete all search history
+  /// DELETE /api/v2/search/history
+  Future<bool> deleteSearchHistory() async {
+    try {
+      print('[ItemAPI] REQUEST[DELETE] => /api/v2/search/history');
+
+      final response = await _dio.delete(
+        '/api/v2/search/history',
+      );
+
+      print(
+          '[ItemAPI] RESPONSE[${response.statusCode}] => Search history deleted');
+      return response.statusCode == 200 || response.statusCode == 204;
+    } on DioException catch (e) {
+      print(
+          '[ItemAPI] ERROR[${e.response?.statusCode}] => Failed to delete search history');
+      print('[ItemAPI] ERROR MESSAGE: ${e.message}');
+      return false;
     }
   }
 }

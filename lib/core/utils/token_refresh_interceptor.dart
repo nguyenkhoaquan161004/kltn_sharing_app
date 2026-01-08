@@ -3,7 +3,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:kltn_sharing_app/data/models/auth_response_model.dart';
 import 'package:kltn_sharing_app/core/config/app_config.dart';
 
-/// Interceptor for handling token refresh on 401 errors
+/// Interceptor for handling token refresh on 401/403 errors
+/// 🔥 FIX: Now handles both 401 (try refresh) and 403 (immediate logout)
 class TokenRefreshInterceptor extends InterceptorsWrapper {
   static const String _accessTokenKey = 'access_token';
   static const String _refreshTokenKey = 'refresh_token';
@@ -20,7 +21,7 @@ class TokenRefreshInterceptor extends InterceptorsWrapper {
 
   TokenRefreshInterceptor({
     Future<void> Function()? onTokenExpiredCallback,
-  })  : _onTokenExpiredCallback = onTokenExpiredCallback {
+  }) : _onTokenExpiredCallback = onTokenExpiredCallback {
     _authDio = Dio(
       BaseOptions(
         baseUrl: AppConfig.authBaseUrl,
@@ -57,10 +58,27 @@ class TokenRefreshInterceptor extends InterceptorsWrapper {
   @override
   Future<void> onError(
       DioException err, ErrorInterceptorHandler handler) async {
-    // Only handle 401/403 errors
-    if (err.response?.statusCode != 401 && err.response?.statusCode != 403) {
+    final statusCode = err.response?.statusCode;
+
+    // ✅ Rule rõ ràng:
+    // 401 Unauthorized → token hết hạn → refresh
+    // 403 Forbidden → quyền không đủ → reject (KHÔNG refresh)
+
+    if (statusCode == 403) {
+      print(
+          '[TokenRefreshInterceptor] 🚫 403 Forbidden - Permission denied, NOT a token issue');
+      print('[TokenRefreshInterceptor] Path: ${err.requestOptions.path}');
+      print(
+          '[TokenRefreshInterceptor] Check: user role/scope hoặc endpoint permission');
       return handler.next(err);
     }
+
+    if (statusCode != 401) {
+      return handler.next(err);
+    }
+
+    print(
+        '[TokenRefreshInterceptor] 🔥 401 Unauthorized - token expired, attempting refresh');
 
     // Wait for SharedPreferences to be initialized
     try {
@@ -69,6 +87,17 @@ class TokenRefreshInterceptor extends InterceptorsWrapper {
       print(
           '[TokenRefreshInterceptor] Failed to initialize SharedPreferences: $e');
       return handler.next(err);
+    }
+
+    // Check if token is already expired by checking expiration time
+    final tokenExpiresAt = _prefs.getString(_tokenExpiresAtKey);
+    if (tokenExpiresAt != null) {
+      final expiresAt = DateTime.parse(tokenExpiresAt);
+      if (DateTime.now().isBefore(expiresAt)) {
+        // Token is still valid but server returned 401 (might be revoked or invalidated)
+        print(
+            '[TokenRefreshInterceptor] ⚠️  Token appears valid (exp: $expiresAt) but got 401 - may be revoked/invalidated');
+      }
     }
 
     if (_isRefreshing) {

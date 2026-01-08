@@ -117,6 +117,13 @@ class _SearchScreenState extends State<SearchScreen> {
   void initState() {
     super.initState();
     _itemApiService = ItemApiService();
+    // Set token from AuthProvider to ensure search history API has authorization
+    final authProvider = context.read<AuthProvider>();
+    if (authProvider.accessToken != null) {
+      _itemApiService.setAuthToken(authProvider.accessToken!);
+      print(
+          '[SearchScreen] Token set on ItemApiService: ${authProvider.accessToken!.substring(0, 20)}...');
+    }
     // Load categories on init
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<CategoryProvider>().loadCategories();
@@ -126,36 +133,30 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Future<void> _loadSearchHistory() async {
     try {
-      final authProvider = context.read<AuthProvider>();
-      final userId = authProvider.userId;
-
-      if (userId == null) {
-        print('[SearchScreen] User ID is null, cannot load search history');
-        return;
-      }
-
       setState(() {
         _isLoadingSearchHistory = true;
       });
 
-      final searchTerms = await _itemApiService.getSearchHistory(
-        userId: userId,
+      // Use the new /api/v2/search/history/recent endpoint
+      final searchTerms = await _itemApiService.getRecentSearchHistory(
         limit: 5,
       );
 
+      print('[SearchScreen] Search terms loaded: $searchTerms');
+      print('[SearchScreen] Search terms count: ${searchTerms.length}');
+
       setState(() {
-        // Convert search terms to display format
+        // Convert search terms to display format - just keep the keyword
         recentSearches = searchTerms.map((term) {
           return {
             'term': term,
-            'time': 'Gần đây',
           };
         }).toList();
         _isLoadingSearchHistory = false;
       });
 
       print(
-          '[SearchScreen] Loaded ${recentSearches.length} search history items');
+          '[SearchScreen] Loaded ${recentSearches.length} recent search history items');
     } catch (e) {
       print('[SearchScreen] Error loading search history: $e');
       setState(() {
@@ -202,6 +203,57 @@ class _SearchScreenState extends State<SearchScreen> {
       'categoryId': categoryId,
       'categoryName': categoryName
     }).then((_) => print('[SearchScreen] Navigation completed'));
+  }
+
+  Future<void> _deleteSearchHistory() async {
+    try {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Xóa lịch sử tìm kiếm'),
+          content:
+              const Text('Bạn có chắc chắn muốn xóa toàn bộ lịch sử tìm kiếm?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Hủy'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Xóa'),
+            ),
+          ],
+        ),
+      );
+
+      if (confirmed != true) return;
+
+      final success = await _itemApiService.deleteSearchHistory();
+
+      if (success) {
+        setState(() {
+          recentSearches.clear();
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Đã xóa lịch sử tìm kiếm')),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Lỗi khi xóa lịch sử tìm kiếm')),
+          );
+        }
+      }
+    } catch (e) {
+      print('[SearchScreen] Error deleting search history: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Lỗi: $e')),
+        );
+      }
+    }
   }
 
   Future<void> _handleImageSearch() async {
@@ -427,62 +479,93 @@ class _SearchScreenState extends State<SearchScreen> {
               const Text(
                 'Tìm kiếm gần đây',
                 style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
                   color: AppColors.textPrimary,
                 ),
               ),
-              const SizedBox(height: 12),
-              ListView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: recentSearches.length,
-                itemBuilder: (context, index) {
-                  final search = recentSearches[index];
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: GestureDetector(
-                      onTap: () => _navigateToResults(search['term']),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.history,
-                              color: AppColors.textSecondary, size: 20),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
+              const SizedBox(height: 16),
+              if (recentSearches.isEmpty)
+                Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 24),
+                    child: Column(
+                      children: [
+                        Icon(
+                          Icons.history,
+                          size: 48,
+                          color: AppColors.textSecondary.withOpacity(0.3),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'Chưa có lịch sử tìm kiếm',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: AppColors.textSecondary.withOpacity(0.6),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              else
+                Column(
+                  children: [
+                    ListView.separated(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: recentSearches.length,
+                      separatorBuilder: (context, index) =>
+                          const SizedBox(height: 8),
+                      itemBuilder: (context, index) {
+                        final search = recentSearches[index];
+                        return GestureDetector(
+                          onTap: () => _navigateToResults(search['term']),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.history,
+                                color: AppColors.textSecondary.withOpacity(0.6),
+                                size: 18,
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
                                   search['term'],
                                   style: const TextStyle(
                                     fontSize: 14,
                                     color: AppColors.textPrimary,
+                                    fontWeight: FontWeight.w500,
                                   ),
+                                  overflow: TextOverflow.ellipsis,
                                 ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  search['time'],
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    color: AppColors.textSecondary,
-                                  ),
-                                ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
-                          IconButton(
-                            icon: const Icon(Icons.close,
-                                color: AppColors.textSecondary, size: 18),
-                            onPressed: () {
-                              setState(() => recentSearches.removeAt(index));
-                            },
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: _deleteSearchHistory,
+                        icon: const Icon(Icons.delete_outline, size: 18),
+                        label: const Text('Xóa lịch sử tìm kiếm'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.textSecondary,
+                          side: BorderSide(
+                            color: AppColors.textSecondary.withOpacity(0.3),
                           ),
-                        ],
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
                       ),
                     ),
-                  );
-                },
-              ),
+                  ],
+                ),
               // const SizedBox(height: 24),
               // const Text(
               //   'Gợi ý tìm kiếm',

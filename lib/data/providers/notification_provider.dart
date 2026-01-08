@@ -9,13 +9,20 @@ class NotificationProvider extends ChangeNotifier {
   List<NotificationModel> _notifications = [];
   int _unreadCount = 0;
   bool _isLoading = false;
+  bool _isLoadingMore = false;
   String? _errorMessage;
+  int _currentPage = 1;
+  int _totalPages = 1;
+  int _pageSize = 20;
 
   // Getters
   List<NotificationModel> get notifications => _notifications;
   int get unreadCount => _unreadCount;
   bool get isLoading => _isLoading;
+  bool get isLoadingMore => _isLoadingMore;
   String? get errorMessage => _errorMessage;
+  int get currentPage => _currentPage;
+  int get totalPages => _totalPages;
 
   List<NotificationModel> get unreadNotifications =>
       _notifications.where((n) => !n.isRead).toList();
@@ -27,7 +34,7 @@ class NotificationProvider extends ChangeNotifier {
     }
   }
 
-  /// Fetch notifications paginated
+  /// Fetch notifications paginated (fresh fetch)
   Future<void> fetchNotifications({int page = 1, int limit = 20}) async {
     _isLoading = true;
     _errorMessage = null;
@@ -46,11 +53,20 @@ class NotificationProvider extends ChangeNotifier {
               NotificationModel.fromJson(item as Map<String, dynamic>))
           .toList();
 
+      // Extract pagination info
+      _currentPage = response['page'] ?? 1;
+      _pageSize = response['limit'] ?? 20;
+      final total = response['totalElements'] ??
+          0; // API uses 'totalElements' not 'total'
+      _totalPages = total > 0 ? (total / _pageSize).ceil() : 1;
+
       // Update unread count from fetched notifications
       _unreadCount = _notifications.where((n) => !n.isRead).length;
 
       print(
-          '[NotificationProvider] Fetched ${_notifications.length} notifications');
+          '[NotificationProvider] Fetched ${_notifications.length} notifications (page $_currentPage/$_totalPages), totalElements=$total');
+      print(
+          '[NotificationProvider] Response pagination: page=${response['page']}, limit=${response['limit']}, totalElements=${response['totalElements']}');
       print('[NotificationProvider] Unread count: $_unreadCount');
       _isLoading = false;
       notifyListeners();
@@ -59,6 +75,54 @@ class NotificationProvider extends ChangeNotifier {
       _isLoading = false;
       notifyListeners();
       print('[NotificationProvider] Error: $_errorMessage');
+    }
+  }
+
+  /// Load more notifications (append to existing list)
+  Future<void> loadMoreNotifications() async {
+    if (_isLoadingMore || _currentPage >= _totalPages) {
+      print(
+          '[NotificationProvider] Already loading or at last page. isLoadingMore=$_isLoadingMore, currentPage=$_currentPage, totalPages=$_totalPages');
+      return;
+    }
+
+    _isLoadingMore = true;
+    notifyListeners();
+
+    try {
+      final nextPage = _currentPage + 1;
+      print('[NotificationProvider] Loading page $nextPage...');
+      final response = await _notificationService.getNotifications(
+        page: nextPage,
+        limit: _pageSize,
+      );
+
+      // Handle ApiResponse structure
+      final notificationsList = response['data'] as List? ?? [];
+      final newNotifications = notificationsList
+          .map((item) =>
+              NotificationModel.fromJson(item as Map<String, dynamic>))
+          .toList();
+
+      // Append to existing list
+      _notifications.addAll(newNotifications);
+
+      // Update pagination info
+      _currentPage = response['page'] ?? nextPage;
+      _pageSize = response['limit'] ?? _pageSize;
+      final total = response['totalElements'] ??
+          0; // API uses 'totalElements' not 'total'
+      _totalPages = total > 0 ? (total / _pageSize).ceil() : 1;
+
+      print(
+          '[NotificationProvider] Loaded more ${newNotifications.length} notifications (page $_currentPage/$_totalPages)');
+      _isLoadingMore = false;
+      notifyListeners();
+    } catch (e) {
+      _errorMessage = e.toString().replaceAll('Exception: ', '');
+      print('[NotificationProvider] Error loading more: $_errorMessage');
+      _isLoadingMore = false;
+      notifyListeners();
     }
   }
 
@@ -84,7 +148,11 @@ class NotificationProvider extends ChangeNotifier {
       notifyListeners();
       print('[NotificationProvider] Unread count: $_unreadCount');
     } catch (e) {
-      print('[NotificationProvider] Error getting count: $e');
+      final errorMsg = e.toString().replaceAll('Exception: ', '');
+      print('[NotificationProvider] Error getting count: $errorMsg');
+      // Don't fail silently - log the error details
+      _errorMessage = errorMsg;
+      notifyListeners();
     }
   }
 

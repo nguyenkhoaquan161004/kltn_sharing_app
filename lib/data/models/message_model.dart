@@ -38,9 +38,13 @@ class MessageModel {
       itemId: json['itemId'] as String? ?? json['item_id']?.toString(),
       readStatus: json['readStatus'] as bool? ?? false,
       createdAt: json['createdAt'] != null
-          ? DateTime.parse(json['createdAt'] as String)
+          ? (DateTime.parse(json['createdAt'] as String).isUtc
+              ? DateTime.parse(json['createdAt'] as String).toLocal()
+              : DateTime.parse(json['createdAt'] as String))
           : (json['created_at'] != null
-              ? DateTime.parse(json['created_at'] as String)
+              ? (DateTime.parse(json['created_at'] as String).isUtc
+                  ? DateTime.parse(json['created_at'] as String).toLocal()
+                  : DateTime.parse(json['created_at'] as String))
               : DateTime.now()),
     );
   }
@@ -111,7 +115,9 @@ class ConversationModel {
       otherUserName: json['otherUserName'] as String? ?? '',
       lastMessage: json['lastMessage'] as String? ?? '',
       lastMessageAt: json['lastMessageAt'] != null
-          ? DateTime.parse(json['lastMessageAt'] as String)
+          ? (DateTime.parse(json['lastMessageAt'] as String).isUtc
+              ? DateTime.parse(json['lastMessageAt'] as String).toLocal()
+              : DateTime.parse(json['lastMessageAt'] as String))
           : DateTime.now(),
       unreadCount: json['unreadCount'] as int? ?? 0,
       lastMessageSenderId: json['lastMessageSenderId'] as String?,

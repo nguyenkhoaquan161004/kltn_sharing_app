@@ -19,113 +19,108 @@ class LeaderboardItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: isCurrentUser
-          ? null
-          : () => context.push(AppRoutes.getUserProfileRoute(user.id)),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          color: isCurrentUser
-              ? AppColors.primaryTeal.withOpacity(0.1)
-              : AppColors.backgroundWhite,
-          borderRadius: BorderRadius.circular(12),
-          border: isCurrentUser
-              ? Border.all(color: AppColors.primaryTeal, width: 1)
-              : null,
-          boxShadow: isCurrentUser
-              ? null
-              : [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 5,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-        ),
-        child: Row(
-          children: [
-            // Rank number
-            SizedBox(
-              width: 40,
-              child: Text(
-                customRankDisplay ?? '${user.rank}',
-                style: AppTextStyles.bodyLarge.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: isCurrentUser
-                      ? AppColors.primaryTeal
-                      : AppColors.textPrimary,
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: isCurrentUser
+            ? AppColors.primaryTeal.withOpacity(0.1)
+            : AppColors.backgroundWhite,
+        borderRadius: BorderRadius.circular(12),
+        border: isCurrentUser
+            ? Border.all(color: AppColors.primaryTeal, width: 1)
+            : null,
+        boxShadow: isCurrentUser
+            ? null
+            : [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 5,
+                  offset: const Offset(0, 2),
                 ),
+              ],
+      ),
+      child: Row(
+        children: [
+          // Rank number
+          SizedBox(
+            width: 40,
+            child: Text(
+              customRankDisplay ?? '${user.rank}',
+              style: AppTextStyles.bodyLarge.copyWith(
+                fontWeight: FontWeight.bold,
+                color: isCurrentUser
+                    ? AppColors.primaryTeal
+                    : AppColors.textPrimary,
               ),
             ),
+          ),
 
-            // Avatar
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: AppColors.borderLight,
-                  width: 2,
-                ),
+          // Avatar
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: AppColors.borderLight,
+                width: 2,
               ),
-              child: ClipOval(
-                child: user.avatar.isNotEmpty
-                    ? Image.network(
-                        user.avatar,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          // Show fallback avatar on error
-                          return Container(
-                            color: AppColors.backgroundGray,
-                            child: const Icon(
-                              Icons.person,
-                              size: 24,
-                              color: AppColors.textSecondary,
-                            ),
-                          );
-                        },
-                      )
-                    : Container(
-                        color: AppColors.backgroundGray,
-                        child: const Icon(
-                          Icons.person,
-                          size: 24,
-                          color: AppColors.textSecondary,
-                        ),
+            ),
+            child: ClipOval(
+              child: user.avatar.isNotEmpty
+                  ? Image.network(
+                      user.avatar,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        // Show fallback avatar on error
+                        return Container(
+                          color: AppColors.backgroundGray,
+                          child: const Icon(
+                            Icons.person,
+                            size: 24,
+                            color: AppColors.textSecondary,
+                          ),
+                        );
+                      },
+                    )
+                  : Container(
+                      color: AppColors.backgroundGray,
+                      child: const Icon(
+                        Icons.person,
+                        size: 24,
+                        color: AppColors.textSecondary,
                       ),
-              ),
-            ),
-            const SizedBox(width: 12),
-
-            // Name and points
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    user.name,
-                    style: AppTextStyles.bodyMedium.copyWith(
-                      fontWeight: FontWeight.w600,
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '${user.points} độ uy tín',
-                    style: AppTextStyles.caption,
-                  ),
-                ],
-              ),
             ),
+          ),
+          const SizedBox(width: 12),
 
-            // Change indicator
-            _buildChangeIndicator(),
-          ],
-        ),
+          // Name and points
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  user.name,
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '${user.points} điểm tương tác',
+                  style: AppTextStyles.caption,
+                ),
+              ],
+            ),
+          ),
+
+          // Change indicator
+          _buildChangeIndicator(),
+        ],
       ),
     );
   }

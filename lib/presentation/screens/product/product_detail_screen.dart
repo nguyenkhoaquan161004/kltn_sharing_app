@@ -50,7 +50,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   String? _errorMessage;
 
   // Mock related products
-  late List<ItemModel> _relatedProducts;
+  late List<ItemModel> _relatedProducts = [];
 
   // Pagination for related products
   int _relatedProductsPage = 0;
@@ -75,6 +75,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       if (authProvider.accessToken != null) {
         _messageApiService.setAuthToken(authProvider.accessToken!);
         _messageApiService.setGetValidTokenCallback(
+          () async => authProvider.accessToken,
+        );
+
+        // Also set up ItemApiService with token callback for related products
+        final itemApiService = context.read<ItemApiService>();
+        itemApiService.setAuthToken(authProvider.accessToken!);
+        itemApiService.setGetValidTokenCallback(
           () async => authProvider.accessToken,
         );
       }
@@ -232,10 +239,20 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   Future<void> _loadSellerInfo(String userId) async {
     try {
-      final userApiService = context.read<UserApiService>();
+      print('[ProductDetail] Starting to load seller info for userId: $userId');
+      final userApiService = UserApiService();
+
+      // Set auth token if available
+      final authProvider = context.read<AuthProvider>();
+      if (authProvider.accessToken != null) {
+        userApiService.setAuthToken(authProvider.accessToken!);
+      }
+
       final sellerUser = await userApiService.getUserById(userId);
+      print('[ProductDetail] Seller user received: ${sellerUser.fullName}');
 
       if (sellerUser != null && _product != null && mounted) {
+        print('[ProductDetail] Updating seller info in product...');
         setState(() {
           _product = _product!.copyWith(
             owner: UserInfo(
@@ -243,11 +260,20 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               name: sellerUser.fullName,
               avatar: sellerUser.avatar ?? '',
               productsShared: sellerUser.itemsShared,
+              address: sellerUser.address,
             ),
           );
           _isSellerLoading = false;
         });
         print('[ProductDetail] Seller info loaded: ${sellerUser.fullName}');
+      } else {
+        print(
+            '[ProductDetail] Failed to update: sellerUser=$sellerUser, _product=$_product, mounted=$mounted');
+        if (mounted) {
+          setState(() {
+            _isSellerLoading = false;
+          });
+        }
       }
     } catch (e) {
       print('[ProductDetail] Error loading seller info: $e');
@@ -297,6 +323,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
       // Fetch items from same category using the API
       final categoryId = _itemDto!.categoryId.toString();
+      print(
+          '[ProductDetail] Loading related products - Current product categoryId: $categoryId, categoryName: ${_itemDto!.categoryName}');
+
       final response = await itemApiService.searchItems(
         categoryId: categoryId,
         page: 0,
@@ -377,7 +406,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       ],
       category: categoryName,
       quantity: itemDto.quantity ?? 1,
-      interestedCount: 0,
+      interestedCount: itemDto.interestedCount ?? 0,
       expiryDate:
           itemDto.expiryDate ?? DateTime.now().add(const Duration(days: 30)),
       createdAt: itemDto.createdAt,
@@ -386,6 +415,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         name: '', // Will be filled by _loadSellerInfo
         avatar: '', // Will be filled by _loadSellerInfo
         productsShared: 0, // Will be filled by _loadSellerInfo
+        address: null,
       ),
       isFree: (itemDto.price ?? 0) == 0,
     );
@@ -456,14 +486,18 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
       // Use the userId from API directly (from itemDto)
       final receiverId = _itemDto!.userId.toString();
-      print('[ProductDetail] Sending message to user ID: $receiverId');
+      final itemId = _itemDto!.id;
 
-      // Send message to the owner
+      print(
+          '[ProductDetail] Sending message with itemId: $itemId to user ID: $receiverId');
+
+      // Send the message with itemId included
       await _messageApiService.sendMessage(
         receiverId: receiverId,
-        content: 'Xin chào, tôi quan tâm đến sản phẩm này.',
-        messageType: 'TEXT',
+        content: 'Xin chào! Tôi quan tâm đến sản phẩm "${_product!.name}".',
+        itemId: itemId.toString(),
       );
+      print('[ProductDetail] Message sent successfully');
 
       if (mounted) {
         // Navigate directly to chat screen
@@ -586,6 +620,15 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     _product!.formattedPrice,
                     style: AppTextStyles.priceLarge,
                   ),
+                  if (_product!.price > 0) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'Số tiền sẽ được góp vào quỹ Mặt trận Tổ quốc Việt Nam',
+                      style: AppTextStyles.caption.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 16),
 
                   // Stats row
@@ -653,25 +696,52 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       ),
       child: Column(
         children: [
-          _buildInfoRow('Phân loại', _product?.category ?? 'Khác'),
+          _buildInfoRow('Phân loại', _product?.category ?? 'Khác',
+              canWrap: false),
           const Divider(height: 24),
-          _buildInfoRow('Hạn sử dụng', 'Không giới hạn'),
+          _buildInfoRow('Hạn sử dụng', 'Không giới hạn', canWrap: false),
+          const Divider(height: 24),
+          _buildInfoRow(
+              'Địa chỉ', _product?.owner.address ?? 'Không có thông tin',
+              canWrap: true),
         ],
       ),
     );
   }
 
-  Widget _buildInfoRow(String label, String value) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(label, style: AppTextStyles.bodyMedium),
-        Text(
-          value,
-          style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w600),
-        ),
-      ],
-    );
+  Widget _buildInfoRow(String label, String value, {bool canWrap = false}) {
+    if (canWrap) {
+      // Layout cho địa chỉ - cho phép xuống hàng
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: AppTextStyles.bodyMedium),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Text(
+              value,
+              style: AppTextStyles.bodyMedium
+                  .copyWith(fontWeight: FontWeight.w600),
+              softWrap: true,
+              overflow: TextOverflow.visible,
+            ),
+          ),
+        ],
+      );
+    } else {
+      // Layout cũ cho phân loại và hạn sử dụng
+      return Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: AppTextStyles.bodyMedium),
+          Text(
+            value,
+            style:
+                AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w600),
+          ),
+        ],
+      );
+    }
   }
 
   Widget _buildOwnerSection() {
@@ -692,8 +762,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           children: [
             // Avatar skeleton
             Container(
-              width: 48,
-              height: 48,
+              width: 56,
+              height: 56,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: AppColors.backgroundGray,
@@ -708,19 +778,27 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Người cho', style: AppTextStyles.caption),
                   Container(
-                    width: 120,
-                    height: 20,
-                    margin: const EdgeInsets.symmetric(vertical: 4),
+                    width: 80,
+                    height: 12,
+                    margin: const EdgeInsets.only(bottom: 8),
                     decoration: BoxDecoration(
                       color: AppColors.backgroundGray,
                       borderRadius: BorderRadius.circular(4),
                     ),
                   ),
                   Container(
-                    width: 80,
-                    height: 16,
+                    width: 140,
+                    height: 18,
+                    margin: const EdgeInsets.only(bottom: 8),
+                    decoration: BoxDecoration(
+                      color: AppColors.backgroundGray,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                  Container(
+                    width: 100,
+                    height: 14,
                     decoration: BoxDecoration(
                       color: AppColors.backgroundGray,
                       borderRadius: BorderRadius.circular(4),
@@ -738,8 +816,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
     return GestureDetector(
       onTap: () {
-        // Navigate to owner profile
-        context.push(AppRoutes.getUserProfileRoute(_product!.owner.id));
+        // Navigate to user profile
+        print('[ProductDetail] Tapping on owner: ${_product!.owner.name}');
       },
       child: Container(
         padding: const EdgeInsets.all(16),
@@ -752,12 +830,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           children: [
             // Avatar with image or fallback
             Container(
-              width: 48,
-              height: 48,
+              width: 56,
+              height: 56,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: AppColors.backgroundGray,
-                border: Border.all(color: AppColors.borderLight),
+                border: Border.all(color: AppColors.borderLight, width: 2),
               ),
               child: _product!.owner.avatar.isNotEmpty
                   ? ClipOval(
@@ -785,15 +863,15 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     style: AppTextStyles.bodyLarge
                         .copyWith(fontWeight: FontWeight.w600),
                   ),
+                  const SizedBox(height: 4),
                   Text(
-                    '${_product!.owner.productsShared} sản phẩm đã cho',
-                    style: AppTextStyles.caption,
+                    '${_product!.owner.productsShared} sản phẩm đã chia sẻ',
+                    style: AppTextStyles.bodySmall
+                        .copyWith(color: AppColors.textSecondary),
                   ),
                 ],
               ),
             ),
-
-            const Icon(Icons.chevron_right, color: AppColors.textSecondary),
           ],
         ),
       ),
@@ -856,15 +934,41 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         child: Row(
           children: [
             // Message button
-            Container(
-              decoration: BoxDecoration(
-                border: Border.all(color: AppColors.borderLight),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: IconButton(
-                icon: const Icon(Icons.mail_outline),
-                onPressed: _handleSendMessage,
-              ),
+            Consumer<AuthProvider>(
+              builder: (context, authProvider, _) {
+                final currentUserId = authProvider.userId;
+                final sellerId = _itemDto?.userId.toString();
+                final isOwnProduct = currentUserId != null &&
+                    sellerId != null &&
+                    currentUserId == sellerId;
+
+                return Container(
+                  decoration: BoxDecoration(
+                    border: Border.all(
+                      color: isOwnProduct
+                          ? AppColors.borderLight.withOpacity(0.3)
+                          : AppColors.borderLight,
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: IconButton(
+                    icon: Icon(
+                      Icons.mail_outline,
+                      color: isOwnProduct ? Colors.grey.withOpacity(0.5) : null,
+                    ),
+                    onPressed: isOwnProduct
+                        ? () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Đây là sản phẩm của bạn'),
+                                duration: Duration(seconds: 2),
+                              ),
+                            );
+                          }
+                        : _handleSendMessage,
+                  ),
+                );
+              },
             ),
             const SizedBox(width: 12),
 

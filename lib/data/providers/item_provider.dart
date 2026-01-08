@@ -200,6 +200,7 @@ class ItemProvider extends ChangeNotifier {
       _nearbyCurrentPage = response.currentPage;
       _nearbyTotalPages = response.totalPages;
       _nearbyTotalItems = response.totalElements;
+      _nearbyErrorMessage = null; // Clear error on success
 
       print(
           '[ItemProvider] Loaded ${_nearbyItems.length} nearby items, total: $_nearbyTotalItems');
@@ -208,8 +209,19 @@ class ItemProvider extends ChangeNotifier {
       print('[ItemProvider.loadNearbyItems] Done - notified listeners');
     } catch (e) {
       _isLoadingNearby = false;
-      _nearbyErrorMessage = e.toString().replaceAll('Exception: ', '');
-      print('[ItemProvider] Error loading nearby items: $_nearbyErrorMessage');
+      final errorMsg = e.toString().replaceAll('Exception: ', '');
+
+      // Chỉ set error nếu không có data. Nếu đã có data → GIỮ NGUYÊN để UX không bị xáo trộn
+      if (_nearbyItems.isEmpty) {
+        _nearbyErrorMessage = errorMsg;
+        print(
+            '[ItemProvider] Error loading nearby items (no existing data): $_nearbyErrorMessage');
+      } else {
+        print(
+            '[ItemProvider] Error loading nearby items (but keeping existing data): $errorMsg');
+        _nearbyErrorMessage = null; // Giữ nguyên dữ liệu cũ, không show error
+      }
+
       print('[ItemProvider] Full error: $e');
       notifyListeners();
     }
@@ -222,7 +234,17 @@ class ItemProvider extends ChangeNotifier {
     double radiusKm = 50,
     int page = 0,
   }) async {
+    // Don't load if we already have all items
+    if (_nearbyItems.length >= _nearbyTotalItems) {
+      print(
+          '[ItemProvider] Already loaded all items (${_nearbyItems.length}/$_nearbyTotalItems), skipping');
+      return;
+    }
+
     try {
+      print(
+          '[ItemProvider.loadMoreNearbyItems] Loading page $page - current: ${_nearbyItems.length}, total: $_nearbyTotalItems');
+
       final response = await _itemApiService.searchNearbyItems(
         latitude: latitude,
         longitude: longitude,
@@ -238,7 +260,7 @@ class ItemProvider extends ChangeNotifier {
       _nearbyTotalItems = response.totalElements;
 
       print(
-          '[ItemProvider] Loaded more nearby items, total now: ${_nearbyItems.length}');
+          '[ItemProvider] Loaded more nearby items, total now: ${_nearbyItems.length}/$_nearbyTotalItems');
       notifyListeners();
     } catch (e) {
       _nearbyErrorMessage = e.toString().replaceAll('Exception: ', '');

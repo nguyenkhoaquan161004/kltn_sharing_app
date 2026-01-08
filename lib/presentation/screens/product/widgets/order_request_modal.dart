@@ -35,6 +35,12 @@ class _OrderRequestModalState extends State<OrderRequestModal> {
   // Receiver info toggle
   bool _useCurrentUserInfo = true;
 
+  // Preferred receive time
+  DateTime? _preferredReceiveTime;
+
+  // Default reason
+  static const String DEFAULT_REASON = 'Chào bạn! Tôi muốn nhận sản phẩm này!';
+
   bool _isLoading = false;
   String? _errorMessage;
   double? _selectedLatitude;
@@ -44,6 +50,10 @@ class _OrderRequestModalState extends State<OrderRequestModal> {
   void initState() {
     super.initState();
     _loadCurrentUserInfo();
+    // Set default reason
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _reasonController.text = DEFAULT_REASON;
+    });
   }
 
   void _loadCurrentUserInfo() {
@@ -103,6 +113,10 @@ class _OrderRequestModalState extends State<OrderRequestModal> {
       setState(() => _errorMessage = 'Vui lòng nhập lý do');
       return;
     }
+    if (_preferredReceiveTime == null) {
+      setState(() => _errorMessage = 'Vui lòng chọn thời gian muốn nhận');
+      return;
+    }
     if (_fullNameController.text.isEmpty) {
       setState(() => _errorMessage = 'Vui lòng nhập họ tên');
       return;
@@ -131,25 +145,27 @@ class _OrderRequestModalState extends State<OrderRequestModal> {
         transactionService.setAuthToken(authProvider.accessToken!);
       }
 
-      // Get receiverId from AuthProvider username
-      final receiverId = authProvider.username ?? '';
+      // Get receiverId from AuthProvider userId
+      final receiverId = authProvider.userId ?? '';
 
       if (receiverId.isEmpty) {
         throw Exception(
-            'Lỗi: Không tìm thấy thông tin người dùng. Vui lòng đăng nhập lại.');
+            'Lỗi: Không tìm thấy ID người dùng. Vui lòng đăng nhập lại.');
       }
 
       // Create transaction request
       final request = TransactionRequest(
         itemId: widget.product.id,
         message: _reasonController.text,
+        quantity: _quantity,
+        preferredReceiveTime: _preferredReceiveTime,
         receiverFullName: _fullNameController.text,
         receiverPhone: _phoneController.text,
         shippingAddress: _addressController.text,
         shippingNote: _noteController.text,
         paymentMethod: 'CASH',
         transactionFee: 0.0,
-        receiverId: receiverId, // Use username from auth
+        receiverId: receiverId, // Use userId from auth
       );
 
       print(
@@ -332,6 +348,15 @@ class _OrderRequestModalState extends State<OrderRequestModal> {
                         widget.product.formattedPrice,
                         style: AppTextStyles.price,
                       ),
+                      if (widget.product.price > 0) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          'Số tiền sẽ được góp vào quỹ Mặt trận Tổ quốc Việt Nam',
+                          style: AppTextStyles.caption.copyWith(
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -391,9 +416,9 @@ class _OrderRequestModalState extends State<OrderRequestModal> {
             const SizedBox(height: 8),
             TextField(
               controller: _reasonController,
-              maxLines: 4,
+              maxLines: 3,
               decoration: InputDecoration(
-                hintText: 'Đưa ra lý do bạn muốn nhận sản phẩm',
+                hintText: 'Nhập lý do bạn muốn nhận sản phẩm',
                 hintStyle: AppTextStyles.bodyMedium.copyWith(
                   color: AppColors.textDisabled,
                 ),
@@ -407,78 +432,160 @@ class _OrderRequestModalState extends State<OrderRequestModal> {
             ),
             const SizedBox(height: 24),
 
-            // Receiver info section
-            const Text('Thông tin người nhận', style: AppTextStyles.h4),
-            const SizedBox(height: 16),
+            // Preferred receive time
+            const Text('Thời gian muốn nhận', style: AppTextStyles.label),
+            const SizedBox(height: 8),
+            GestureDetector(
+              onTap: () async {
+                final now = DateTime.now();
+                final minDate = now.add(const Duration(hours: 1));
+                final maxDate = now.add(const Duration(days: 30));
 
-            // Toggle: Use current user info or enter new
-            Container(
-              decoration: BoxDecoration(
-                color: AppColors.backgroundGray,
-                borderRadius: BorderRadius.circular(12),
+                final selectedDate = await showDatePicker(
+                  context: context,
+                  initialDate: _preferredReceiveTime ?? minDate,
+                  firstDate: minDate,
+                  lastDate: maxDate,
+                  builder: (context, child) {
+                    return Theme(
+                      data: Theme.of(context).copyWith(
+                        colorScheme: ColorScheme.light(
+                          primary: AppColors.primaryGreen,
+                          onPrimary: Colors.white,
+                          surface: Colors.white,
+                          onSurface: AppColors.textPrimary,
+                        ),
+                      ),
+                      child: child!,
+                    );
+                  },
+                );
+
+                if (selectedDate != null) {
+                  if (mounted) {
+                    final selectedTime = await showTimePicker(
+                      context: context,
+                      initialTime: TimeOfDay.fromDateTime(
+                        _preferredReceiveTime ?? minDate,
+                      ),
+                      builder: (context, child) {
+                        return Theme(
+                          data: Theme.of(context).copyWith(
+                            colorScheme: ColorScheme.light(
+                              primary: AppColors.primaryGreen,
+                              onPrimary: Colors.white,
+                              surface: Colors.white,
+                              onSurface: AppColors.textPrimary,
+                            ),
+                          ),
+                          child: child!,
+                        );
+                      },
+                    );
+
+                    if (selectedTime != null) {
+                      setState(() {
+                        _preferredReceiveTime = DateTime(
+                          selectedDate.year,
+                          selectedDate.month,
+                          selectedDate.day,
+                          selectedTime.hour,
+                          selectedTime.minute,
+                        );
+                      });
+                    }
+                  }
+                }
+              },
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: AppColors.backgroundGray,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      _preferredReceiveTime != null
+                          ? 'Ngày ${_preferredReceiveTime!.day}/${_preferredReceiveTime!.month}/${_preferredReceiveTime!.year} lúc ${_preferredReceiveTime!.hour.toString().padLeft(2, '0')}:${_preferredReceiveTime!.minute.toString().padLeft(2, '0')}'
+                          : 'Chọn thời gian muốn nhận',
+                      style: AppTextStyles.bodyMedium.copyWith(
+                        color: _preferredReceiveTime != null
+                            ? AppColors.textPrimary
+                            : AppColors.textDisabled,
+                      ),
+                    ),
+                    const Icon(
+                      Icons.calendar_today,
+                      color: AppColors.primaryGreen,
+                      size: 20,
+                    ),
+                  ],
+                ),
               ),
-              padding: const EdgeInsets.all(12),
-              child: Column(
+            ),
+            const SizedBox(height: 24),
+
+            // Receiver info section title
+            const Text('Thông tin người nhận', style: AppTextStyles.h4),
+            const SizedBox(height: 12),
+
+            // Toggle: Thông tin người nhận khác
+            GestureDetector(
+              onTap: () {
+                setState(() => _useCurrentUserInfo = !_useCurrentUserInfo);
+                if (!_useCurrentUserInfo) {
+                  // Clear fields when switching to "other person"
+                  _fullNameController.clear();
+                  _phoneController.clear();
+                  _addressController.clear();
+                } else {
+                  // Load current user info when switching back
+                  _loadCurrentUserInfo();
+                }
+              },
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () {
-                            setState(() => _useCurrentUserInfo = true);
-                            _loadCurrentUserInfo();
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                            decoration: BoxDecoration(
-                              color: _useCurrentUserInfo
-                                  ? AppColors.primaryGreen
-                                  : Colors.transparent,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Center(
-                              child: Text(
-                                'Thông tin hiện tại',
-                                style: AppTextStyles.bodyMedium.copyWith(
-                                  color: _useCurrentUserInfo
-                                      ? Colors.white
-                                      : AppColors.textSecondary,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
+                  SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: Checkbox(
+                      value: !_useCurrentUserInfo,
+                      onChanged: (value) {
+                        setState(() => _useCurrentUserInfo = !(value ?? false));
+                        if (!_useCurrentUserInfo) {
+                          _fullNameController.clear();
+                          _phoneController.clear();
+                          _addressController.clear();
+                        } else {
+                          _loadCurrentUserInfo();
+                        }
+                      },
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(4),
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () {
-                            setState(() => _useCurrentUserInfo = false);
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                            decoration: BoxDecoration(
-                              color: !_useCurrentUserInfo
-                                  ? AppColors.primaryGreen
-                                  : Colors.transparent,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Center(
-                              child: Text(
-                                'Thông tin khác',
-                                style: AppTextStyles.bodyMedium.copyWith(
-                                  color: !_useCurrentUserInfo
-                                      ? Colors.white
-                                      : AppColors.textSecondary,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
+                      side: BorderSide(
+                        color: AppColors.primaryTeal,
+                        width: 1.5,
                       ),
-                    ],
+                      fillColor: MaterialStateProperty.resolveWith((states) {
+                        if (states.contains(MaterialState.selected)) {
+                          return AppColors.primaryTeal;
+                        }
+                        return Colors.transparent;
+                      }),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    'Thông tin người nhận khác',
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.textPrimary,
+                    ),
                   ),
                 ],
               ),
@@ -536,7 +643,7 @@ class _OrderRequestModalState extends State<OrderRequestModal> {
             AddressAutocompleteField(
               controller: _addressController,
               label: 'Địa chỉ giao hàng',
-              hintText: 'Nhập địa chỉ giao hàng (autocomplete)',
+              hintText: 'Nhập địa chỉ giao hàng',
               onAddressSelected: (latitude, longitude, address) {
                 setState(() {
                   _selectedLatitude = latitude;

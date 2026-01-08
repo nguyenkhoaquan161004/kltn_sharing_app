@@ -5,8 +5,10 @@ import '../../../core/constants/app_text_styles.dart';
 import '../../../data/models/notification_model.dart';
 import '../../../data/providers/notification_provider.dart';
 import '../../../data/providers/auth_provider.dart';
+import '../../../data/providers/item_provider.dart';
 import '../../widgets/app_header_bar.dart';
 import '../../widgets/bottom_navigation_widget.dart';
+import '../profile/widgets/create_product_modal.dart';
 import 'widgets/notification_card.dart';
 
 class NotificationsScreen extends StatefulWidget {
@@ -19,15 +21,47 @@ class NotificationsScreen extends StatefulWidget {
 class _NotificationsScreenState extends State<NotificationsScreen> {
   String _filterType =
       'all'; // all, ITEM_SHARED, ITEM_INTEREST, TRANSACTION_CREATED, etc.
+  late ScrollController _scrollController;
 
   @override
   void initState() {
     super.initState();
+    _scrollController = ScrollController();
+    _scrollController.addListener(_onScroll);
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadNotifications();
       // Also refresh unread count periodically
       _refreshUnreadCount();
     });
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    final notificationProvider = context.read<NotificationProvider>();
+
+    final scrollPercentage = _scrollController.position.pixels /
+        _scrollController.position.maxScrollExtent;
+    print(
+        '[NotificationsScreen] Scroll: ${scrollPercentage.toStringAsFixed(2)}% (${_scrollController.position.pixels} / ${_scrollController.position.maxScrollExtent})');
+
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 500) {
+      // User scrolled near bottom, load more
+      print(
+          '[NotificationsScreen] Near bottom! isLoadingMore=${notificationProvider.isLoadingMore}, currentPage=${notificationProvider.currentPage}, totalPages=${notificationProvider.totalPages}');
+      if (!notificationProvider.isLoadingMore &&
+          notificationProvider.currentPage < notificationProvider.totalPages) {
+        print('[NotificationsScreen] Loading more notifications...');
+        notificationProvider.loadMoreNotifications();
+      }
+    }
   }
 
   void _loadNotifications() {
@@ -101,6 +135,24 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     }
   }
 
+  void _showAddItemModal() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => CreateProductModal(
+        onProductCreated: (success) {
+          if (success) {
+            final itemProvider = context.read<ItemProvider>();
+            itemProvider.loadItems();
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Tạo sản phẩm thành công!')),
+            );
+          }
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -126,13 +178,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                           style: AppTextStyles.h2,
                         ),
                         if (notificationProvider.unreadCount > 0)
-                          GestureDetector(
-                            onTap: _markAllAsRead,
-                            child: Text(
-                              'Đánh dấu đã đọc',
-                              style: AppTextStyles.bodyMedium.copyWith(
+                          Tooltip(
+                            message: 'Đánh dấu tất cả đã đọc',
+                            child: GestureDetector(
+                              onTap: _markAllAsRead,
+                              child: Icon(
+                                Icons.done_all,
+                                size: 24,
                                 color: AppColors.primaryTeal,
-                                fontWeight: FontWeight.w600,
                               ),
                             ),
                           ),
@@ -243,10 +296,23 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                         : RefreshIndicator(
                             onRefresh: _handleRefresh,
                             child: ListView.builder(
+                              controller: _scrollController,
                               padding:
                                   const EdgeInsets.symmetric(horizontal: 24),
-                              itemCount: filteredNotifications.length,
+                              itemCount: filteredNotifications.length +
+                                  (notificationProvider.isLoadingMore ? 1 : 0),
                               itemBuilder: (context, index) {
+                                // Show loading indicator at the end
+                                if (index == filteredNotifications.length) {
+                                  return Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: 16),
+                                    child: Center(
+                                      child: CircularProgressIndicator(),
+                                    ),
+                                  );
+                                }
+
                                 final notification =
                                     filteredNotifications[index];
                                 return NotificationCard(
@@ -261,7 +327,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           );
         },
       ),
-      bottomNavigationBar: const BottomNavigationWidget(currentIndex: 2),
+      bottomNavigationBar: BottomNavigationWidget(
+        currentIndex: 2,
+        onAddPressed: _showAddItemModal,
+      ),
     );
   }
 
@@ -270,6 +339,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     return GestureDetector(
       onTap: () {
         setState(() => _filterType = type);
+        // Reset pagination and reload when filter changes
+        final notificationProvider = context.read<NotificationProvider>();
+        // Reset to page 1 and reload
+        notificationProvider.fetchNotifications(page: 1);
       },
       child: Container(
         padding: const EdgeInsets.symmetric(

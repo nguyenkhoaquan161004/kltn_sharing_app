@@ -59,6 +59,19 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
         '[SearchResultsScreen] initState - keyword: ${widget.keyword}, categoryId: ${widget.categoryId}, categoryName: ${widget.categoryName}');
     print(
         '[SearchResultsScreen] initState - _filterByCategory: $_filterByCategory');
+
+    // Set up ItemApiService with token callback
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final authProvider = context.read<AuthProvider>();
+      final itemService = context.read<ItemApiService>();
+      if (authProvider.accessToken != null) {
+        itemService.setAuthToken(authProvider.accessToken!);
+        itemService.setGetValidTokenCallback(
+          () async => authProvider.accessToken,
+        );
+      }
+    });
+
     _currentPage = 0;
     _loadItems(isInitial: true);
   }
@@ -94,6 +107,16 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
       print(
           '[SearchResultsScreen]   _filterByCategory value: $_filterByCategory');
 
+      // Smart sort: when searching by keyword, sort by name (relevance)
+      // Otherwise use user's selected sort
+      final String finalSortBy =
+          widget.keyword.isNotEmpty && _sortBy == 'createdAt'
+              ? 'name' // Sort by name when searching by keyword
+              : _sortBy;
+
+      print(
+          '[SearchResultsScreen] Final sortBy: $finalSortBy (keyword: ${widget.keyword})');
+
       final response = await itemService.searchItems(
         page: _currentPage,
         size: _pageSize,
@@ -102,15 +125,47 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
             ? _filterByCategory
             : null,
         status: _filterByStatus,
-        sortBy: _sortBy,
+        sortBy: _sortBy, // Keep original sortBy for server
         sortDirection: 'DESC',
       );
 
+      // Client-side sort by relevance when searching by keyword
+      List<ItemDto> items = response.content;
+      if (widget.keyword.isNotEmpty) {
+        items.sort((a, b) {
+          final keywordLower = widget.keyword.toLowerCase();
+          final aNameLower = a.name.toLowerCase();
+          final bNameLower = b.name.toLowerCase();
+
+          // Exact match first
+          if (aNameLower == keywordLower && bNameLower != keywordLower)
+            return -1;
+          if (bNameLower == keywordLower && aNameLower != keywordLower)
+            return 1;
+
+          // Starts with keyword
+          if (aNameLower.startsWith(keywordLower) &&
+              !bNameLower.startsWith(keywordLower)) return -1;
+          if (bNameLower.startsWith(keywordLower) &&
+              !aNameLower.startsWith(keywordLower)) return 1;
+
+          // Contains keyword (closer to start = more relevant)
+          int aIndex = aNameLower.indexOf(keywordLower);
+          int bIndex = bNameLower.indexOf(keywordLower);
+          if (aIndex != bIndex) return aIndex.compareTo(bIndex);
+
+          // Same relevance -> sort by newer first
+          return b.createdAt.compareTo(a.createdAt);
+        });
+        print(
+            '[SearchResultsScreen] Sorted ${items.length} items by relevance to keyword: "${widget.keyword}"');
+      }
+
       setState(() {
         if (isInitial) {
-          _searchResults = response.content;
+          _searchResults = items;
         } else {
-          _searchResults.addAll(response.content);
+          _searchResults.addAll(items);
         }
         _totalItems = response.totalElements;
         _isLoading = false;

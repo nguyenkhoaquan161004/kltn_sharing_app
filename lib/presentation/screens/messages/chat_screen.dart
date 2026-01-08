@@ -14,12 +14,16 @@ import '../../../core/constants/app_text_styles.dart';
 import '../../../core/constants/app_routes.dart';
 import '../../../data/services/message_api_service.dart';
 import '../../../data/services/message_notification_service.dart';
+import '../../../data/services/websocket_service.dart';
 import '../../../data/services/firebase_debug_service.dart';
 import '../../../data/services/user_api_service.dart';
+import '../../../data/services/item_api_service.dart';
 import '../../../data/services/cloudinary_service.dart';
 import '../../../data/models/message_model.dart';
 import '../../../data/models/user_response_model.dart';
+import '../../../data/models/item_response_model.dart';
 import '../../../data/providers/auth_provider.dart';
+import '../../../data/providers/websocket_provider.dart';
 import 'widgets/chat_input.dart';
 import 'media_preview_screen.dart';
 
@@ -40,10 +44,15 @@ class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _messageController = TextEditingController();
   late MessageApiService _messageApiService;
   late UserApiService _userApiService;
+  late ItemApiService _itemApiService;
   late MessageNotificationService _messageNotificationService;
   final CloudinaryService _cloudinaryService = CloudinaryService();
   late Future<UserDto> _userFuture;
-  StreamSubscription<Map<String, dynamic>>? _messageSubscription;
+  StreamSubscription<MessageModel>? _messageSubscription;
+  late WebSocketProvider _webSocketProvider;
+
+  // Cache for item details fetched by itemId
+  final Map<String, ItemDto> _itemCache = {};
 
   List<MessageModel> _messages = [];
   List<MessageModel> _optimisticMessages =
@@ -57,8 +66,9 @@ class _ChatScreenState extends State<ChatScreen> {
     super.initState();
     _scrollController = ScrollController();
 
-    // Get auth from provider
+    // Get auth and WebSocket provider from context
     final authProvider = context.read<AuthProvider>();
+    _webSocketProvider = context.read<WebSocketProvider>();
 
     // Initialize services with auth
     _messageApiService = MessageApiService();
@@ -77,8 +87,19 @@ class _ChatScreenState extends State<ChatScreen> {
       );
     }
 
+    _itemApiService = ItemApiService();
+    if (authProvider.accessToken != null) {
+      _itemApiService.setAuthToken(authProvider.accessToken!);
+      _itemApiService.setGetValidTokenCallback(
+        () async => authProvider.accessToken,
+      );
+    }
+
     // Initialize message notification service
     _messageNotificationService = MessageNotificationService();
+
+    // Initialize WebSocket for real-time messaging
+    _setupWebSocket();
     _setupMessageListener();
 
     _userFuture = _userApiService.getUserById(widget.userId);
@@ -86,6 +107,61 @@ class _ChatScreenState extends State<ChatScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _scrollToBottom();
     });
+  }
+
+  /// Setup WebSocket for real-time messaging
+  void _setupWebSocket() {
+    try {
+      final authProvider = context.read<AuthProvider>();
+
+      if (authProvider.userId == null || authProvider.accessToken == null) {
+        print('[ChatScreen] ❌ User ID or access token not available');
+        return;
+      }
+
+      print('[ChatScreen] 🔌 Setting up WebSocket connection');
+
+      // Connect WebSocket
+      _webSocketProvider.connect(
+        userId: authProvider.userId!,
+        accessToken: authProvider.accessToken!,
+      );
+
+      // Listen to incoming messages via WebSocket
+      _webSocketProvider.messageStream.listen((message) {
+        print('[ChatScreen] 📬 Received message via WebSocket: ${message.id}');
+
+        // Check if message is from the current conversation
+        final fromUserId = message.senderId;
+        final toUserId = message.receiverId;
+        final currentUserId = authProvider.userId;
+
+        final isRelevant =
+            (fromUserId == widget.userId && toUserId == currentUserId) ||
+                (fromUserId == currentUserId && toUserId == widget.userId);
+
+        if (isRelevant && mounted) {
+          print('[ChatScreen] ✅ Message is relevant - updating UI');
+          setState(() {
+            // Check if message already exists to avoid duplicates
+            final messageExists = _messages.any((m) => m.id == message.id);
+            if (!messageExists) {
+              _messages.insert(0, message);
+            }
+            // Remove from optimistic messages if it was sent by current user
+            if (message.senderId == currentUserId) {
+              _optimisticMessages
+                  .removeWhere((m) => m.content == message.content);
+            }
+          });
+          _scrollToBottom();
+        }
+      });
+
+      print('[ChatScreen] ✅ WebSocket setup complete');
+    } catch (e) {
+      print('[ChatScreen] ❌ Error setting up WebSocket: $e');
+    }
   }
 
   /// Setup listener cho tin nhắn mới từ Firebase
@@ -113,23 +189,21 @@ class _ChatScreenState extends State<ChatScreen> {
       print('[ChatScreen] Chat with User: ${widget.userId}');
       print('[ChatScreen] ═══════════════════════════════════════════');
 
-      _messageSubscription = _messageNotificationService.messageStream.listen(
-        (messageData) {
+      // Listen to WebSocket messages directly from WebSocketProvider
+      _messageSubscription = _webSocketProvider.messageStream.listen(
+        (message) {
           print('[ChatScreen] ║');
           print(
               '[ChatScreen] 📨 =============== NEW MESSAGE RECEIVED ===============');
-          print(
-              '[ChatScreen] ║ Message data keys: ${messageData.keys.toList()}');
-          print('[ChatScreen] ║ Full message: $messageData');
+          print('[ChatScreen] ║ Message ID: ${message.id}');
+          print('[ChatScreen] ║ From: ${message.senderId}');
+          print('[ChatScreen] ║ To: ${message.receiverId}');
+          print('[ChatScreen] ║ Content: ${message.content}');
 
           // Kiểm tra tin nhắn có phải từ cuộc trò chuyện này không
-          final fromUserId =
-              messageData['fromUserId'] ?? messageData['senderId'] ?? '';
-          final toUserId =
-              messageData['toUserId'] ?? messageData['receiverId'] ?? '';
+          final fromUserId = message.senderId ?? '';
+          final toUserId = message.receiverId ?? '';
 
-          print('[ChatScreen] ║ Message FROM: $fromUserId');
-          print('[ChatScreen] ║ Message TO: $toUserId');
           print('[ChatScreen] ║ Current User: $currentUserId');
           print('[ChatScreen] ║ Other User: ${widget.userId}');
 
@@ -139,7 +213,9 @@ class _ChatScreenState extends State<ChatScreen> {
                   (fromUserId == currentUserId && toUserId == widget.userId);
 
           if (isRelevant) {
-            print('[ChatScreen] ║ ✅ RELEVANT - Reloading messages...');
+            print(
+                '[ChatScreen] ║ ✅ RELEVANT - Message is for this conversation');
+            print('[ChatScreen] ║ Reloading messages to show new message...');
             print(
                 '[ChatScreen] ║ =======================================================');
             _loadMessages(showLoading: false);
@@ -160,8 +236,32 @@ class _ChatScreenState extends State<ChatScreen> {
       );
 
       print(
-          '[ChatScreen] ✅ MESSAGE LISTENER SETUP COMPLETE - Ready to receive messages');
+          '[ChatScreen] ✅ MESSAGE LISTENER SETUP COMPLETE - Listening to WebSocket');
       print('[ChatScreen] ═══════════════════════════════════════════');
+
+      // ALSO listen to FCM notifications as backup (when WebSocket doesn't deliver or for offline notifications)
+      print('[ChatScreen] 🔄 Also setting up FCM notification listener...');
+      _messageNotificationService.messageStream.listen(
+        (notificationData) {
+          print('[ChatScreen] 📲 FCM Notification received in chat screen');
+          print(
+              '[ChatScreen] 📲 Reference Type: ${notificationData['referenceType']}');
+          print(
+              '[ChatScreen] 📲 Reference ID: ${notificationData['referenceId']}');
+
+          // When FCM notification arrives, refresh messages (fetch from server)
+          // This acts as a fallback/trigger when WebSocket might not deliver instantly
+          print(
+              '[ChatScreen] 📲 Refreshing messages due to FCM notification...');
+          _loadMessages(showLoading: false);
+        },
+        onError: (error) {
+          print('[ChatScreen] 📲 ERROR in FCM stream: $error');
+        },
+        cancelOnError: false,
+      );
+
+      print('[ChatScreen] ✅ FCM listener also setup');
     } catch (e) {
       print('[ChatScreen] ❌ ERROR setting up message listener: $e');
       print('[ChatScreen] ═══════════════════════════════════════════');
@@ -245,6 +345,12 @@ class _ChatScreenState extends State<ChatScreen> {
         print('[ChatScreen] ⚠️  Error cancelling subscription in dispose: $e');
       }
     }
+
+    // NOTE: Don't call _webSocketProvider.disconnect() here!
+    // WebSocketProvider is a singleton shared across all screens.
+    // If we disconnect here, other screens will lose connection.
+    // The WebSocket connection should persist across screen navigations.
+
     _scrollController.dispose();
     _messageController.dispose();
     super.dispose();
@@ -258,6 +364,161 @@ class _ChatScreenState extends State<ChatScreen> {
         curve: Curves.easeOut,
       );
     }
+  }
+
+  /// Build item card for shared items (when message has itemId)
+  Future<ItemDto?> _fetchItemById(String itemId) async {
+    // Check cache first
+    if (_itemCache.containsKey(itemId)) {
+      return _itemCache[itemId];
+    }
+
+    try {
+      final item = await _itemApiService.getItem(itemId);
+      if (item != null) {
+        _itemCache[itemId] = item;
+      }
+      return item;
+    } catch (e) {
+      print('[ChatScreen] Error fetching item $itemId: $e');
+      return null;
+    }
+  }
+
+  /// Build a shared item card widget for displaying in message
+  Widget _buildItemCardForMessage(ItemDto item) {
+    return GestureDetector(
+      onTap: () {
+        context.push('/item/${item.id}');
+      },
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          color: Colors.white,
+          border: Border.all(color: const Color(0xFFE0E0E0)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Image with status badge
+            Stack(
+              children: [
+                // Item image
+                Container(
+                  height: 160,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(12),
+                    ),
+                    color: Colors.grey[200],
+                  ),
+                  child: item.imageUrl != null && item.imageUrl!.isNotEmpty
+                      ? Image.network(
+                          item.imageUrl!,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Center(
+                              child: Icon(
+                                Icons.image_not_supported,
+                                size: 40,
+                                color: Colors.grey[400],
+                              ),
+                            );
+                          },
+                        )
+                      : Center(
+                          child: Icon(
+                            Icons.image_not_supported,
+                            size: 40,
+                            color: Colors.grey[400],
+                          ),
+                        ),
+                ),
+                // Status badge
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryTeal,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      '📦',
+                      style: AppTextStyles.bodySmall,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            // Item details
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Item name
+                  Text(
+                    item.name,
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 8),
+                  // Category
+                  Text(
+                    item.categoryName ?? 'Không xác định',
+                    style: AppTextStyles.bodySmall.copyWith(
+                      color: Colors.grey[600],
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 8),
+                  // Quantity and Expiry info
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      // Quantity
+                      if (item.quantity != null)
+                        Text(
+                          'SL: ${item.quantity}',
+                          style: AppTextStyles.bodySmall.copyWith(
+                            color: Colors.grey[700],
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      // Expiry date if available
+                      if (item.expiryDate != null)
+                        Text(
+                          'HSD: ${item.expiryDate!.day}/${item.expiryDate!.month}',
+                          style: AppTextStyles.bodySmall.copyWith(
+                            color: Colors.grey[700],
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _sendMessage() async {
@@ -789,15 +1050,35 @@ class _ChatScreenState extends State<ChatScreen> {
               final user = snapshot.data!;
               return Row(
                 children: [
-                  CircleAvatar(
-                    radius: 18,
-                    backgroundImage: user.avatar != null
-                        ? NetworkImage(user.avatar!)
-                        : const AssetImage('assets/images/default_avatar.png')
-                            as ImageProvider,
-                    onBackgroundImageError: (exception, stackTrace) {
-                      // Fallback to initials
-                    },
+                  SizedBox(
+                    width: 40,
+                    height: 40,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(20),
+                      child: user.avatar != null && user.avatar!.isNotEmpty
+                          ? Image.network(
+                              user.avatar!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Container(
+                                  color: AppColors.backgroundGray,
+                                  child: const Icon(
+                                    Icons.person,
+                                    size: 18,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                );
+                              },
+                            )
+                          : Container(
+                              color: AppColors.backgroundGray,
+                              child: const Icon(
+                                Icons.person,
+                                size: 18,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -829,7 +1110,7 @@ class _ChatScreenState extends State<ChatScreen> {
             return Row(
               children: [
                 CircleAvatar(
-                  radius: 18,
+                  radius: 20,
                   backgroundColor: Colors.grey[300],
                 ),
                 const SizedBox(width: 12),
@@ -863,35 +1144,10 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.call, color: AppColors.primaryTeal),
-            onPressed: () {},
-          ),
-          IconButton(
             icon: const Icon(Icons.info_outline, color: AppColors.primaryTeal),
             onPressed: () {},
           ),
           // Test button for debugging real-time messages
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert, color: AppColors.primaryTeal),
-            onSelected: (String choice) {
-              if (choice == 'test_message') {
-                _testMessageUpdate();
-              } else if (choice == 'debug_firebase') {
-                _showFirebaseDebugInfo();
-              }
-            },
-            itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-              const PopupMenuItem<String>(
-                value: 'test_message',
-                child: Text('Test Update'),
-              ),
-              const PopupMenuDivider(),
-              const PopupMenuItem<String>(
-                value: 'debug_firebase',
-                child: Text('🔥 Firebase Debug Info'),
-              ),
-            ],
-          ),
         ],
       ),
       body: Column(
@@ -1082,6 +1338,41 @@ class _ChatScreenState extends State<ChatScreen> {
                                           ],
                                         ],
                                       ),
+                                      // Display item card if message has itemId
+                                      if (message.itemId != null &&
+                                          message.itemId!.isNotEmpty)
+                                        FutureBuilder<ItemDto?>(
+                                          future:
+                                              _fetchItemById(message.itemId!),
+                                          builder: (context, snapshot) {
+                                            if (snapshot.connectionState ==
+                                                ConnectionState.waiting) {
+                                              return Padding(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                        horizontal: 16,
+                                                        vertical: 8),
+                                                child: SizedBox(
+                                                  height: 100,
+                                                  width: MediaQuery.of(context)
+                                                          .size
+                                                          .width *
+                                                      0.7,
+                                                  child:
+                                                      const CircularProgressIndicator(
+                                                    color:
+                                                        AppColors.primaryTeal,
+                                                  ),
+                                                ),
+                                              );
+                                            } else if (snapshot.hasData &&
+                                                snapshot.data != null) {
+                                              return _buildItemCardForMessage(
+                                                  snapshot.data!);
+                                            }
+                                            return const SizedBox.shrink();
+                                          },
+                                        ),
                                     ],
                                   ),
                                 ),
@@ -1102,17 +1393,21 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   String _formatTime(DateTime dateTime) {
+    // Convert to local timezone if it's in UTC
+    final localDateTime = dateTime.isUtc ? dateTime.toLocal() : dateTime;
+
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final yesterday = today.subtract(const Duration(days: 1));
-    final messageDate = DateTime(dateTime.year, dateTime.month, dateTime.day);
+    final messageDate =
+        DateTime(localDateTime.year, localDateTime.month, localDateTime.day);
 
     if (messageDate == today) {
-      return '${dateTime.hour}:${dateTime.minute.toString().padLeft(2, '0')}';
+      return '${localDateTime.hour.toString().padLeft(2, '0')}:${localDateTime.minute.toString().padLeft(2, '0')}';
     } else if (messageDate == yesterday) {
       return 'Hôm qua';
     } else {
-      return '${dateTime.day}/${dateTime.month}';
+      return '${localDateTime.day}/${localDateTime.month}';
     }
   }
 

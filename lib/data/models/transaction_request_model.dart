@@ -1,6 +1,8 @@
 class TransactionRequest {
   final String itemId;
   final String message;
+  final int? quantity;
+  final DateTime? preferredReceiveTime;
   final String receiverFullName;
   final String receiverPhone;
   final String shippingAddress;
@@ -12,6 +14,8 @@ class TransactionRequest {
   TransactionRequest({
     required this.itemId,
     required this.message,
+    this.quantity,
+    this.preferredReceiveTime,
     required this.receiverFullName,
     required this.receiverPhone,
     required this.shippingAddress,
@@ -25,6 +29,9 @@ class TransactionRequest {
     return {
       'itemId': itemId,
       'message': message,
+      if (quantity != null) 'quantity': quantity,
+      if (preferredReceiveTime != null)
+        'preferredReceiveTime': preferredReceiveTime?.toIso8601String(),
       'receiverFullName': receiverFullName,
       'receiverPhone': receiverPhone,
       'shippingAddress': shippingAddress,

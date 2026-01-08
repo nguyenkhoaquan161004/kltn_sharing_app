@@ -1,22 +1,35 @@
 import 'package:flutter/material.dart';
 import 'package:kltn_sharing_app/data/models/user_response_model.dart';
+import 'package:kltn_sharing_app/data/models/transaction_stats_model.dart';
 import 'package:kltn_sharing_app/data/services/user_api_service.dart';
+import 'package:kltn_sharing_app/data/services/transaction_api_service.dart';
 
 class UserProvider extends ChangeNotifier {
   final UserApiService _userApiService = UserApiService();
+  final TransactionApiService _transactionApiService = TransactionApiService();
 
   UserDto? _currentUser;
   UserDto? get currentUser => _currentUser;
 
+  TransactionStats? _transactionStats;
+  TransactionStats? get transactionStats => _transactionStats;
+
   bool _isLoading = false;
   bool get isLoading => _isLoading;
+
+  bool _isLoadingStats = false;
+  bool get isLoadingStats => _isLoadingStats;
 
   String? _errorMessage;
   String? get errorMessage => _errorMessage;
 
+  String? _statsErrorMessage;
+  String? get statsErrorMessage => _statsErrorMessage;
+
   /// Set authorization token from AuthProvider
   void setAuthToken(String accessToken) {
     _userApiService.setAuthToken(accessToken);
+    _transactionApiService.setAuthToken(accessToken);
   }
 
   /// Load current user profile
@@ -89,6 +102,28 @@ class UserProvider extends ChangeNotifier {
       final errorMsg = e.toString().replaceAll('Exception: ', '');
       print('[UserProvider] Error deleting FCM token: $errorMsg');
       // Don't rethrow - logout should succeed even if delete fails
+    }
+  }
+
+  /// Load transaction statistics for current user
+  Future<void> loadTransactionStats() async {
+    try {
+      _isLoadingStats = true;
+      _statsErrorMessage = null;
+      notifyListeners();
+
+      final statsMap = await _transactionApiService.getTransactionStats();
+      _transactionStats = TransactionStats.fromJson(statsMap);
+
+      _isLoadingStats = false;
+      notifyListeners();
+    } catch (e) {
+      _isLoadingStats = false;
+      final errorMsg = e.toString().replaceAll('Exception: ', '');
+      _statsErrorMessage = errorMsg;
+      print(
+          '[UserProvider] Error loading transaction stats: $_statsErrorMessage');
+      notifyListeners();
     }
   }
 }

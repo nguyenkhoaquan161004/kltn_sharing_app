@@ -33,6 +33,8 @@ class NotificationApiService {
         onRequest: (options, handler) {
           print(
               '[NotificationAPI] REQUEST[${options.method}] => ${options.path}');
+          print('[NotificationAPI] Headers: ${options.headers}');
+          print('[NotificationAPI] QueryParams: ${options.queryParameters}');
           return handler.next(options);
         },
         onResponse: (response, handler) {
@@ -43,6 +45,9 @@ class NotificationApiService {
         onError: (e, handler) {
           print(
               '[NotificationAPI] ERROR[${e.response?.statusCode}] => ${e.requestOptions.path}');
+          if (e.response != null) {
+            print('[NotificationAPI] ERROR Response body: ${e.response!.data}');
+          }
           return handler.next(e);
         },
       ),
@@ -147,12 +152,19 @@ class NotificationApiService {
       if (response.statusCode == 200) {
         final data = response.data;
 
+        // Handle both Map and direct number responses
         if (data is Map<String, dynamic>) {
           final count = (data['data'] as num?)?.toInt() ?? 0;
           print('[NotificationAPI] Unread count: $count');
           return count;
+        } else if (data is num) {
+          final count = data.toInt();
+          print('[NotificationAPI] Unread count (direct): $count');
+          return count;
         }
 
+        print(
+            '[NotificationAPI] Unexpected response format for unread count: $data (type: ${data.runtimeType})');
         throw Exception('Unexpected response format: $data');
       } else {
         throw Exception('Failed to get unread count: ${response.statusCode}');

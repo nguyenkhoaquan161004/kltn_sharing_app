@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:geocoding/geocoding.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
+import '../../../widgets/address_autocomplete_field.dart';
 import '../../../../data/services/item_api_service.dart';
 import '../../../../data/services/cloudinary_service.dart';
 import '../../../../data/providers/user_provider.dart';
@@ -31,6 +32,7 @@ class _CreateProductModalState extends State<CreateProductModal> {
   late TextEditingController _descriptionController;
   late TextEditingController _priceController;
   late TextEditingController _quantityController;
+  late TextEditingController _addressController;
 
   String _selectedCategory = '';
   String? _selectedCategoryId;
@@ -45,6 +47,9 @@ class _CreateProductModalState extends State<CreateProductModal> {
   // Location
   double? _latitude;
   double? _longitude;
+  String? _selectedAddress;
+  String _locationMode = 'current'; // 'current' or 'other'
+  String? _userCurrentAddress;
 
   // Categories from API
   List<Map<String, dynamic>> categories = [];
@@ -59,10 +64,12 @@ class _CreateProductModalState extends State<CreateProductModal> {
     _descriptionController = TextEditingController();
     _priceController = TextEditingController(text: '0');
     _quantityController = TextEditingController(text: '1');
+    _addressController = TextEditingController();
 
     // Use default Ho Chi Minh City coordinates initially
     _latitude = 10.7769;
     _longitude = 106.7009;
+    _selectedAddress = 'Mặc định (TP. Hồ Chí Minh)';
 
     // Load categories and user address after frame is built
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -111,6 +118,14 @@ class _CreateProductModalState extends State<CreateProductModal> {
       if (user == null || (user.address == null || user.address!.isEmpty)) {
         print(
             '[CreateProductModal] No user address found, using default coordinates');
+        if (mounted) {
+          setState(() {
+            _userCurrentAddress = null; // No address from user
+            _latitude = 10.7769;
+            _longitude = 106.7009;
+            _selectedAddress = 'Mặc định (TP. Hồ Chí Minh)';
+          });
+        }
         return;
       }
 
@@ -124,8 +139,10 @@ class _CreateProductModalState extends State<CreateProductModal> {
         final location = locations.first;
         if (mounted) {
           setState(() {
+            _userCurrentAddress = address; // User's actual address
             _latitude = location.latitude;
             _longitude = location.longitude;
+            _selectedAddress = address;
             print(
                 '[CreateProductModal] Geocoded address - Lat: $_latitude, Long: $_longitude');
           });
@@ -133,10 +150,25 @@ class _CreateProductModalState extends State<CreateProductModal> {
       } else {
         print(
             '[CreateProductModal] Geocoding failed, using default coordinates');
+        if (mounted) {
+          setState(() {
+            _userCurrentAddress = null; // Geocoding failed
+            _latitude = 10.7769;
+            _longitude = 106.7009;
+            _selectedAddress = 'Mặc định (TP. Hồ Chí Minh)';
+          });
+        }
       }
     } catch (e) {
       print('[CreateProductModal] Error geocoding address: $e');
-      // Silently fail and use default coordinates
+      if (mounted) {
+        setState(() {
+          _userCurrentAddress = null; // Error occurred
+          _latitude = 10.7769;
+          _longitude = 106.7009;
+          _selectedAddress = 'Mặc định (TP. Hồ Chí Minh)';
+        });
+      }
     }
   }
 
@@ -146,6 +178,7 @@ class _CreateProductModalState extends State<CreateProductModal> {
     _descriptionController.dispose();
     _priceController.dispose();
     _quantityController.dispose();
+    _addressController.dispose();
     super.dispose();
   }
 
@@ -364,8 +397,15 @@ class _CreateProductModalState extends State<CreateProductModal> {
               _buildCategoryDropdown(),
               const SizedBox(height: 16),
 
+              // Chọn vị trí lấy hàng
+              Text('Vị trí lấy hàng *', style: AppTextStyles.label),
+              const SizedBox(height: 12),
+              _buildLocationSelector(),
+              const SizedBox(height: 16),
+
               // Số lượng và Giá (side by side)
               Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(
                     child: Column(
@@ -439,6 +479,13 @@ class _CreateProductModalState extends State<CreateProductModal> {
                     ),
                   ),
                 ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Số tiền sẽ được góp vào quỹ Mặt trận Tổ quốc Việt Nam',
+                style: AppTextStyles.caption.copyWith(
+                  color: AppColors.textSecondary,
+                ),
               ),
               const SizedBox(height: 16),
 
@@ -553,7 +600,7 @@ class _CreateProductModalState extends State<CreateProductModal> {
               const SizedBox(height: 24),
 
               // Ngày hết hạn
-              Text('Ngày hết hạn *', style: AppTextStyles.label),
+              Text('Ngày hết hạn', style: AppTextStyles.label),
               const SizedBox(height: 8),
               GestureDetector(
                 onTap: () async {
@@ -699,6 +746,172 @@ class _CreateProductModalState extends State<CreateProductModal> {
           });
         }
       },
+    );
+  }
+
+  Widget _buildLocationSelector() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Option 1: Địa chỉ hiện tại
+        GestureDetector(
+          onTap: () {
+            setState(() {
+              _locationMode = 'current';
+              _addressController.clear();
+              // Set to user's current address with geocoded coordinates
+              if (_userCurrentAddress != null &&
+                  _userCurrentAddress!.isNotEmpty) {
+                _selectedAddress = _userCurrentAddress;
+              } else {
+                _selectedAddress = 'Mặc định (TP. Hồ Chí Minh)';
+              }
+            });
+          },
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              border: Border.all(
+                color: _locationMode == 'current'
+                    ? AppColors.primaryTeal
+                    : AppColors.borderLight,
+                width: 2,
+              ),
+              borderRadius: BorderRadius.circular(12),
+              color: _locationMode == 'current'
+                  ? AppColors.primaryTeal.withOpacity(0.05)
+                  : Colors.transparent,
+            ),
+            child: Row(
+              children: [
+                Radio<String>(
+                  value: 'current',
+                  groupValue: _locationMode,
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() {
+                        _locationMode = value;
+                        _addressController.clear();
+                        if (_userCurrentAddress != null &&
+                            _userCurrentAddress!.isNotEmpty) {
+                          _selectedAddress = _userCurrentAddress;
+                        } else {
+                          _selectedAddress = 'Mặc định (TP. Hồ Chí Minh)';
+                        }
+                      });
+                    }
+                  },
+                  activeColor: AppColors.primaryTeal,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Dùng địa chỉ hiện tại',
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+
+        // Show current address below
+        Padding(
+          padding: const EdgeInsets.only(left: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Show user's address if available, otherwise show default
+              Text(
+                _userCurrentAddress ?? 'Mặc định (TP. Hồ Chí Minh)',
+                style: AppTextStyles.bodyMedium.copyWith(
+                  color: AppColors.textPrimary,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 2),
+              Text(
+                '${_latitude?.toStringAsFixed(4)}, ${_longitude?.toStringAsFixed(4)}',
+                style: AppTextStyles.caption.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+
+        // Option 2: Địa chỉ khác
+        GestureDetector(
+          onTap: () {
+            setState(() {
+              _locationMode = 'other';
+            });
+          },
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              border: Border.all(
+                color: _locationMode == 'other'
+                    ? AppColors.primaryTeal
+                    : AppColors.borderLight,
+                width: 2,
+              ),
+              borderRadius: BorderRadius.circular(12),
+              color: _locationMode == 'other'
+                  ? AppColors.primaryTeal.withOpacity(0.05)
+                  : Colors.transparent,
+            ),
+            child: Row(
+              children: [
+                Radio<String>(
+                  value: 'other',
+                  groupValue: _locationMode,
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() {
+                        _locationMode = value;
+                      });
+                    }
+                  },
+                  activeColor: AppColors.primaryTeal,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Chọn địa chỉ khác',
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        // Input địa chỉ khác
+        if (_locationMode == 'other') ...[
+          const SizedBox(height: 12),
+          AddressAutocompleteField(
+            controller: _addressController,
+            label: '',
+            hintText: 'Nhập địa chỉ lấy hàng',
+            onAddressSelected: (latitude, longitude, address) {
+              setState(() {
+                _latitude = latitude;
+                _longitude = longitude;
+                _selectedAddress = address;
+              });
+              print(
+                  '[CreateProductModal] Selected custom location: $address ($_latitude, $_longitude)');
+            },
+            initialAddress: null,
+          ),
+        ],
+      ],
     );
   }
 }

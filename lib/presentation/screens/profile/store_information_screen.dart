@@ -141,7 +141,7 @@ class _StoreInformationScreenState extends State<StoreInformationScreen> {
               AddressAutocompleteField(
                 controller: _addressController,
                 label: 'Địa chỉ',
-                hintText: 'Nhập địa chỉ cửa hàng (autocomplete)',
+                hintText: 'Nhập địa chỉ cửa hàng',
                 onAddressSelected: (latitude, longitude, address) {
                   setState(() {
                     _selectedLatitude = latitude;

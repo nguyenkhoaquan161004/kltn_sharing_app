@@ -8,6 +8,8 @@ class GamificationProvider extends ChangeNotifier {
   List<GamificationDto> _leaderboard = [];
   List<GamificationDto> _topUsers = [];
   GamificationDto? _currentUserStats;
+  dynamic
+      _currentUserEntryFromLeaderboard; // LeaderboardEntryDto from leaderboard API
   bool _isLoading = false;
   String? _errorMessage;
   int _currentPage = 0;
@@ -20,6 +22,8 @@ class GamificationProvider extends ChangeNotifier {
   List<GamificationDto> get leaderboard => _leaderboard;
   List<GamificationDto> get topUsers => _topUsers;
   GamificationDto? get currentUserStats => _currentUserStats;
+  dynamic get currentUserEntryFromLeaderboard =>
+      _currentUserEntryFromLeaderboard;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
   int get currentPage => _currentPage;
@@ -61,14 +65,20 @@ class GamificationProvider extends ChangeNotifier {
     }
   }
 
-  /// Load top 3 users for podium
-  Future<void> loadTopUsers({int limit = 3}) async {
+  /// Load top N users for podium
+  Future<void> loadTopUsers({
+    int limit = 3,
+    String timeFrame = 'ALL_TIME',
+  }) async {
     try {
       _isLoading = true;
       _errorMessage = null;
       notifyListeners();
 
-      _topUsers = await _gamificationApiService.getTopUsers(limit: limit);
+      _topUsers = await _gamificationApiService.getTopUsers(
+        limit: limit,
+        timeFrame: timeFrame,
+      );
       _isLoading = false;
       notifyListeners();
     } catch (e) {
@@ -89,6 +99,7 @@ class GamificationProvider extends ChangeNotifier {
       _errorMessage = null;
       notifyListeners();
 
+      // Use authenticated version to get user's actual stats
       _currentUserStats = await _gamificationApiService.getCurrentUserStats();
       _isLoading = false;
       notifyListeners();
@@ -144,6 +155,13 @@ class GamificationProvider extends ChangeNotifier {
                 badge: null,
               ))
           .toList();
+
+      // Extract current user entry from leaderboard response
+      if (response.currentUserEntry != null) {
+        _currentUserEntryFromLeaderboard = response.currentUserEntry;
+        print(
+            '[GamificationProvider] Current user entry extracted from leaderboard');
+      }
 
       _currentPage = response.page;
       _totalPages = response.totalPages;

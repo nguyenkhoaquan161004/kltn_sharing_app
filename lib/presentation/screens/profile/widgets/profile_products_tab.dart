@@ -5,6 +5,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../../../../data/models/item_model.dart';
 import '../../../../data/models/transaction_model.dart';
+import '../../../../data/models/transaction_status.dart';
 import '../../../../data/mock_data.dart';
 import '../../../../data/services/item_api_service.dart';
 import '../../../../data/services/transaction_api_service.dart';
@@ -822,26 +823,49 @@ class _ProfileProductsTabState extends State<ProfileProductsTab>
   Widget _buildProductDetailSheet(ItemModel product) {
     final productId = product.itemId_str ?? product.itemId.toString();
 
-    // Load requesters into cache if not already loaded
-    if (!_requestersCache.containsKey(productId)) {
-      _itemApiService
-          .getSharerTransactionsForItem(productId)
-          .then((requesters) {
-        if (mounted) {
-          setState(() {
-            _requestersCache[productId] = requesters;
-          });
-        }
-      }).catchError((e) {
-        print('Error loading requesters: $e');
-      });
-    }
-
     return DraggableScrollableSheet(
       expand: false,
       builder: (context, scrollController) => StatefulBuilder(
         builder: (context, setSheetState) {
-          final requesters = _requestersCache[productId] ?? [];
+          // Load requesters into cache if not already loaded
+          if (!_requestersCache.containsKey(productId)) {
+            print(
+                '[ProfileProductsTab] Loading requesters for item: $productId');
+            _itemApiService
+                .getSharerTransactionsForItem(productId)
+                .then((requesters) {
+              print(
+                  '[ProfileProductsTab] Loaded ${requesters.length} requesters for item $productId');
+              if (mounted) {
+                setState(() {
+                  _requestersCache[productId] = requesters;
+                });
+                // Force rebuild the sheet after data loads
+                setSheetState(() {});
+              }
+            }).catchError((e) {
+              print('[ProfileProductsTab] Error loading requesters: $e');
+            });
+          }
+
+          final allRequesters = _requestersCache[productId] ?? [];
+          print(
+              '[ProfileProductsTab] Building sheet with ${allRequesters.length} total requesters');
+
+          // Debug: Log all statuses
+          for (var req in allRequesters) {
+            print(
+                '[ProfileProductsTab] Requester status: ${req.status} (type: ${req.status.runtimeType})');
+          }
+
+          // Show only PENDING requesters
+          final pendingRequesters = allRequesters
+              .where((transaction) =>
+                  transaction.status == TransactionStatus.pending)
+              .toList();
+
+          print(
+              '[ProfileProductsTab] Filtered to ${pendingRequesters.length} pending requesters');
 
           return Container(
             decoration: const BoxDecoration(
@@ -890,7 +914,7 @@ class _ProfileProductsTabState extends State<ProfileProductsTab>
                               Text(
                                 product.price == 0
                                     ? 'Miễn phí'
-                                    : '${product.price} VND',
+                                    : '${_formatPrice(product.price.toDouble())} VND',
                                 style: AppTextStyles.price.copyWith(
                                   color: AppColors.primaryCyan,
                                 ),
@@ -934,13 +958,13 @@ class _ProfileProductsTabState extends State<ProfileProductsTab>
 
                     // Requesters list header
                     Text(
-                      'Người muốn nhận (${requesters.length})',
+                      'Người muốn nhận (${pendingRequesters.length})',
                       style: AppTextStyles.h4,
                     ),
                     const SizedBox(height: 16),
 
                     // Requesters list
-                    if (requesters.isEmpty)
+                    if (pendingRequesters.isEmpty)
                       Center(
                         child: Padding(
                           padding: const EdgeInsets.symmetric(vertical: 32),
@@ -953,7 +977,7 @@ class _ProfileProductsTabState extends State<ProfileProductsTab>
                         ),
                       )
                     else
-                      ...requesters.map((transaction) {
+                      ...pendingRequesters.map((transaction) {
                         return _buildRequesterCard(
                           transaction,
                           product,
@@ -1123,6 +1147,19 @@ class _ProfileProductsTabState extends State<ProfileProductsTab>
     }
   }
 
+  String _formatPrice(double price) {
+    final priceStr = price.toStringAsFixed(0);
+    final reversedPrice = priceStr.split('').reversed.toList();
+    final formatted = <String>[];
+    for (int i = 0; i < reversedPrice.length; i++) {
+      if (i > 0 && i % 3 == 0) {
+        formatted.add('.');
+      }
+      formatted.add(reversedPrice[i]);
+    }
+    return formatted.reversed.join('');
+  }
+
   Future<void> _acceptRequest(
     TransactionModel transaction,
     ItemModel product,
@@ -1169,7 +1206,9 @@ class _ProfileProductsTabState extends State<ProfileProductsTab>
       // Update product description with recipient info
       try {
         final recipientName = transaction.receiverName ?? 'Người dùng';
-        final recipientPhone = transaction.receiverPhone ?? 'Không có';
+        final recipientPhone = transaction.receiverPhone?.isNotEmpty == true
+            ? transaction.receiverPhone
+            : 'Số điện thoại';
         final recipientAddress = transaction.receiverAddress ?? 'Không có';
 
         // Format recipient info - prepend to description

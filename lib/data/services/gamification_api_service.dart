@@ -5,6 +5,7 @@ import 'package:kltn_sharing_app/data/models/gamification_response_model.dart';
 
 class GamificationApiService {
   late Dio _dio;
+  late Dio _dioNoAuth; // For public leaderboard endpoints
   late TokenRefreshInterceptor _tokenRefreshInterceptor;
   Future<String?> Function()? _getValidTokenCallback;
 
@@ -53,6 +54,8 @@ class GamificationApiService {
         onRequest: (options, handler) {
           print(
               '[GamificationAPI] REQUEST[${options.method}] => ${options.path}');
+          print('[GamificationAPI] Headers: ${options.headers}');
+          print('[GamificationAPI] QueryParams: ${options.queryParameters}');
           return handler.next(options);
         },
         onResponse: (response, handler) {
@@ -63,6 +66,43 @@ class GamificationApiService {
         onError: (e, handler) {
           print(
               '[GamificationAPI] ERROR[${e.response?.statusCode}] => ${e.requestOptions.path}');
+          if (e.response != null) {
+            print('[GamificationAPI] ERROR Response body: ${e.response!.data}');
+          }
+          return handler.next(e);
+        },
+      ),
+    );
+
+    // Create Dio instance for public endpoints (no token refresh)
+    _dioNoAuth = Dio(
+      BaseOptions(
+        baseUrl: AppConfig.baseUrl,
+        connectTimeout: Duration(seconds: AppConfig.requestTimeoutSeconds),
+        receiveTimeout: Duration(seconds: AppConfig.requestTimeoutSeconds),
+        contentType: 'application/json',
+        headers: {
+          'Accept': 'application/json',
+        },
+      ),
+    );
+
+    // Add logging interceptor to _dioNoAuth
+    _dioNoAuth.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (options, handler) {
+          print(
+              '[GamificationAPI-NoAuth] REQUEST[${options.method}] => ${options.path}');
+          return handler.next(options);
+        },
+        onResponse: (response, handler) {
+          print(
+              '[GamificationAPI-NoAuth] RESPONSE[${response.statusCode}] => ${response.requestOptions.path}');
+          return handler.next(response);
+        },
+        onError: (e, handler) {
+          print(
+              '[GamificationAPI-NoAuth] ERROR[${e.response?.statusCode}] => ${e.requestOptions.path}');
           return handler.next(e);
         },
       ),
@@ -162,8 +202,11 @@ class GamificationApiService {
     }
   }
 
-  /// Get top 3 users for podium
-  Future<List<GamificationDto>> getTopUsers({int limit = 3}) async {
+  /// Get top N users for podium
+  Future<List<GamificationDto>> getTopUsers({
+    int limit = 3,
+    String timeFrame = 'ALL_TIME',
+  }) async {
     try {
       final response = await _dio.get(
         '/api/v2/gamification/leaderboard',
@@ -171,7 +214,7 @@ class GamificationApiService {
           'page': 0,
           'size': limit,
           'scope': 'GLOBAL',
-          'timeFrame': 'ALL_TIME',
+          'timeFrame': timeFrame,
           'sortBy': 'points',
           'sortDirection': 'DESC',
         },
@@ -218,6 +261,44 @@ class GamificationApiService {
   Future<GamificationDto> getCurrentUserStats() async {
     try {
       final response = await _dio.get('/api/v2/gamification/me');
+
+      if (response.statusCode == 200) {
+        final data = response.data;
+
+        if (data is Map<String, dynamic>) {
+          if (data.containsKey('data')) {
+            final userData = data['data'] as Map<String, dynamic>;
+            // Map the response to GamificationDto
+            return GamificationDto(
+              id: userData['id'] ?? '',
+              userId: userData['userId'] ?? userData['user_id'] ?? '',
+              username: userData['username'] ?? '',
+              avatarUrl: userData['avatarUrl'] ?? userData['avatar_url'],
+              points: userData['points'] ?? 0,
+              rank: userData['level'] ?? userData['rank'] ?? 0,
+              itemsShared:
+                  userData['totalShares'] ?? userData['items_shared'] ?? 0,
+              itemsReceived:
+                  userData['totalReceives'] ?? userData['items_received'] ?? 0,
+              badge: null,
+            );
+          }
+          return GamificationDto.fromJson(data);
+        }
+
+        throw Exception('Unexpected response format');
+      } else {
+        throw Exception('Failed to load user stats: ${response.statusCode}');
+      }
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  /// Get current user stats without triggering token refresh (public endpoint)
+  Future<GamificationDto> getCurrentUserStatsNoAuth() async {
+    try {
+      final response = await _dioNoAuth.get('/api/v2/gamification/me');
 
       if (response.statusCode == 200) {
         final data = response.data;

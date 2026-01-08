@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:kltn_sharing_app/core/config/app_config.dart';
 import 'package:kltn_sharing_app/core/utils/token_refresh_interceptor.dart';
 import 'package:kltn_sharing_app/data/models/cart_request_model.dart';
@@ -73,9 +74,37 @@ class CartApiService {
     _dio.options.headers.remove('Authorization');
   }
 
+  /// Ensure token is loaded from SharedPreferences before making API calls
+  /// This prevents "No refresh token available" errors when token was set earlier
+  Future<void> _ensureTokenLoaded() async {
+    try {
+      // Check if we already have a token set
+      final currentAuth = _dio.options.headers['Authorization'];
+      if (currentAuth != null && currentAuth.toString().isNotEmpty) {
+        return;
+      }
+
+      // Load token from SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      final savedToken = prefs.getString('access_token');
+
+      if (savedToken != null && savedToken.isNotEmpty) {
+        setAuthToken(savedToken);
+        print('[CartAPI] ✅ Token loaded from SharedPreferences');
+      } else {
+        print('[CartAPI] ⚠️  No saved token found in SharedPreferences');
+      }
+    } catch (e) {
+      print('[CartAPI] ⚠️  Error loading token from SharedPreferences: $e');
+    }
+  }
+
   /// Add item to cart
   Future<Map<String, dynamic>> addToCart(CartRequest request) async {
     try {
+      // Ensure token is loaded from SharedPreferences before making the request
+      await _ensureTokenLoaded();
+
       final response = await _dio.post(
         '/api/v2/cart',
         data: request.toJson(),
@@ -101,6 +130,9 @@ class CartApiService {
   /// Get all cart items for current user
   Future<List<dynamic>> getCart({int page = 1, int limit = 20}) async {
     try {
+      // Ensure token is loaded from SharedPreferences before making the request
+      await _ensureTokenLoaded();
+
       final response = await _dio.get(
         '/api/v2/cart',
         queryParameters: {
@@ -149,6 +181,9 @@ class CartApiService {
   /// Remove item from cart
   Future<void> removeFromCart(String itemId) async {
     try {
+      // Ensure token is loaded from SharedPreferences before making the request
+      await _ensureTokenLoaded();
+
       print('[CartAPI] Removing item from cart: $itemId');
       final response = await _dio.delete(
         '/api/v2/cart/items/$itemId',
@@ -167,6 +202,11 @@ class CartApiService {
           '[CartAPI] DioException removing from cart: ${e.response?.statusCode} - ${e.message}');
       throw _handleDioException(e);
     }
+  }
+
+  /// Delete item from cart (alias for removeFromCart)
+  Future<void> deleteCartItem(String itemId) async {
+    return removeFromCart(itemId);
   }
 
   Exception _handleDioException(DioException e) {

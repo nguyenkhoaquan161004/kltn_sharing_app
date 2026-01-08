@@ -69,19 +69,36 @@ class _BadgesListScreenState extends State<BadgesListScreen> {
   /// Check if a badge is earned by the user
   bool _isBadgeEarned(dynamic badgeId) {
     if (badgeId == null) return false;
-    return _userBadges.any((ub) {
-      final id = ub['badge_id'] ?? ub['badgeId'];
-      return id.toString() == badgeId.toString();
+
+    final badgeIdStr = badgeId.toString().toLowerCase();
+
+    final isEarned = _userBadges.any((ub) {
+      // Check multiple possible ID field names
+      final id = ub['id'] ?? ub['badge_id'] ?? ub['badgeId'];
+      final idStr = id?.toString().toLowerCase() ?? '';
+      return idStr == badgeIdStr;
     });
+
+    // Debug log
+    if (isEarned) {
+      print('[BadgesListScreen] Badge $badgeId is earned by user');
+    }
+
+    return isEarned;
   }
 
   /// Get earned date for a badge
   String? _getEarnedDate(dynamic badgeId) {
     if (badgeId == null) return null;
+
+    final badgeIdStr = badgeId.toString().toLowerCase();
+
     final userBadge = _userBadges.firstWhere(
       (ub) {
-        final id = ub['badge_id'] ?? ub['badgeId'];
-        return id.toString() == badgeId.toString();
+        // Check multiple possible ID field names
+        final id = ub['id'] ?? ub['badge_id'] ?? ub['badgeId'];
+        final idStr = id?.toString().toLowerCase() ?? '';
+        return idStr == badgeIdStr;
       },
       orElse: () => {},
     );
@@ -102,11 +119,21 @@ class _BadgesListScreenState extends State<BadgesListScreen> {
   Widget build(BuildContext context) {
     // Separate earned and unearned badges
     final earnedBadges = _allBadges
-        .where((b) => _isBadgeEarned(b['badge_id'] ?? b['badgeId']))
+        .where((b) => _isBadgeEarned(b['id'] ?? b['badge_id'] ?? b['badgeId']))
         .toList();
     final unearnedBadges = _allBadges
-        .where((b) => !_isBadgeEarned(b['badge_id'] ?? b['badgeId']))
+        .where((b) => !_isBadgeEarned(b['id'] ?? b['badge_id'] ?? b['badgeId']))
         .toList();
+
+    print(
+        '[BadgesListScreen] DEBUG: All badges: ${_allBadges.length}, Earned: ${earnedBadges.length}, Unearned: ${unearnedBadges.length}');
+    print('[BadgesListScreen] DEBUG: User badges count: ${_userBadges.length}');
+    if (_userBadges.isNotEmpty) {
+      print('[BadgesListScreen] DEBUG: First user badge: ${_userBadges[0]}');
+    }
+    if (_allBadges.isNotEmpty) {
+      print('[BadgesListScreen] DEBUG: First all badge: ${_allBadges[0]}');
+    }
 
     return Scaffold(
       backgroundColor: AppColors.backgroundWhite,
@@ -226,7 +253,7 @@ class _BadgesListScreenState extends State<BadgesListScreen> {
                           padding: const EdgeInsets.symmetric(horizontal: 8),
                           child: GridView.count(
                             crossAxisCount: 2,
-                            childAspectRatio: 0.85,
+                            childAspectRatio: 0.65,
                             crossAxisSpacing: 12,
                             mainAxisSpacing: 12,
                             shrinkWrap: true,
@@ -250,7 +277,7 @@ class _BadgesListScreenState extends State<BadgesListScreen> {
                           padding: const EdgeInsets.symmetric(horizontal: 8),
                           child: GridView.count(
                             crossAxisCount: 2,
-                            childAspectRatio: 0.85,
+                            childAspectRatio: 0.65,
                             crossAxisSpacing: 12,
                             mainAxisSpacing: 12,
                             shrinkWrap: true,
@@ -270,121 +297,156 @@ class _BadgesListScreenState extends State<BadgesListScreen> {
   Widget _buildBadgeItem(Map<String, dynamic> badge, bool isEarned) {
     final badgeName = badge['name'] ?? badge['badge_name'] ?? 'Unknown Badge';
     final badgeDescription = badge['description'] ?? '';
-    final iconName = badge['icon'] ?? '';
-    final badgeIcon = _getEmojiForBadge(iconName);
+    final iconValue = badge['icon'] ?? '';
+    // Use icon directly from API if it looks like an emoji/unicode, otherwise convert
+    final badgeIcon =
+        _isEmoji(iconValue) ? iconValue : _getEmojiForBadge(iconValue);
     final badgeColor = badge['color'] ?? badge['badge_color'] ?? 'gray';
 
-    return Container(
-      decoration: BoxDecoration(
-        color: isEarned ? Colors.white : Colors.grey[200],
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isEarned ? AppColors.borderLight : Colors.grey[300]!,
-          width: 1,
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Container(
+        decoration: BoxDecoration(
+          color: isEarned
+              ? AppColors.primaryGreen.withOpacity(0.08)
+              : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isEarned
+                ? AppColors.primaryGreen.withOpacity(0.5)
+                : AppColors.borderLight,
+            width: isEarned ? 2 : 1,
+          ),
+          boxShadow: isEarned
+              ? [
+                  BoxShadow(
+                    color: AppColors.primaryGreen.withOpacity(0.15),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
+                  ),
+                ]
+              : [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 6,
+                    offset: const Offset(0, 1),
+                  ),
+                ],
+          gradient: isEarned
+              ? LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    AppColors.primaryGreen.withOpacity(0.05),
+                    AppColors.primaryGreen.withOpacity(0.02),
+                  ],
+                )
+              : null,
         ),
-        boxShadow: isEarned
-            ? [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Circular badge
+            Padding(
+              padding: const EdgeInsets.only(top: 12.0),
+              child: Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  color:
+                      isEarned ? _getBadgeColor(badgeColor) : Colors.grey[200],
+                  shape: BoxShape.circle,
+                  boxShadow: isEarned
+                      ? [
+                          BoxShadow(
+                            color: _getBadgeColor(badgeColor).withOpacity(0.35),
+                            blurRadius: 12,
+                            spreadRadius: 1,
+                            offset: const Offset(0, 4),
+                          ),
+                        ]
+                      : [
+                          BoxShadow(
+                            color: Colors.grey.withOpacity(0.15),
+                            blurRadius: 8,
+                            spreadRadius: 0,
+                          ),
+                        ],
                 ),
-              ]
-            : [],
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          // Circular badge
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              color: isEarned ? _getBadgeColor(badgeColor) : Colors.grey[300],
-              shape: BoxShape.circle,
-              boxShadow: isEarned
-                  ? [
-                      BoxShadow(
-                        color: _getBadgeColor(badgeColor).withOpacity(0.35),
-                        blurRadius: 12,
-                        spreadRadius: 1,
-                        offset: const Offset(0, 4),
-                      ),
-                    ]
-                  : [
-                      BoxShadow(
-                        color: Colors.grey.withOpacity(0.15),
-                        blurRadius: 8,
-                        spreadRadius: 0,
-                      ),
-                    ],
-            ),
-            child: Center(
-              child: Text(
-                badgeIcon,
-                style: const TextStyle(fontSize: 36),
+                child: Center(
+                  child: Text(
+                    badgeIcon,
+                    style: const TextStyle(fontSize: 36),
+                  ),
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: 10),
+            const SizedBox(height: 8),
 
-          // Badge info
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  badgeName,
-                  style: AppTextStyles.caption.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: isEarned ? AppColors.textPrimary : Colors.grey[600],
-                  ),
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 4),
-                Expanded(
-                  child: Text(
-                    badgeDescription,
-                    style: AppTextStyles.caption.copyWith(
-                      color:
-                          isEarned ? AppColors.textSecondary : Colors.grey[500],
-                      fontSize: 10,
-                    ),
-                    textAlign: TextAlign.center,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                if (isEarned)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Text(
-                      'Đạt được: ${_getEarnedDate(badge['badge_id'] ?? badge['badgeId']) ?? 'N/A'}',
+            // Badge info
+            Expanded(
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      badgeName,
                       style: AppTextStyles.caption.copyWith(
-                        color: AppColors.primaryTeal,
-                        fontSize: 9,
+                        fontWeight: FontWeight.w600,
+                        color: isEarned
+                            ? AppColors.primaryGreen
+                            : AppColors.textPrimary,
                       ),
                       textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                  )
-                else
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Text(
-                      'Tiếp tục cố gắng',
-                      style: AppTextStyles.caption.copyWith(
-                        color: Colors.grey[600],
-                        fontSize: 9,
+                    const SizedBox(height: 2),
+                    Expanded(
+                      child: Text(
+                        badgeDescription,
+                        style: AppTextStyles.caption.copyWith(
+                          color: AppColors.textSecondary,
+                          fontSize: 10,
+                        ),
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      textAlign: TextAlign.center,
                     ),
-                  ),
-              ],
+                    if (isEarned)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Text(
+                          'Đạt được: ${_getEarnedDate(badge['badge_id'] ?? badge['badgeId'] ?? badge['id']) ?? 'N/A'}',
+                          style: AppTextStyles.caption.copyWith(
+                            color: AppColors.primaryGreen,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      )
+                    else
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Text(
+                          'Chưa đạt được',
+                          style: AppTextStyles.caption.copyWith(
+                            color: Colors.grey[600],
+                            fontSize: 9,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -410,6 +472,18 @@ class _BadgesListScreenState extends State<BadgesListScreen> {
     }
   }
 
+  /// Check if the string is likely an emoji or unicode character
+  bool _isEmoji(String? value) {
+    if (value == null || value.isEmpty) return false;
+    // Check if it's a single character (likely emoji/unicode)
+    // or if it contains common emoji patterns
+    final codeUnits = value.codeUnits;
+    if (codeUnits.isEmpty) return false;
+    // Emoji are typically represented as high unicode values or multiple code units
+    // This is a simple heuristic check
+    return value.length <= 2 && codeUnits.any((cu) => cu > 127);
+  }
+
   /// Map icon name from API to emoji
   String _getEmojiForBadge(String? iconName) {
     if (iconName == null || iconName.isEmpty) return '🏅';
@@ -420,6 +494,21 @@ class _BadgesListScreenState extends State<BadgesListScreen> {
       case 'badgenewcomer':
       case 'newcomer':
         return '👋';
+      case 'badgefirstshare':
+      case 'firstshare':
+        return '📦';
+      case 'badgefirstreceive':
+      case 'firstreceive':
+        return '🎁';
+      case 'badgebronze':
+      case 'bronze':
+        return '🥉';
+      case 'badgesilver':
+      case 'silver':
+        return '🥈';
+      case 'badgegold':
+      case 'gold':
+        return '🥇';
       case 'badgestar':
       case 'star':
         return '⭐';
@@ -435,9 +524,6 @@ class _BadgesListScreenState extends State<BadgesListScreen> {
       case 'badgecommunity':
       case 'community':
         return '👥';
-      case 'badgegold':
-      case 'gold':
-        return '✨';
       case 'badgefire':
       case 'fire':
         return '🔥';

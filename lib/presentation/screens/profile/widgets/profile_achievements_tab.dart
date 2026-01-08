@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:dio/dio.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../../../../data/services/gamification_api_service.dart';
 import '../../../../data/models/gamification_response_model.dart';
+import '../../../../data/providers/auth_provider.dart';
 import 'dart:async';
 
 class ProfileAchievementsTab extends StatefulWidget {
@@ -31,7 +33,36 @@ class _ProfileAchievementsTabState extends State<ProfileAchievementsTab> {
   void initState() {
     super.initState();
     _gamificationApiService = context.read<GamificationApiService>();
-    _loadData();
+
+    // Set auth token and token refresh callback from AuthProvider BEFORE loading data
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      try {
+        final authProvider = context.read<AuthProvider>();
+        if (authProvider.accessToken != null) {
+          _gamificationApiService.setAuthToken(authProvider.accessToken!);
+          // Set token refresh callback to automatically get fresh token
+          _gamificationApiService.setGetValidTokenCallback(
+            () async => authProvider.accessToken,
+          );
+          print(
+              '[ProfileAchievementsTab] Auth token and callback set for GamificationApiService');
+
+          // Load data AFTER token is set
+          _loadData();
+        } else {
+          setState(() {
+            _errorMessage = 'Token không tìm thấy. Vui lòng đăng nhập lại.';
+            _isLoading = false;
+          });
+        }
+      } catch (e) {
+        print('[ProfileAchievementsTab] Error setting auth token: $e');
+        setState(() {
+          _errorMessage = 'Lỗi: $e';
+          _isLoading = false;
+        });
+      }
+    });
   }
 
   /// Load user stats and badges data
@@ -46,35 +77,41 @@ class _ProfileAchievementsTabState extends State<ProfileAchievementsTab> {
     try {
       print('DEBUG: Starting to load badges data...');
 
-      // Fetch all data in parallel with timeout
+      // Fetch all data in parallel
       print('DEBUG: Calling getCurrentUserStats...');
-      final statsResponse = _gamificationApiService
-          .getCurrentUserStats()
-          .timeout(const Duration(seconds: 10), onTimeout: () {
-        throw TimeoutException('getCurrentUserStats timed out');
-      });
+      final statsResponse = _gamificationApiService.getCurrentUserStats();
 
       print('DEBUG: Calling getAllBadges...');
-      final allBadgesResponse = _gamificationApiService
-          .getAllBadges()
-          .timeout(const Duration(seconds: 10), onTimeout: () {
-        throw TimeoutException('getAllBadges timed out');
-      });
+      final allBadgesResponse = _gamificationApiService.getAllBadges();
 
       print('DEBUG: Calling getUserBadges...');
-      final userBadgesResponse = _gamificationApiService
-          .getUserBadges()
-          .timeout(const Duration(seconds: 10), onTimeout: () {
-        throw TimeoutException('getUserBadges timed out');
-      });
+      final userBadgesResponse = _gamificationApiService.getUserBadges();
 
       print('DEBUG: Awaiting all results...');
+
+      // Add individual timeouts for each request
+      final statsWithTimeout = statsResponse.timeout(
+        const Duration(seconds: 20),
+        onTimeout: () =>
+            throw TimeoutException('getCurrentUserStats timed out'),
+      );
+
+      final allBadgesWithTimeout = allBadgesResponse.timeout(
+        const Duration(seconds: 25),
+        onTimeout: () => throw TimeoutException('getAllBadges timed out'),
+      );
+
+      final userBadgesWithTimeout = userBadgesResponse.timeout(
+        const Duration(seconds: 20),
+        onTimeout: () => throw TimeoutException('getUserBadges timed out'),
+      );
+
       final results = await Future.wait([
-        statsResponse,
-        allBadgesResponse,
-        userBadgesResponse,
-      ]).timeout(const Duration(seconds: 15), onTimeout: () {
-        throw TimeoutException('Future.wait timed out after 15 seconds');
+        statsWithTimeout,
+        allBadgesWithTimeout,
+        userBadgesWithTimeout,
+      ]).timeout(const Duration(seconds: 60), onTimeout: () {
+        throw TimeoutException('Loading badges data timed out');
       });
 
       if (!mounted) return;
@@ -105,6 +142,27 @@ class _ProfileAchievementsTabState extends State<ProfileAchievementsTab> {
         _errorMessage = 'Kết nối bị hết thời gian: ${e.message}';
         _isLoading = false;
       });
+    } on DioException catch (e) {
+      if (!mounted) return;
+
+      print('DEBUG: ❌ DioException - Status Code: ${e.response?.statusCode}');
+      print('DEBUG: Error: $e');
+
+      String errorMessage = 'Lỗi tải dữ liệu';
+
+      if (e.response?.statusCode == 403) {
+        errorMessage = 'Bạn không có quyền truy cập tính năng này';
+      } else if (e.response?.statusCode == 401) {
+        errorMessage = 'Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại';
+      } else if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.receiveTimeout) {
+        errorMessage = 'Kết nối bị hết thời gian, vui lòng thử lại';
+      }
+
+      setState(() {
+        _errorMessage = errorMessage;
+        _isLoading = false;
+      });
     } catch (e, stackTrace) {
       if (!mounted) return;
 
@@ -113,7 +171,7 @@ class _ProfileAchievementsTabState extends State<ProfileAchievementsTab> {
       print('DEBUG: StackTrace: $stackTrace');
 
       setState(() {
-        _errorMessage = e.toString();
+        _errorMessage = 'Lỗi tải dữ liệu: ${e.toString().substring(0, 50)}';
         _isLoading = false;
       });
     }
@@ -122,19 +180,27 @@ class _ProfileAchievementsTabState extends State<ProfileAchievementsTab> {
   /// Check if a badge is earned by the user
   bool _isBadgeEarned(dynamic badgeId) {
     if (badgeId == null) return false;
+
+    final badgeIdStr = badgeId.toString().toLowerCase();
+
     return _userBadges.any((ub) {
       final id = ub['id'] ?? ub['badge_id'] ?? ub['badgeId'];
-      return id.toString() == badgeId.toString();
+      final idStr = id?.toString().toLowerCase() ?? '';
+      return idStr == badgeIdStr;
     });
   }
 
   /// Get earned date for a badge
   String? _getEarnedDate(dynamic badgeId) {
     if (badgeId == null) return null;
+
+    final badgeIdStr = badgeId.toString().toLowerCase();
+
     final userBadge = _userBadges.firstWhere(
       (ub) {
         final id = ub['id'] ?? ub['badge_id'] ?? ub['badgeId'];
-        return id.toString() == badgeId.toString();
+        final idStr = id?.toString().toLowerCase() ?? '';
+        return idStr == badgeIdStr;
       },
       orElse: () => {},
     );
@@ -153,9 +219,26 @@ class _ProfileAchievementsTabState extends State<ProfileAchievementsTab> {
 
   @override
   Widget build(BuildContext context) {
-    // Get earned badges
-    final earnedBadges =
-        _allBadges.where((b) => _isBadgeEarned(b['id'])).take(5).toList();
+    // Separate earned and unearned badges
+    final earnedBadges = _allBadges
+        .where((b) => _isBadgeEarned(b['id'] ?? b['badge_id'] ?? b['badgeId']))
+        .toList();
+    final unearnedBadges = _allBadges
+        .where((b) => !_isBadgeEarned(b['id'] ?? b['badge_id'] ?? b['badgeId']))
+        .toList();
+
+    print(
+        '[ProfileAchievementsTab] DEBUG: All badges: ${_allBadges.length}, Earned: ${earnedBadges.length}, Unearned: ${unearnedBadges.length}');
+    print(
+        '[ProfileAchievementsTab] DEBUG: User badges count: ${_userBadges.length}');
+    if (_userBadges.isNotEmpty) {
+      print(
+          '[ProfileAchievementsTab] DEBUG: First user badge: ${_userBadges[0]}');
+    }
+    if (_allBadges.isNotEmpty) {
+      print(
+          '[ProfileAchievementsTab] DEBUG: First all badge: ${_allBadges[0]}');
+    }
 
     return _isLoading
         ? const Center(child: CircularProgressIndicator())
@@ -183,181 +266,267 @@ class _ProfileAchievementsTabState extends State<ProfileAchievementsTab> {
                 ),
               )
             : SingleChildScrollView(
-                padding: const EdgeInsets.all(24),
+                padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Stats row - Gamification points + Total badges
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildStatItem(
-                            value: '$_userPoints',
-                            label: 'Điểm gamification',
-                          ),
-                        ),
-                        Container(
-                          width: 1,
-                          height: 40,
-                          color: AppColors.borderLight,
-                        ),
-                        Expanded(
-                          child: _buildStatItem(
-                            value: '${_userBadges.length}',
-                            label: 'Danh hiệu đạt được',
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 32),
-
-                    // Badges section
-                    _buildSection(
-                      title: 'Bộ sưu tập danh hiệu',
-                      onViewAll: () {
-                        context.push('/badges/list');
-                      },
-                      child: earnedBadges.isEmpty
-                          ? Center(
-                              child: Padding(
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 24),
-                                child: Text(
-                                  'Chưa đạt được danh hiệu nào',
-                                  style: AppTextStyles.bodySmall.copyWith(
-                                    color: AppColors.textSecondary,
-                                  ),
+                    // Stats
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: AppColors.backgroundGray,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceAround,
+                        children: [
+                          Column(
+                            children: [
+                              Text(
+                                '$_userPoints',
+                                style: AppTextStyles.h2.copyWith(
+                                  fontWeight: FontWeight.bold,
                                 ),
                               ),
-                            )
-                          : SizedBox(
-                              height: 160,
-                              child: ListView.separated(
-                                scrollDirection: Axis.horizontal,
-                                itemCount: earnedBadges.length,
-                                separatorBuilder: (_, __) =>
-                                    const SizedBox(width: 12),
-                                itemBuilder: (context, index) {
-                                  return _buildBadgeItem(earnedBadges[index]);
-                                },
+                              const SizedBox(height: 4),
+                              Text(
+                                'Điểm tương tác',
+                                style: AppTextStyles.caption,
+                              ),
+                            ],
+                          ),
+                          Column(
+                            children: [
+                              Text(
+                                '${earnedBadges.length}',
+                                style: AppTextStyles.h2.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Đã đạt được',
+                                style: AppTextStyles.caption,
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+
+                    // Earned badges section - Only show earned badges
+                    if (earnedBadges.isNotEmpty) ...[
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Danh hiệu đã đạt được',
+                            style: AppTextStyles.h4,
+                          ),
+                          GestureDetector(
+                            onTap: () {
+                              context.push('/badges/list');
+                            },
+                            child: Text(
+                              'Xem tất cả',
+                              style: AppTextStyles.bodySmall.copyWith(
+                                color: AppColors.primaryTeal,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
-                    ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        child: GridView.count(
+                          crossAxisCount: 2,
+                          childAspectRatio: 0.65,
+                          crossAxisSpacing: 12,
+                          mainAxisSpacing: 12,
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          children: earnedBadges
+                              .map((b) => _buildBadgeItem(b, true))
+                              .toList(),
+                        ),
+                      ),
+                    ] else ...[
+                      Center(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 32),
+                          child: Column(
+                            children: [
+                              Icon(Icons.emoji_events_outlined,
+                                  size: 48, color: AppColors.textSecondary),
+                              const SizedBox(height: 16),
+                              Text(
+                                'Chưa đạt được danh hiệu nào',
+                                style: AppTextStyles.bodyMedium.copyWith(
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Tiếp tục tham gia để kiếm danh hiệu',
+                                style: AppTextStyles.bodySmall.copyWith(
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               );
   }
 
-  Widget _buildStatItem({required String value, required String label}) {
-    return Column(
-      children: [
-        Text(
-          value,
-          style: AppTextStyles.h2.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: AppTextStyles.caption,
-          textAlign: TextAlign.center,
-        ),
-      ],
-    );
-  }
+  Widget _buildBadgeItem(Map<String, dynamic> badge, bool isEarned) {
+    final badgeName = badge['name'] ?? badge['badge_name'] ?? 'Unknown Badge';
+    final badgeDescription = badge['description'] ?? '';
+    final iconValue = badge['icon'] ?? '';
+    // Use icon directly from API if it looks like an emoji/unicode, otherwise convert
+    final badgeIcon =
+        _isEmoji(iconValue) ? iconValue : _getEmojiForBadge(iconValue);
+    final badgeColor = badge['color'] ?? badge['badge_color'] ?? 'gray';
 
-  Widget _buildSection({
-    required String title,
-    required VoidCallback onViewAll,
-    required Widget child,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppColors.backgroundWhite,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Container(
+        decoration: BoxDecoration(
+          color: isEarned
+              ? AppColors.primaryGreen.withOpacity(0.08)
+              : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isEarned
+                ? AppColors.primaryGreen.withOpacity(0.5)
+                : AppColors.borderLight,
+            width: isEarned ? 2 : 1,
           ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(title, style: AppTextStyles.h4),
-              GestureDetector(
-                onTap: onViewAll,
-                child: Text(
-                  'Xem tất cả',
-                  style: AppTextStyles.bodySmall.copyWith(
-                    color: AppColors.primaryTeal,
-                    fontWeight: FontWeight.w600,
+          boxShadow: isEarned
+              ? [
+                  BoxShadow(
+                    color: AppColors.primaryGreen.withOpacity(0.15),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
+                  ),
+                ]
+              : [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 6,
+                    offset: const Offset(0, 1),
+                  ),
+                ],
+          gradient: isEarned
+              ? LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    AppColors.primaryGreen.withOpacity(0.05),
+                    AppColors.primaryGreen.withOpacity(0.02),
+                  ],
+                )
+              : null,
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Circular badge
+            Padding(
+              padding: const EdgeInsets.only(top: 12.0),
+              child: Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  color:
+                      isEarned ? _getBadgeColor(badgeColor) : Colors.grey[300],
+                  shape: BoxShape.circle,
+                  boxShadow: isEarned
+                      ? [
+                          BoxShadow(
+                            color: _getBadgeColor(badgeColor).withOpacity(0.35),
+                            blurRadius: 12,
+                            spreadRadius: 1,
+                            offset: const Offset(0, 4),
+                          ),
+                        ]
+                      : [
+                          BoxShadow(
+                            color: Colors.grey.withOpacity(0.15),
+                            blurRadius: 8,
+                            spreadRadius: 0,
+                          ),
+                        ],
+                ),
+                child: Center(
+                  child: Text(
+                    badgeIcon,
+                    style: const TextStyle(fontSize: 36),
                   ),
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          child,
-        ],
-      ),
-    );
-  }
+            ),
+            const SizedBox(height: 8),
 
-  Widget _buildBadgeItem(Map<String, dynamic> badge) {
-    final badgeName = badge['name'] ?? badge['badge_name'] ?? 'Unknown Badge';
-    final badgeColor = badge['color'] ?? badge['badge_color'] ?? 'green';
-    final iconName = badge['icon'] ?? '';
-    final badgeIcon = _getEmojiForBadge(iconName);
-
-    return Column(
-      children: [
-        // Circular badge with shadow
-        Container(
-          width: 100,
-          height: 100,
-          decoration: BoxDecoration(
-            color: _getBadgeColor(badgeColor),
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: _getBadgeColor(badgeColor).withOpacity(0.35),
-                blurRadius: 12,
-                spreadRadius: 1,
-                offset: const Offset(0, 4),
+            // Badge info
+            Expanded(
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      badgeName,
+                      style: AppTextStyles.caption.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: isEarned
+                            ? AppColors.primaryGreen
+                            : AppColors.textPrimary,
+                      ),
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Expanded(
+                      child: Text(
+                        badgeDescription,
+                        style: AppTextStyles.caption.copyWith(
+                          color: AppColors.textSecondary,
+                          fontSize: 10,
+                        ),
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (isEarned)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Text(
+                          'Đạt được: ${_getEarnedDate(badge['id'] ?? badge['badge_id'] ?? badge['badgeId']) ?? 'N/A'}',
+                          style: AppTextStyles.caption.copyWith(
+                            color: AppColors.primaryGreen,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                  ],
+                ),
               ),
-            ],
-          ),
-          child: Center(
-            child: Text(
-              badgeIcon,
-              style: const TextStyle(fontSize: 42),
             ),
-          ),
+          ],
         ),
-        const SizedBox(height: 12),
-        // Badge name below circle
-        SizedBox(
-          width: 110,
-          child: Text(
-            badgeName,
-            style: AppTextStyles.caption.copyWith(
-              fontWeight: FontWeight.w500,
-              color: AppColors.textPrimary,
-            ),
-            textAlign: TextAlign.center,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-      ],
+      ),
     );
   }
 
@@ -381,6 +550,18 @@ class _ProfileAchievementsTabState extends State<ProfileAchievementsTab> {
     }
   }
 
+  /// Check if the string is likely an emoji or unicode character
+  bool _isEmoji(String? value) {
+    if (value == null || value.isEmpty) return false;
+    // Check if it's a single character (likely emoji/unicode)
+    // or if it contains common emoji patterns
+    final codeUnits = value.codeUnits;
+    if (codeUnits.isEmpty) return false;
+    // Emoji are typically represented as high unicode values or multiple code units
+    // This is a simple heuristic check
+    return value.length <= 2 && codeUnits.any((cu) => cu > 127);
+  }
+
   /// Map icon name from API to emoji
   String _getEmojiForBadge(String? iconName) {
     if (iconName == null || iconName.isEmpty) return '🏅';
@@ -391,6 +572,21 @@ class _ProfileAchievementsTabState extends State<ProfileAchievementsTab> {
       case 'badgenewcomer':
       case 'newcomer':
         return '👋';
+      case 'badgefirstshare':
+      case 'firstshare':
+        return '📦';
+      case 'badgefirstreceive':
+      case 'firstreceive':
+        return '🎁';
+      case 'badgebronze':
+      case 'bronze':
+        return '🥉';
+      case 'badgesilver':
+      case 'silver':
+        return '🥈';
+      case 'badgegold':
+      case 'gold':
+        return '🥇';
       case 'badgestar':
       case 'star':
         return '⭐';
@@ -406,13 +602,6 @@ class _ProfileAchievementsTabState extends State<ProfileAchievementsTab> {
       case 'badgecommunity':
       case 'community':
         return '👥';
-      case 'badgegold':
-      case 'gold':
-        return '✨';
-      case 'badgefire':
-      case 'fire':
-        return '🔥';
-      case 'badgecertified':
       case 'certified':
         return '✓';
       default:

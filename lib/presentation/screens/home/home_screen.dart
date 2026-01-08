@@ -15,6 +15,7 @@ import '../../dialogs/location_permission_dialog.dart';
 import '../../widgets/bottom_navigation_widget.dart';
 import '../../widgets/item_card.dart';
 import '../../widgets/app_header_bar.dart';
+import '../profile/widgets/create_product_modal.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -60,6 +61,9 @@ class _HomeScreenState extends State<HomeScreen>
     _recommendationScrollController.addListener(_onRecommendationScroll);
     _itemsScrollController.addListener(_onItemsScroll);
     _nearbyScrollController.addListener(_onNearbyScroll);
+
+    // Add listener to reload nearby items when "Gần đây" tab is tapped
+    _tabController.addListener(_onTabChanged);
 
     print('[HomeScreen] Scroll listeners attached');
 
@@ -222,29 +226,94 @@ class _HomeScreenState extends State<HomeScreen>
     }
   }
 
+  /// Handle tab changes - reload nearby items when "Gần đây" tab is tapped
+  void _onTabChanged() {
+    // Tab index 1 is "Gần đây" (Nearby)
+    if (_tabController.index == 1) {
+      print('[HomeScreen] "Gần đây" tab tapped - reloading nearby items');
+      final itemProvider = context.read<ItemProvider>();
+      final locationProvider = context.read<LocationProvider>();
+
+      // Chặn gọi khi đang loading
+      if (_isLoadingMoreNearby) {
+        print('[HomeScreen] Already loading, skip duplicate call');
+        return;
+      }
+
+      if (locationProvider.hasLocation) {
+        // Reset pagination for nearby items
+        _nearbyPage = 0;
+        _loadNearbyItems(itemProvider, locationProvider);
+      } else {
+        print('[HomeScreen] Location not available, cannot load nearby items');
+      }
+    }
+  }
+
   /// Load nearby items based on user location
-  void _loadNearbyItems(
-      ItemProvider itemProvider, LocationProvider locationProvider) {
+  Future<void> _loadNearbyItems(
+      ItemProvider itemProvider, LocationProvider locationProvider) async {
     print('[HomeScreen] _loadNearbyItems called');
     print('[HomeScreen] hasLocation: ${locationProvider.hasLocation}');
     print('[HomeScreen] latitude: ${locationProvider.latitude}');
     print('[HomeScreen] longitude: ${locationProvider.longitude}');
 
+    // Chặn ngay đầu nếu đang loading
+    if (_isLoadingMoreNearby) {
+      print('[HomeScreen] Already loading nearby items, skip');
+      return;
+    }
+
     if (locationProvider.hasLocation) {
       print(
           '[HomeScreen] Loading nearby items at lat: ${locationProvider.latitude}, lon: ${locationProvider.longitude}');
-      itemProvider
-          .loadNearbyItems(
-        latitude: locationProvider.latitude!,
-        longitude: locationProvider.longitude!,
-      )
-          .then((_) {
-        print('[HomeScreen] Nearby items loaded successfully');
-      }).catchError((e) {
+
+      _isLoadingMoreNearby = true;
+
+      try {
+        await itemProvider.loadNearbyItems(
+          latitude: locationProvider.latitude!,
+          longitude: locationProvider.longitude!,
+          radiusKm: 20, // Safe radius: 20km (backend struggles with 500km)
+        );
+
+        if (itemProvider.nearbyErrorMessage == null) {
+          print('[HomeScreen] Nearby items loaded successfully');
+        } else {
+          print(
+              '[HomeScreen] Loading complete but has error: ${itemProvider.nearbyErrorMessage}');
+        }
+      } catch (e) {
         print('[HomeScreen] Error loading nearby items: $e');
-      });
+      } finally {
+        _isLoadingMoreNearby = false;
+      }
     } else {
-      print('[HomeScreen] Location not available yet');
+      print('[HomeScreen] Location not available, requesting location...');
+      // Show location request dialog
+      if (mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => AlertDialog(
+            title: const Text('Bật vị trí'),
+            content: const Text('Cần bật vị trí để xem các sản phẩm gần đây'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Huỷ'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  locationProvider.requestLocationPermissionAndGetLocation();
+                },
+                child: const Text('Bật vị trí'),
+              ),
+            ],
+          ),
+        );
+      }
     }
   }
 
@@ -294,9 +363,70 @@ class _HomeScreenState extends State<HomeScreen>
           ),
         ],
       ),
-      bottomNavigationBar: const BottomNavigationWidget(currentIndex: 0),
-      floatingActionButton: _buildChatFAB(),
+      bottomNavigationBar: BottomNavigationWidget(
+        currentIndex: 0,
+        onAddPressed: _showAddItemModal,
+      ),
+      floatingActionButton: _buildChatButton(),
       floatingActionButtonLocation: FloatingActionButtonLocation.endDocked,
+    );
+  }
+
+  Widget _buildChatButton() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 72, right: 16),
+      decoration: BoxDecoration(
+        color: AppColors.primaryGreen,
+        shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primaryGreen.withOpacity(0.5),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+            spreadRadius: 1,
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            context.pushNamed('chatbot');
+          },
+          borderRadius: BorderRadius.circular(50),
+          child: const Padding(
+            padding: EdgeInsets.all(14),
+            child: Icon(
+              Icons.smart_toy_outlined,
+              color: Colors.white,
+              size: 28,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showAddItemModal() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => CreateProductModal(
+        onProductCreated: (success) {
+          if (success) {
+            // Reload items after successful creation
+            final itemProvider = context.read<ItemProvider>();
+            itemProvider.loadItems();
+            // Show success message
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Thêm sản phẩm thành công!'),
+                backgroundColor: Colors.green,
+              ),
+            );
+          }
+        },
+      ),
     );
   }
 
@@ -522,6 +652,7 @@ class _HomeScreenState extends State<HomeScreen>
                   latitude: itemDto.latitude,
                   longitude: itemDto.longitude,
                   distance: itemDto.distanceKm,
+                  price: itemDto.price ?? 0.0,
                 );
                 return ItemCard(
                   item: itemModel,

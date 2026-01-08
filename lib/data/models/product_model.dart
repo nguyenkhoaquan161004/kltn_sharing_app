@@ -38,7 +38,17 @@ class ProductModel {
 
   String get formattedPrice {
     if (isFree || price == 0) return '0 VND';
-    return '${price.toStringAsFixed(0)} VND';
+    // Format price with thousand separators (e.g., 30000 -> 30.000)
+    final priceStr = price.toStringAsFixed(0);
+    final reversedPrice = priceStr.split('').reversed.toList();
+    final formatted = <String>[];
+    for (int i = 0; i < reversedPrice.length; i++) {
+      if (i > 0 && i % 3 == 0) {
+        formatted.add('.');
+      }
+      formatted.add(reversedPrice[i]);
+    }
+    return '${formatted.reversed.join('')} VND';
   }
 
   String get formattedCountdown {
@@ -131,12 +141,14 @@ class UserInfo {
   final String name;
   final String avatar;
   final int productsShared;
+  final String? address;
 
   UserInfo({
     required this.id,
     required this.name,
     required this.avatar,
     required this.productsShared,
+    this.address,
   });
 
   factory UserInfo.fromJson(Map<String, dynamic> json) {
@@ -145,6 +157,7 @@ class UserInfo {
       name: json['name'] ?? '',
       avatar: json['avatar'] ?? '',
       productsShared: json['productsShared'] ?? 0,
+      address: json['address'] as String?,
     );
   }
 
@@ -154,6 +167,7 @@ class UserInfo {
       'name': name,
       'avatar': avatar,
       'productsShared': productsShared,
+      if (address != null) 'address': address,
     };
   }
 }

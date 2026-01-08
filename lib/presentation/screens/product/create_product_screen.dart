@@ -4,7 +4,9 @@ import 'package:provider/provider.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../..//widgets/custom_text_field.dart';
+import '../../widgets/address_autocomplete_field.dart';
 import '../../../../data/services/item_api_service.dart';
+import '../../../../data/providers/auth_provider.dart';
 
 class CreateProductScreen extends StatefulWidget {
   const CreateProductScreen({super.key});
@@ -24,20 +26,28 @@ class _CreateProductScreenState extends State<CreateProductScreen> {
   DateTime? _expiryDate;
   String? _selectedCategory;
   String? _selectedCategoryId; // Store category ID for API
-  bool _useDefaultAddress = true;
+  String? _selectedLocationMode; // 'saved' or 'custom'
+  String? _selectedSavedLocationIndex; // Index of selected saved location
+  double? _selectedLatitude;
+  double? _selectedLongitude;
+  String? _selectedAddress;
   bool _isLoading = false;
   bool _categoriesLoading = true;
+  bool _userLoading = true;
   List<String> _selectedImages = [];
 
   List<Map<String, dynamic>> _categories = [];
   String? _categoryError;
+  List<Map<String, dynamic>> _savedLocations = [];
+  String? _userError;
 
   @override
   void initState() {
     super.initState();
-    // Load categories after frame is built
+    // Load categories and user data after frame is built
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadCategories();
+      _loadUserData();
     });
   }
 
@@ -62,6 +72,77 @@ class _CreateProductScreenState extends State<CreateProductScreen> {
           _categoryError = 'Không thể tải danh mục: ${e.toString()}';
           _categoriesLoading = false;
           print('[CreateProduct] Error: $e');
+        });
+      }
+    }
+  }
+
+  Future<void> _loadUserData() async {
+    try {
+      final authProvider = context.read<AuthProvider>();
+
+      // Get user data to extract saved locations (address)
+      if (authProvider.userId != null) {
+        print(
+            '[CreateProduct] Loading user data for userId: ${authProvider.userId}');
+
+        // Initialize with default location (HCMC) as first option
+        final defaultLocation = {
+          'address': 'Mặc định (TP. Hồ Chí Minh)',
+          'latitude': 10.7769,
+          'longitude': 106.7009,
+          'isDefault': true,
+        };
+
+        // Get user's saved address if available
+        final itemService = context.read<ItemApiService>();
+        try {
+          // In a real app, we'd fetch user's saved locations from API
+          // For now, using default location
+          final savedLocations = [defaultLocation];
+
+          if (mounted) {
+            setState(() {
+              _savedLocations = savedLocations;
+              _selectedLocationMode = 'saved';
+              _selectedSavedLocationIndex = '0';
+              _selectedLatitude = defaultLocation['latitude'] as double;
+              _selectedLongitude = defaultLocation['longitude'] as double;
+              _selectedAddress = defaultLocation['address'] as String;
+              _userLoading = false;
+              print(
+                  '[CreateProduct] User data loaded: ${savedLocations.length} locations');
+            });
+          }
+        } catch (e) {
+          if (mounted) {
+            setState(() {
+              _userLoading = false;
+              _userError = 'Không thể tải vị trí đã lưu';
+              print('[CreateProduct] Error loading saved locations: $e');
+              // Set default location anyway
+              _savedLocations = [
+                {
+                  'address': 'Mặc định (TP. Hồ Chí Minh)',
+                  'latitude': 10.7769,
+                  'longitude': 106.7009,
+                  'isDefault': true,
+                }
+              ];
+              _selectedLocationMode = 'saved';
+              _selectedSavedLocationIndex = '0';
+              _selectedLatitude = 10.7769;
+              _selectedLongitude = 106.7009;
+              _selectedAddress = 'Mặc định (TP. Hồ Chí Minh)';
+            });
+          }
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _userLoading = false;
+          print('[CreateProduct] Error loading user data: $e');
         });
       }
     }
@@ -125,29 +206,67 @@ class _CreateProductScreenState extends State<CreateProductScreen> {
       return;
     }
 
-    setState(() => _isLoading = true);
-
-    // TODO: Call API to create product with _selectedCategoryId
-    // Example:
-    // await itemService.createItem(
-    //   name: _nameController.text,
-    //   categoryId: _selectedCategoryId,
-    //   ...
-    // );
-
-    // Simulate API call
-    await Future.delayed(const Duration(seconds: 2));
-
-    setState(() => _isLoading = false);
-
-    if (mounted) {
+    if (_selectedLatitude == null || _selectedLongitude == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Đăng sản phẩm thành công!'),
-          backgroundColor: AppColors.success,
+          content: Text('Vui lòng chọn vị trí lấy hàng'),
+          backgroundColor: AppColors.error,
         ),
       );
-      context.pop();
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      final itemService = context.read<ItemApiService>();
+
+      // Use the first image for now (in a real app, you'd upload all images)
+      final imageUrl = _selectedImages.isNotEmpty
+          ? 'https://via.placeholder.com/300x300?text=Product'
+          : '';
+
+      final success = await itemService.createItem(
+        name: _nameController.text.trim(),
+        description: _descriptionController.text.trim(),
+        quantity: int.tryParse(_quantityController.text) ?? 1,
+        imageUrl: imageUrl,
+        expiryDate: _expiryDate ?? DateTime.now().add(const Duration(days: 30)),
+        categoryId: _selectedCategoryId!,
+        latitude: _selectedLatitude!,
+        longitude: _selectedLongitude!,
+        price: double.tryParse(_priceController.text) ?? 0.0,
+      );
+
+      setState(() => _isLoading = false);
+
+      if (mounted) {
+        if (success) {
+          print(
+              '[CreateProduct] ✅ Product created successfully with location: $_selectedAddress ($_selectedLatitude, $_selectedLongitude)');
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Chia sẻ sản phẩm thành công!'),
+              backgroundColor: AppColors.success,
+            ),
+          );
+          context.pop();
+        } else {
+          throw Exception('Failed to create product');
+        }
+      }
+    } catch (e) {
+      setState(() => _isLoading = false);
+      print('[CreateProduct] ❌ Error creating product: $e');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Lỗi: ${e.toString()}'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
     }
   }
 
@@ -264,32 +383,9 @@ class _CreateProductScreenState extends State<CreateProductScreen> {
               _buildCategoryDropdown(),
               const SizedBox(height: 20),
 
-              // Use default address
-              Row(
-                children: [
-                  Checkbox(
-                    value: _useDefaultAddress,
-                    onChanged: (value) {
-                      setState(() => _useDefaultAddress = value ?? true);
-                    },
-                    activeColor: AppColors.primaryGreen,
-                  ),
-                  const Text(
-                    'Sử dụng địa chỉ mặc định',
-                    style: AppTextStyles.bodyMedium,
-                  ),
-                ],
-              ),
-
-              // Address (if not using default)
-              if (!_useDefaultAddress) ...[
-                const SizedBox(height: 12),
-                _buildLabel('Địa chỉ'),
-                CustomTextField(
-                  controller: _addressController,
-                  hint: 'Nhập địa chỉ lấy hàng',
-                ),
-              ],
+              // Location Selection
+              _buildLabel('Chọn vị trí lấy hàng'),
+              _buildLocationSelector(),
               const SizedBox(height: 20),
 
               // Description
@@ -514,6 +610,157 @@ class _CreateProductScreenState extends State<CreateProductScreen> {
           },
         ),
       ),
+    );
+  }
+
+  Widget _buildLocationSelector() {
+    if (_userLoading) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: AppColors.backgroundGray,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const Center(
+          child: SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Saved locations
+        Text(
+          'Vị trí đã lưu',
+          style: AppTextStyles.caption.copyWith(
+            color: AppColors.textSecondary,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          decoration: BoxDecoration(
+            color: AppColors.backgroundGray,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: _selectedSavedLocationIndex,
+              hint: const Text('Chọn vị trí đã lưu'),
+              isExpanded: true,
+              icon: const Icon(Icons.keyboard_arrow_down),
+              items: _savedLocations.asMap().entries.map((entry) {
+                final index = entry.key.toString();
+                final location = entry.value;
+                final displayText = location['address'] as String? ?? 'Unknown';
+                return DropdownMenuItem(
+                  value: index,
+                  child: Text(
+                    displayText,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                );
+              }).toList(),
+              onChanged: (value) {
+                if (value != null) {
+                  final selectedLoc = _savedLocations[int.parse(value)];
+                  setState(() {
+                    _selectedLocationMode = 'saved';
+                    _selectedSavedLocationIndex = value;
+                    _selectedAddress = selectedLoc['address'] as String?;
+                    _selectedLatitude = selectedLoc['latitude'] as double?;
+                    _selectedLongitude = selectedLoc['longitude'] as double?;
+                  });
+                  print(
+                      '[CreateProduct] Selected saved location: $_selectedAddress ($_selectedLatitude, $_selectedLongitude)');
+                }
+              },
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 16),
+
+        // OR divider
+        Center(
+          child: Text(
+            'HOẶC',
+            style: AppTextStyles.caption.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 16),
+
+        // Custom location input
+        Text(
+          'Nhập vị trí khác',
+          style: AppTextStyles.caption.copyWith(
+            color: AppColors.textSecondary,
+          ),
+        ),
+        const SizedBox(height: 8),
+        AddressAutocompleteField(
+          controller: _addressController,
+          label: '',
+          hintText: 'Nhập địa chỉ lấy hàng',
+          onAddressSelected: (latitude, longitude, address) {
+            setState(() {
+              _selectedLocationMode = 'custom';
+              _selectedAddress = address;
+              _selectedLatitude = latitude;
+              _selectedLongitude = longitude;
+            });
+            print(
+                '[CreateProduct] Selected custom location: $address ($latitude, $longitude)');
+          },
+          initialAddress: null,
+        ),
+
+        if (_selectedAddress != null && _selectedLocationMode == 'custom') ...[
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.green.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppColors.primaryGreen),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(
+                  Icons.check_circle,
+                  color: AppColors.primaryGreen,
+                  size: 16,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _selectedAddress!,
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    color: AppColors.primaryGreen,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '${_selectedLatitude?.toStringAsFixed(4)}, ${_selectedLongitude?.toStringAsFixed(4)}',
+                  style: AppTextStyles.caption.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
     );
   }
 }

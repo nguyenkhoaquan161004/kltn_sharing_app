@@ -5,12 +5,14 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../../../../data/providers/auth_provider.dart';
 import '../../../../data/providers/user_provider.dart';
+import '../../../../data/providers/item_provider.dart';
 import '../../widgets/bottom_navigation_widget.dart';
 import '../../widgets/app_header_bar.dart';
 import 'widgets/profile_header.dart';
 import 'widgets/profile_info_tab.dart';
 import 'widgets/profile_products_tab.dart';
 import 'widgets/profile_achievements_tab.dart';
+import 'widgets/create_product_modal.dart';
 
 class ProfileScreen extends StatefulWidget {
   final bool isOwnProfile;
@@ -54,6 +56,8 @@ class _ProfileScreenState extends State<ProfileScreen>
       // Load current user if it's own profile
       if (widget.isOwnProfile) {
         userProvider.loadCurrentUser();
+        // Load transaction stats for own profile
+        userProvider.loadTransactionStats();
       }
     });
   }
@@ -142,12 +146,18 @@ class _ProfileScreenState extends State<ProfileScreen>
                   userData: {
                     'name': user.fullName,
                     'email': user.email,
-                    'address': user.address ?? 'N/A',
-                    'phone': user.phoneNumber ?? 'N/A',
+                    'address': user.address ?? 'Địa chỉ',
+                    'phone': user.phoneNumber?.isNotEmpty == true
+                        ? user.phoneNumber
+                        : 'Số điện thoại',
                     'avatar': user.avatar ?? '',
                     'points': user.trustScore ?? 0,
-                    'productsShared': user.itemsShared,
-                    'productsReceived': user.itemsReceived,
+                    'productsShared':
+                        userProvider.transactionStats?.completedShared ??
+                            user.itemsShared,
+                    'productsReceived':
+                        userProvider.transactionStats?.completedReceived ??
+                            user.itemsReceived,
                   },
                   isOwnProfile: widget.isOwnProfile,
                   userId: int.tryParse(user.id) ?? 0,
@@ -166,7 +176,28 @@ class _ProfileScreenState extends State<ProfileScreen>
           );
         },
       ),
-      bottomNavigationBar: const BottomNavigationWidget(currentIndex: 3),
+      bottomNavigationBar: BottomNavigationWidget(
+        currentIndex: 3,
+        onAddPressed: _showAddItemModal,
+      ),
+    );
+  }
+
+  void _showAddItemModal() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => CreateProductModal(
+        onProductCreated: (success) {
+          if (success) {
+            final itemProvider = context.read<ItemProvider>();
+            itemProvider.loadItems();
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Tạo sản phẩm thành công!')),
+            );
+          }
+        },
+      ),
     );
   }
 }

@@ -18,6 +18,21 @@ class OrderItemCard extends StatelessWidget {
     this.onTap,
   });
 
+  String _formatPrice(String priceStr) {
+    // Convert string to double, then format with thousand separators
+    final priceValue = double.tryParse(priceStr) ?? 0;
+    final priceValue0 = priceValue.toStringAsFixed(0);
+    final reversedPrice = priceValue0.split('').reversed.toList();
+    final formatted = <String>[];
+    for (int i = 0; i < reversedPrice.length; i++) {
+      if (i > 0 && i % 3 == 0) {
+        formatted.add('.');
+      }
+      formatted.add(reversedPrice[i]);
+    }
+    return formatted.reversed.join('');
+  }
+
   @override
   Widget build(BuildContext context) {
     return InkWell(
@@ -78,7 +93,7 @@ class OrderItemCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    price,
+                    '${_formatPrice(price)} VND',
                     style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,

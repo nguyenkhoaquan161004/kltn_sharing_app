@@ -8,6 +8,7 @@ class OrderProvider extends ChangeNotifier {
   final CartApiService _cartApiService;
 
   int _orderCount = 0;
+  int _cartCount = 0;
   bool _isLoading = false;
 
   OrderProvider({
@@ -18,6 +19,7 @@ class OrderProvider extends ChangeNotifier {
 
   // Getters
   int get orderCount => _orderCount;
+  int get cartCount => _cartCount;
   bool get isLoading => _isLoading;
 
   /// Set auth token for API services
@@ -57,7 +59,8 @@ class OrderProvider extends ChangeNotifier {
 
       print('[OrderProvider] Cart items: $cartCount');
 
-      // Set total count
+      // Set counts
+      _cartCount = cartCount;
       _orderCount = transactionCount + cartCount;
       _isLoading = false;
 
@@ -73,6 +76,26 @@ class OrderProvider extends ChangeNotifier {
   /// Manually update order count (for real-time updates)
   void setOrderCount(int count) {
     _orderCount = count;
+    notifyListeners();
+  }
+
+  /// Update cart count (call after adding/removing items from cart)
+  void setCartCount(int count) {
+    _cartCount = count;
+    notifyListeners();
+  }
+
+  /// Increment cart count
+  void incrementCartCount() {
+    _cartCount++;
+    notifyListeners();
+  }
+
+  /// Decrement cart count
+  void decrementCartCount() {
+    if (_cartCount > 0) {
+      _cartCount--;
+    }
     notifyListeners();
   }
 

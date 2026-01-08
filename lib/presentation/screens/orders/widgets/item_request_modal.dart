@@ -30,6 +30,20 @@ class _ItemRequestModalState extends State<ItemRequestModal> {
     super.dispose();
   }
 
+  /// Format price with thousand separators (e.g., 30000 -> 30.000)
+  String _formatPrice(num price) {
+    final priceStr = price.toString().split('.')[0];
+    final reversedPrice = priceStr.split('').reversed.toList();
+    final formatted = <String>[];
+    for (int i = 0; i < reversedPrice.length; i++) {
+      if (i > 0 && i % 3 == 0) {
+        formatted.add('.');
+      }
+      formatted.add(reversedPrice[i]);
+    }
+    return formatted.reversed.join('');
+  }
+
   void _increaseQuantity() {
     if (_quantity < widget.item.quantity) {
       setState(() => _quantity++);
@@ -179,7 +193,7 @@ class _ItemRequestModalState extends State<ItemRequestModal> {
                       Text(
                         widget.item.price == 0
                             ? 'Miễn phí'
-                            : '${widget.item.price} VND',
+                            : '${_formatPrice(widget.item.price)} VND',
                         style: AppTextStyles.price.copyWith(
                           color: widget.item.price == 0
                               ? AppColors.success

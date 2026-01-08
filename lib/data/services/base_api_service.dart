@@ -50,6 +50,7 @@ abstract class BaseApiService {
     if (getValidTokenCallback != null && onTokenExpiredCallback != null) {
       _dio.interceptors.add(
         TokenRefreshInterceptor(
+          dio: _dio,
           getValidTokenCallback: getValidTokenCallback,
           onTokenExpiredCallback: onTokenExpiredCallback,
         ),

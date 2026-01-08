@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 import '../../core/constants/app_routes.dart';
 import '../../core/theme/app_colors.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import '../../data/providers/auth_provider.dart';
 
 class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key});
@@ -16,10 +18,18 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   void initState() {
     super.initState();
 
-    // Delay 3 seconds and then navigate to onboarding screen
+    // Delay 3 seconds and then navigate based on login status
     Future.delayed(const Duration(seconds: 3), () {
       if (mounted) {
-        context.go(AppRoutes.onboarding);
+        final authProvider = context.read<AuthProvider>();
+        if (authProvider.isLoggedIn) {
+          print('[WelcomeScreen] ✅ User is logged in, navigating to home');
+          context.go(AppRoutes.home);
+        } else {
+          print(
+              '[WelcomeScreen] ⚠️  User not logged in, navigating to onboarding');
+          context.go(AppRoutes.onboarding);
+        }
       }
     });
   }

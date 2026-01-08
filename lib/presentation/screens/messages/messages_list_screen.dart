@@ -13,6 +13,8 @@ import '../../../data/services/user_api_service.dart';
 import '../../../data/models/message_model.dart';
 import '../../../data/models/user_response_model.dart';
 import '../../../data/providers/auth_provider.dart';
+import '../../../data/providers/item_provider.dart';
+import '../profile/widgets/create_product_modal.dart';
 
 class MessagesListScreen extends StatefulWidget {
   const MessagesListScreen({super.key});
@@ -258,7 +260,28 @@ class _MessagesListScreenState extends State<MessagesListScreen>
           );
         },
       ),
-      bottomNavigationBar: const BottomNavigationWidget(currentIndex: 3),
+      bottomNavigationBar: BottomNavigationWidget(
+        currentIndex: 3,
+        onAddPressed: _showAddItemModal,
+      ),
+    );
+  }
+
+  void _showAddItemModal() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => CreateProductModal(
+        onProductCreated: (success) {
+          if (success) {
+            final itemProvider = context.read<ItemProvider>();
+            itemProvider.loadItems();
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Tạo sản phẩm thành công!')),
+            );
+          }
+        },
+      ),
     );
   }
 
@@ -288,37 +311,44 @@ class _MessagesListScreenState extends State<MessagesListScreen>
           ),
           child: Row(
             children: [
-              // Avatar
-              if (isLoading)
-                CircleAvatar(
-                  radius: 28,
-                  backgroundColor: Colors.grey[300],
-                )
-              else if (!hasError &&
-                  user?.avatar != null &&
-                  user!.avatar!.isNotEmpty)
-                CircleAvatar(
-                  radius: 28,
-                  backgroundImage: NetworkImage(user.avatar!),
-                  onBackgroundImageError: (exception, stackTrace) {
-                    // Fallback to initials
-                  },
-                )
-              else
-                CircleAvatar(
-                  radius: 28,
-                  backgroundColor: AppColors.primaryTeal,
-                  child: Text(
-                    conversation.otherUserName.isNotEmpty
-                        ? conversation.otherUserName[0].toUpperCase()
-                        : '?',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+              // Avatar - Fixed size to prevent overflow
+              SizedBox(
+                width: 48,
+                height: 48,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(24),
+                  child: isLoading
+                      ? CircleAvatar(
+                          radius: 24,
+                          backgroundColor: Colors.grey[300],
+                        )
+                      : !hasError &&
+                              user?.avatar != null &&
+                              user!.avatar!.isNotEmpty
+                          ? Image.network(
+                              user.avatar!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Container(
+                                  color: AppColors.backgroundGray,
+                                  child: const Icon(
+                                    Icons.person,
+                                    size: 20,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                );
+                              },
+                            )
+                          : Container(
+                              color: AppColors.backgroundGray,
+                              child: const Icon(
+                                Icons.person,
+                                size: 20,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
                 ),
+              ),
               const SizedBox(width: 12),
               // Message info
               Expanded(
