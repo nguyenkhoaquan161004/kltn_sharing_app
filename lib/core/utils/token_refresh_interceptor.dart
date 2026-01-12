@@ -11,6 +11,7 @@ class TokenRefreshInterceptor extends InterceptorsWrapper {
   static const String _tokenExpiresAtKey = 'token_expires_at';
 
   late Dio _authDio; // Separate Dio instance for auth endpoints
+  late Dio _mainDio; // Main Dio instance for API calls (will be set externally)
   late SharedPreferences _prefs;
   late Future<void> _prefsReady;
   bool _isRefreshing = false;
@@ -42,6 +43,11 @@ class TokenRefreshInterceptor extends InterceptorsWrapper {
     _onTokenExpiredCallback = onTokenExpiredCallback;
   }
 
+  /// Set main Dio instance for retrying requests (must be called before use)
+  void setMainDio(Dio dio) {
+    _mainDio = dio;
+  }
+
   Future<void> _initPrefs() async {
     _prefs = await SharedPreferences.getInstance();
   }
@@ -62,14 +68,31 @@ class TokenRefreshInterceptor extends InterceptorsWrapper {
 
     // ✅ Rule rõ ràng:
     // 401 Unauthorized → token hết hạn → refresh
-    // 403 Forbidden → quyền không đủ → reject (KHÔNG refresh)
+    // 403 Forbidden → quyền không đủ HOẶC token không hợp lệ → logout & login lại
 
     if (statusCode == 403) {
       print(
-          '[TokenRefreshInterceptor] 🚫 403 Forbidden - Permission denied, NOT a token issue');
+          '[TokenRefreshInterceptor] 🚫 403 Forbidden - Token không hợp lệ hoặc quyền bị từ chối');
       print('[TokenRefreshInterceptor] Path: ${err.requestOptions.path}');
       print(
-          '[TokenRefreshInterceptor] Check: user role/scope hoặc endpoint permission');
+          '[TokenRefreshInterceptor] Clearing tokens and forcing re-login...');
+
+      // Wait for SharedPreferences to be initialized
+      try {
+        await _prefsReady;
+      } catch (e) {
+        print(
+            '[TokenRefreshInterceptor] Failed to initialize SharedPreferences: $e');
+      }
+
+      // Clear tokens
+      await _clearTokens();
+
+      // Force user to login
+      if (_onTokenExpiredCallback != null) {
+        await _onTokenExpiredCallback!();
+      }
+
       return handler.next(err);
     }
 
@@ -129,21 +152,46 @@ class TokenRefreshInterceptor extends InterceptorsWrapper {
       print(
           '[TokenRefreshInterceptor] Using refresh token from SharedPreferences: ${refreshToken.substring(0, 20)}...');
 
+      print('[TokenRefreshInterceptor] 📤 Sending refresh request...');
+      print(
+          '[TokenRefreshInterceptor] - URL: ${_authDio.options.baseUrl}/refresh-token');
+      print(
+          '[TokenRefreshInterceptor] - Body: refreshToken=${refreshToken.substring(0, 20)}...');
+
       // Call refresh token endpoint - MUST use refreshToken from storage
       final response = await _authDio.post(
         '/refresh-token',
         data: {'refreshToken': refreshToken},
       );
 
+      print(
+          '[TokenRefreshInterceptor] 📥 Refresh response received: ${response.statusCode}');
+
       if (response.statusCode == 200) {
         final data = response.data as Map<String, dynamic>;
-        if (data['success'] == true && data['data'] != null) {
-          final tokenResponse = TokenResponse.fromJson(data['data']);
+
+        print('[TokenRefreshInterceptor] Response data: $data');
+
+        // Handle both formats: {success: true, data: {...}} and direct {...}
+        Map<String, dynamic>? tokenData;
+        if (data.containsKey('success') && data.containsKey('data')) {
+          // Format: {success: true, data: {...}}
+          if (data['success'] == true && data['data'] is Map<String, dynamic>) {
+            tokenData = data['data'];
+          }
+        } else if (data.containsKey('accessToken') &&
+            data.containsKey('refreshToken')) {
+          // Format: direct {accessToken: ..., refreshToken: ...}
+          tokenData = data;
+        }
+
+        if (tokenData != null) {
+          final tokenResponse = TokenResponse.fromJson(tokenData);
 
           // Verify we got new tokens back
-          if (tokenResponse.refreshToken.isEmpty) {
-            print(
-                '[TokenRefreshInterceptor] ❌ Backend returned empty refresh token');
+          if (tokenResponse.refreshToken.isEmpty ||
+              tokenResponse.accessToken.isEmpty) {
+            print('[TokenRefreshInterceptor] ❌ Backend returned empty tokens');
             throw Exception('Invalid token response from backend');
           }
 
@@ -166,39 +214,29 @@ class TokenRefreshInterceptor extends InterceptorsWrapper {
 
           _isRefreshing = false;
 
-          // Retry original request with properly configured Dio
+          // Clear queued failed requests since we refreshed successfully
+          _failedRequests.clear();
+
+          // Retry original request with new token
           try {
-            final retryDio = Dio(
-              BaseOptions(
-                baseUrl: AppConfig.baseUrl,
-                connectTimeout:
-                    Duration(seconds: AppConfig.requestTimeoutSeconds),
-                receiveTimeout:
-                    Duration(seconds: AppConfig.requestTimeoutSeconds),
-                contentType: 'application/json',
-                headers: {
-                  'Accept': 'application/json',
-                  'Authorization': 'Bearer ${tokenResponse.accessToken}',
-                },
-              ),
-            );
-            final retryResponse = await retryDio.request<dynamic>(
+            err.requestOptions.headers['Authorization'] =
+                'Bearer ${tokenResponse.accessToken}';
+            final retryResponse = await _mainDio.request(
               err.requestOptions.path,
-              options: Options(
-                method: err.requestOptions.method,
-                contentType: err.requestOptions.contentType,
-              ),
+              options: Options(method: err.requestOptions.method),
               data: err.requestOptions.data,
               queryParameters: err.requestOptions.queryParameters,
             );
+            print('[TokenRefreshInterceptor] ✅ Retry successful after refresh');
             return handler.resolve(retryResponse);
           } catch (retryErr) {
-            print('[TokenRefreshInterceptor] ❌ Retry failed: $retryErr');
+            print(
+                '[TokenRefreshInterceptor] ❌ Retry after refresh failed: $retryErr');
             return handler.next(err);
           }
         } else {
           print(
-              '[TokenRefreshInterceptor] ❌ Invalid refresh response: success=${data['success']}, data=${data['data']}');
+              '[TokenRefreshInterceptor] ❌ Invalid refresh response format: $data');
         }
       } else {
         print(

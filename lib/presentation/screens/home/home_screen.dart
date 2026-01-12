@@ -79,6 +79,18 @@ class _HomeScreenState extends State<HomeScreen>
       if (authProvider.accessToken != null) {
         itemProvider.setAuthToken(authProvider.accessToken!);
         recommendationProvider.setAuthToken(authProvider.accessToken!);
+
+        // Set callback for when token refresh fails (403 or 401 after refresh fails)
+        itemProvider.setGetValidTokenCallback(() async {
+          print(
+              '[HomeScreen] Token expired callback triggered - navigating to login');
+          if (mounted) {
+            // Clear auth state
+            authProvider.logout();
+            // Navigate to login
+            context.go(AppRoutes.login);
+          }
+        });
       }
 
       // Load all data
@@ -209,6 +221,7 @@ class _HomeScreenState extends State<HomeScreen>
             .loadMoreNearbyItems(
           latitude: locationProvider.latitude!,
           longitude: locationProvider.longitude!,
+          maxDistanceKm: 20,
           page: _nearbyPage,
         )
             .then((_) {
@@ -274,7 +287,7 @@ class _HomeScreenState extends State<HomeScreen>
         await itemProvider.loadNearbyItems(
           latitude: locationProvider.latitude!,
           longitude: locationProvider.longitude!,
-          radiusKm: 20, // Safe radius: 20km (backend struggles with 500km)
+          maxDistanceKm: 20,
         );
 
         if (itemProvider.nearbyErrorMessage == null) {

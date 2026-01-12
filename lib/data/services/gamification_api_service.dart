@@ -28,6 +28,9 @@ class GamificationApiService {
     // Add token refresh interceptor for handling 401/403 errors
     _dio.interceptors.add(_tokenRefreshInterceptor);
 
+    // Set main Dio reference so TokenRefreshInterceptor can retry original requests
+    _tokenRefreshInterceptor.setMainDio(_dio);
+
     // Add token interceptor - adds token to every request
     _dio.interceptors.add(
       InterceptorsWrapper(

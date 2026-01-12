@@ -8,7 +8,9 @@ import '../../../data/models/transaction_model.dart';
 import '../../../data/models/transaction_status.dart';
 import '../../../data/services/transaction_api_service.dart';
 import '../../../data/services/message_api_service.dart';
+import '../../../data/services/report_api_service.dart';
 import '../../../data/providers/auth_provider.dart';
+import '../../../data/providers/user_provider.dart';
 
 class OrderDetailScreen extends StatefulWidget {
   final String transactionId;
@@ -25,6 +27,7 @@ class OrderDetailScreen extends StatefulWidget {
 class _OrderDetailScreenState extends State<OrderDetailScreen> {
   late TransactionApiService _transactionApiService;
   late MessageApiService _messageApiService;
+  late ReportApiService _reportApiService;
   TransactionModel? _transaction;
   bool _isLoading = false;
   String? _errorMessage;
@@ -34,6 +37,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     super.initState();
     _transactionApiService = TransactionApiService();
     _messageApiService = MessageApiService();
+    _reportApiService = ReportApiService();
 
     // Setup auth token and load transaction detail
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -46,6 +50,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
         _messageApiService.setAuthToken(authProvider.accessToken!);
         _messageApiService.setGetValidTokenCallback(
+          () async => authProvider.accessToken,
+        );
+
+        _reportApiService.setAuthToken(authProvider.accessToken!);
+        _reportApiService.setGetValidTokenCallback(
           () async => authProvider.accessToken,
         );
       }
@@ -138,26 +147,23 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
     try {
       final txn = _transaction!;
+      final userProvider = context.read<UserProvider>();
+      final currentUserId = userProvider.currentUser?.id;
 
-      // Determine message receiver and content based on current user role
+      // Determine message receiver based on current user role (using UUID)
       String receiverId;
       String messageContent;
-      bool isSharer;
 
-      // Since we can't reliably determine current user ID, we'll create a simple heuristic:
-      // If this is an inProgress/accepted transaction, the current user viewing it is the SHARER
-      // So send message to RECEIVER
-      if (txn.status == TransactionStatus.accepted ||
-          txn.status == TransactionStatus.inProgress) {
-        // Current user is the sharer (viewing from their orders tab)
+      if (currentUserId != null &&
+          txn.sharerIdUuid != null &&
+          currentUserId == txn.sharerIdUuid) {
+        // Current user is the sharer
         receiverId = txn.receiverIdUuid ?? txn.receiverId.toString();
         messageContent = 'Chào bạn, tôi muốn thảo luận về đơn hàng';
-        isSharer = true;
       } else {
-        // For other statuses, send to sharer (more common scenario)
+        // Current user is the receiver
         receiverId = txn.sharerIdUuid ?? txn.sharerId.toString();
         messageContent = 'Xin chào, tôi đang quan tâm đến đơn hàng này.';
-        isSharer = false;
       }
 
       final itemId = txn.itemIdUuid ?? txn.itemId.toString();
@@ -678,9 +684,80 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     );
   }
 
+  void _handleReportTransaction() {
+    if (_transaction == null) return;
+
+    final txn = _transaction!;
+
+    // Show report dialog with category selection
+    showDialog(
+      context: context,
+      builder: (context) => _ReportDialog(
+        transactionId: txn.transactionIdUuid ?? txn.transactionId.toString(),
+        transactionName: txn.itemName ?? 'Giao dịch',
+        onSubmit: _submitReport,
+      ),
+    );
+  }
+
+  Future<void> _submitReport({
+    required String category,
+    required String description,
+  }) async {
+    if (_transaction == null) return;
+
+    try {
+      final txn = _transaction!;
+
+      // Create report
+      await _reportApiService.createReport(
+        type: 'TRANSACTION', // This is a transaction report
+        category: category,
+        description: description,
+        targetId: txn.transactionIdUuid ?? txn.transactionId.toString(),
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Báo cáo đã được gửi. Cảm ơn bạn!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Lỗi: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      print('[OrderDetailScreen] Error reporting transaction: $e');
+    }
+  }
+
   Widget _buildActionButtons() {
     final txn = _transaction!;
     final status = txn.status;
+    final userProvider = context.read<UserProvider>();
+    final currentUserId = userProvider.currentUser?.id;
+
+    print('[OrderDetailScreen] DEBUG - currentUserId: $currentUserId');
+    print('[OrderDetailScreen] DEBUG - sharerIdUuid: ${txn.sharerIdUuid}');
+    print('[OrderDetailScreen] DEBUG - receiverIdUuid: ${txn.receiverIdUuid}');
+
+    // Check if current user is the sharer or receiver (compare with UUID)
+    final isSharer = currentUserId != null &&
+        txn.sharerIdUuid != null &&
+        currentUserId == txn.sharerIdUuid;
+    final isReceiver = currentUserId != null &&
+        txn.receiverIdUuid != null &&
+        currentUserId == txn.receiverIdUuid;
+
+    print(
+        '[OrderDetailScreen] DEBUG - isSharer: $isSharer, isReceiver: $isReceiver');
 
     // PENDING: "Hủy đơn hàng" + "Nhắn tin"
     if (status == TransactionStatus.pending) {
@@ -728,8 +805,101 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         ],
       );
     }
-    // ACCEPTED: "Nhắn tin" + "Hoàn tất đơn hàng" (người gửi hàng)
+    // ACCEPTED: Different buttons based on user role
     else if (status == TransactionStatus.accepted) {
+      // If current user is the receiver -> "Nhắn tin" + "Báo cáo"
+      if (isReceiver) {
+        return Row(
+          children: [
+            Expanded(
+              child: OutlinedButton(
+                onPressed: _handleSendMessage,
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: AppColors.primaryGreen),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                child: Text(
+                  'Nhắn tin',
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    color: AppColors.primaryGreen,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: ElevatedButton(
+                onPressed: _handleReportTransaction,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                child: Text(
+                  'Báo cáo',
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      }
+      // If current user is the sharer -> "Nhắn tin" + "Hoàn tất đơn hàng"
+      else if (isSharer) {
+        return Row(
+          children: [
+            Expanded(
+              child: OutlinedButton(
+                onPressed: _handleSendMessage,
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: AppColors.primaryGreen),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                child: Text(
+                  'Nhắn tin',
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    color: AppColors.primaryGreen,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: ElevatedButton(
+                onPressed: _handleCompleteTransaction,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryGreen,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                child: Text(
+                  'Hoàn tất đơn hàng',
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      }
+      // Fallback for unknown role
       return Row(
         children: [
           Expanded(
@@ -989,5 +1159,338 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         ),
       );
     }
+  }
+}
+
+/// Report Dialog Widget for submitting transaction reports
+class _ReportDialog extends StatefulWidget {
+  final String transactionId;
+  final String transactionName;
+  final Function({required String category, required String description})
+      onSubmit;
+
+  const _ReportDialog({
+    required this.transactionId,
+    required this.transactionName,
+    required this.onSubmit,
+  });
+
+  @override
+  State<_ReportDialog> createState() => _ReportDialogState();
+}
+
+class _ReportDialogState extends State<_ReportDialog> {
+  String? _selectedCategory;
+  final _descriptionController = TextEditingController();
+  bool _isSubmitting = false;
+  String? _descriptionError;
+
+  // Transaction-related report categories
+  final Map<String, String> _categories = {
+    'ITEM_NOT_RECEIVED': 'Chưa nhận được hàng',
+    'ITEM_NOT_AS_DESCRIBED': 'Hàng không như mô tả',
+    'DAMAGED_ITEM': 'Hàng bị hư hỏng',
+    'WRONG_ITEM': 'Gửi nhầm hàng',
+    'NO_SHOW': 'Người gửi không xuất hiện',
+    'PAYMENT_ISSUE': 'Vấn đề về thanh toán',
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    _descriptionController.addListener(_validateDescription);
+  }
+
+  @override
+  void dispose() {
+    _descriptionController.removeListener(_validateDescription);
+    _descriptionController.dispose();
+    super.dispose();
+  }
+
+  void _validateDescription() {
+    final text = _descriptionController.text;
+    setState(() {
+      if (text.isEmpty) {
+        _descriptionError = 'Mô tả không được để trống';
+      } else if (text.length < 10) {
+        _descriptionError =
+            'Mô tả phải có ít nhất 10 ký tự (hiện tại: ${text.length})';
+      } else if (text.length > 2000) {
+        _descriptionError = 'Mô tả không được vượt quá 2000 ký tự';
+      } else {
+        _descriptionError = null;
+      }
+    });
+  }
+
+  bool _isFormValid() {
+    return _selectedCategory != null &&
+        _descriptionController.text.length >= 10 &&
+        _descriptionController.text.length <= 2000;
+  }
+
+  void _handleSubmit() async {
+    if (!_isFormValid()) {
+      if (_selectedCategory == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Vui lòng chọn lý do báo cáo'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+
+    try {
+      await widget.onSubmit(
+        category: _selectedCategory!,
+        description: _descriptionController.text.trim(),
+      );
+
+      if (mounted) {
+        Navigator.pop(context);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 400),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Báo cáo giao dịch',
+                  style: AppTextStyles.h3.copyWith(
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Giao dịch: ${widget.transactionName}',
+                  style: AppTextStyles.bodySmall.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 24),
+
+                // Category Dropdown
+                Text(
+                  'Lý do báo cáo',
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  decoration: BoxDecoration(
+                    border: Border.all(color: AppColors.borderLight),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: DropdownButton<String>(
+                    isExpanded: true,
+                    hint: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: Text(
+                        'Chọn lý do',
+                        style: AppTextStyles.bodyMedium.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                    value: _selectedCategory,
+                    underline: const SizedBox.shrink(),
+                    items: _categories.entries.map((entry) {
+                      return DropdownMenuItem<String>(
+                        value: entry.key,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          child: Text(entry.value),
+                        ),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      setState(() => _selectedCategory = value);
+                    },
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // Description TextField
+                Text(
+                  'Mô tả chi tiết (tối thiểu 10 ký tự)',
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _descriptionController,
+                  maxLines: 5,
+                  minLines: 4,
+                  maxLength: 2000,
+                  onChanged: (_) => _validateDescription(),
+                  decoration: InputDecoration(
+                    hintText: 'Mô tả chi tiết về vấn đề...',
+                    hintStyle: AppTextStyles.bodyMedium.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: _descriptionError != null
+                            ? Colors.red
+                            : AppColors.borderLight,
+                      ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: _descriptionError != null
+                            ? Colors.red
+                            : AppColors.borderLight,
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: _descriptionError != null
+                            ? Colors.red
+                            : AppColors.primaryGreen,
+                        width: 2,
+                      ),
+                    ),
+                    counterText: '',
+                    contentPadding: const EdgeInsets.all(16),
+                  ),
+                  style: AppTextStyles.bodyMedium,
+                ),
+                if (_descriptionError != null) ...[
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.error_outline,
+                        size: 16,
+                        color: Colors.red,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _descriptionError!,
+                          style: AppTextStyles.bodySmall.copyWith(
+                            color: Colors.red,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ] else ...[
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.check_circle,
+                        size: 16,
+                        color: Colors.green,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Mô tả hợp lệ',
+                        style: AppTextStyles.bodySmall.copyWith(
+                          color: Colors.green,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+                const SizedBox(height: 24),
+
+                // Action Buttons
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed:
+                            _isSubmitting ? null : () => Navigator.pop(context),
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: AppColors.borderLight),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                        child: Text(
+                          'Hủy',
+                          style: AppTextStyles.bodyMedium.copyWith(
+                            color: AppColors.textPrimary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: _isSubmitting || !_isFormValid()
+                            ? null
+                            : _handleSubmit,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor:
+                              _isFormValid() ? Colors.red : Colors.grey,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                        child: _isSubmitting
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.white,
+                                  ),
+                                ),
+                              )
+                            : Text(
+                                'Báo cáo',
+                                style: AppTextStyles.bodyMedium.copyWith(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }

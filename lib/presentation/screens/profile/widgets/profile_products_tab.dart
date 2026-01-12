@@ -71,6 +71,12 @@ class _ProfileProductsTabState extends State<ProfileProductsTab>
     _messageApiService = MessageApiService();
     final authProvider = context.read<AuthProvider>();
     if (authProvider.accessToken != null) {
+      // Setup token for TransactionApiService
+      _transactionApiService.setAuthToken(authProvider.accessToken!);
+      _transactionApiService.setGetValidTokenCallback(
+        () async => authProvider.accessToken,
+      );
+
       _messageApiService.setAuthToken(authProvider.accessToken!);
       _messageApiService.setGetValidTokenCallback(
         () async => authProvider.accessToken,

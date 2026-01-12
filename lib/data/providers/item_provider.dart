@@ -167,15 +167,16 @@ class ItemProvider extends ChangeNotifier {
   }
 
   /// Load nearby items based on user location
+  /// Backend filters results by distance using lat/lon coordinates
   Future<void> loadNearbyItems({
     required double latitude,
     required double longitude,
-    double radiusKm = 50,
+    double maxDistanceKm = 50,
     int page = 0,
   }) async {
     try {
       print(
-          '[ItemProvider.loadNearbyItems] Starting - lat: $latitude, lon: $longitude, radiusKm: $radiusKm, page: $page');
+          '[ItemProvider.loadNearbyItems] Starting - lat: $latitude, lon: $longitude, maxDistanceKm: $maxDistanceKm, page: $page');
       _isLoadingNearby = true;
       _nearbyErrorMessage = null;
       notifyListeners();
@@ -184,7 +185,7 @@ class ItemProvider extends ChangeNotifier {
       final response = await _itemApiService.searchNearbyItems(
         latitude: latitude,
         longitude: longitude,
-        radiusKm: radiusKm,
+        maxDistanceKm: maxDistanceKm,
         page: page,
         size: 20,
         status: 'AVAILABLE',
@@ -231,7 +232,7 @@ class ItemProvider extends ChangeNotifier {
   Future<void> loadMoreNearbyItems({
     required double latitude,
     required double longitude,
-    double radiusKm = 50,
+    double maxDistanceKm = 50,
     int page = 0,
   }) async {
     // Don't load if we already have all items
@@ -248,7 +249,7 @@ class ItemProvider extends ChangeNotifier {
       final response = await _itemApiService.searchNearbyItems(
         latitude: latitude,
         longitude: longitude,
-        radiusKm: radiusKm,
+        maxDistanceKm: maxDistanceKm,
         page: page,
         size: 20,
         status: 'AVAILABLE',
@@ -274,12 +275,12 @@ class ItemProvider extends ChangeNotifier {
   Future<void> refreshNearbyItems({
     required double latitude,
     required double longitude,
-    double radiusKm = 50,
+    double maxDistanceKm = 50,
   }) async {
     await loadNearbyItems(
       latitude: latitude,
       longitude: longitude,
-      radiusKm: radiusKm,
+      maxDistanceKm: maxDistanceKm,
       page: 0,
     );
   }

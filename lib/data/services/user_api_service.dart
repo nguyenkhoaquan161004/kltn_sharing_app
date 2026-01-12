@@ -27,6 +27,9 @@ class UserApiService {
     // Add token refresh interceptor for handling 401/403 errors
     _dio.interceptors.add(_tokenRefreshInterceptor);
 
+    // Set main Dio reference so TokenRefreshInterceptor can retry original requests
+    _tokenRefreshInterceptor.setMainDio(_dio);
+
     // Add logging interceptor
     _dio.interceptors.add(
       InterceptorsWrapper(
@@ -51,7 +54,8 @@ class UserApiService {
   }
 
   /// Set callback to get valid access token from AuthProvider
-  void setGetValidTokenCallback(Future<void> Function() onTokenExpiredCallback) {
+  void setGetValidTokenCallback(
+      Future<void> Function() onTokenExpiredCallback) {
     try {
       _tokenRefreshInterceptor.setCallbacks(
         getValidTokenCallback: () async => null, // Not needed

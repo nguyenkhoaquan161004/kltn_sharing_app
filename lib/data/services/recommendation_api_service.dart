@@ -28,6 +28,9 @@ class RecommendationApiService {
     // Add token refresh interceptor (recommendations require authentication)
     _dio.interceptors.add(_tokenRefreshInterceptor);
 
+    // Set main Dio reference so TokenRefreshInterceptor can retry original requests
+    _tokenRefreshInterceptor.setMainDio(_dio);
+
     // Add logging interceptor
     _dio.interceptors.add(
       InterceptorsWrapper(

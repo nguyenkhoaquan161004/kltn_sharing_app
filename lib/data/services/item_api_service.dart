@@ -32,6 +32,9 @@ class ItemApiService {
     // Add token refresh interceptor for handling 401/403 errors
     _dio.interceptors.add(_tokenRefreshInterceptor);
 
+    // Set main Dio reference so TokenRefreshInterceptor can retry original requests
+    _tokenRefreshInterceptor.setMainDio(_dio);
+
     // Add logging interceptor
     _dio.interceptors.add(
       InterceptorsWrapper(
@@ -147,11 +150,12 @@ class ItemApiService {
   }
 
   /// Search nearby items based on user location
-  /// Requires [latitude], [longitude], and optionally [radiusKm] (default 50km)
+  /// Requires [latitude] and [longitude], optionally [maxDistanceKm] (default 50km)
+  /// If server returns 500 error, automatically retries without maxDistanceKm
   Future<PageResponse<ItemDto>> searchNearbyItems({
     required double latitude,
     required double longitude,
-    double radiusKm = 50,
+    double maxDistanceKm = 50,
     int page = 0,
     int size = 10,
     String? status = 'AVAILABLE',
@@ -185,16 +189,14 @@ class ItemApiService {
         'limit': size,
         'userLat': latitude,
         'userLon': longitude,
-        'maxDistanceKm':
-            radiusKm, // Backend bug: causes 500 error with geo query
+        'maxDistanceKm': maxDistanceKm,
         if (status != null && status.isNotEmpty) 'status': status,
         // TODO: Backend may not support sort + geo filter together
         // 'sortBy': sortBy,
         // 'sortOrder': sortDirection,
       };
       print('[ItemAPI] searchNearbyItems called with:');
-      print('[ItemAPI]   latitude: $latitude, longitude: $longitude');
-      print('[ItemAPI]   radiusKm: $radiusKm');
+      print('[ItemAPI]   latitude: $latitude, longitude: $longitude, maxDistanceKm: $maxDistanceKm');
       print('[ItemAPI]   Final queryParams: $queryParams');
 
       final response = await _dio.get(
@@ -241,6 +243,50 @@ class ItemApiService {
       if (e.response?.statusCode == 500) {
         print(
             '[ItemAPI.searchNearbyItems] Server error response: ${e.response?.data}');
+        print('[ItemAPI.searchNearbyItems] Retrying without maxDistanceKm...');
+        
+        // Retry without maxDistanceKm parameter to bypass server issue
+        try {
+          final retryQueryParams = {
+            'page': page + 1,
+            'limit': size,
+            'userLat': latitude,
+            'userLon': longitude,
+            // maxDistanceKm removed for retry
+            if (status != null && status.isNotEmpty) 'status': status,
+          };
+          
+          print('[ItemAPI] Retry queryParams: $retryQueryParams');
+          final retryResponse = await _dio.get(
+            '/api/v2/items',
+            queryParameters: retryQueryParams,
+          );
+          
+          if (retryResponse.statusCode == 200) {
+            final data = retryResponse.data;
+            print('[ItemAPI.searchNearbyItems] Retry successful! Got ${data['data']?['content']?.length ?? 0} items');
+            
+            if (data is Map<String, dynamic>) {
+              if (data.containsKey('data')) {
+                final pageData = data['data'];
+                if (pageData is Map<String, dynamic>) {
+                  return PageResponse<ItemDto>.fromJson(
+                    pageData,
+                    (json) => ItemDto.fromJson(json),
+                  );
+                }
+              } else {
+                return PageResponse<ItemDto>.fromJson(
+                  data,
+                  (json) => ItemDto.fromJson(json),
+                );
+              }
+            }
+          }
+        } catch (retryError) {
+          print('[ItemAPI.searchNearbyItems] Retry also failed: $retryError');
+          throw _handleDioException(e); // Throw original error
+        }
       }
       throw _handleDioException(e);
     }
