@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/constants/app_routes.dart';
+import '../../../core/utils/auth_token_callback_helper.dart';
 import '../../../data/models/transaction_model.dart';
 import '../../../data/models/transaction_status.dart';
 import '../../../data/services/transaction_api_service.dart';
@@ -45,17 +46,17 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       if (authProvider.accessToken != null) {
         _transactionApiService.setAuthToken(authProvider.accessToken!);
         _transactionApiService.setGetValidTokenCallback(
-          () async => authProvider.accessToken,
+          createTokenExpiredCallback(context),
         );
 
         _messageApiService.setAuthToken(authProvider.accessToken!);
         _messageApiService.setGetValidTokenCallback(
-          () async => authProvider.accessToken,
+          createTokenExpiredCallback(context),
         );
 
         _reportApiService.setAuthToken(authProvider.accessToken!);
         _reportApiService.setGetValidTokenCallback(
-          () async => authProvider.accessToken,
+          createTokenExpiredCallback(context),
         );
       }
 

@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/constants/app_routes.dart';
+import '../../../core/utils/auth_token_callback_helper.dart';
 import '../../../data/models/item_model.dart';
 import '../../../data/models/item_response_model.dart';
 import '../../../data/services/item_api_service.dart';
@@ -14,12 +15,16 @@ class SearchResultsScreen extends StatefulWidget {
   final String keyword;
   final String? categoryId;
   final String? categoryName;
+  final String? imageUrl;
+  final List<ItemModel>? precomputedResults;
 
   const SearchResultsScreen({
     super.key,
     this.keyword = '',
     this.categoryId,
     this.categoryName,
+    this.imageUrl,
+    this.precomputedResults,
   });
 
   @override
@@ -56,9 +61,13 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
       _filterByCategory = ''; // No category filter by default
     }
     print(
-        '[SearchResultsScreen] initState - keyword: ${widget.keyword}, categoryId: ${widget.categoryId}, categoryName: ${widget.categoryName}');
+        '[SearchResultsScreen] initState - keyword: ${widget.keyword}, categoryId: ${widget.categoryId}, categoryName: ${widget.categoryName}, imageUrl: ${widget.imageUrl}');
     print(
         '[SearchResultsScreen] initState - _filterByCategory: $_filterByCategory');
+    if (widget.precomputedResults != null) {
+      print(
+          '[SearchResultsScreen] initState - Pre-computed results available: ${widget.precomputedResults!.length} items');
+    }
 
     // Set up ItemApiService with token callback
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -67,7 +76,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
       if (authProvider.accessToken != null) {
         itemService.setAuthToken(authProvider.accessToken!);
         itemService.setGetValidTokenCallback(
-          () async => authProvider.accessToken,
+          createTokenExpiredCallback(context),
         );
       }
     });
@@ -96,6 +105,63 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
 
       if (authProvider.accessToken != null) {
         itemService.setAuthToken(authProvider.accessToken!);
+      }
+
+      // Handle image search if imageUrl is provided
+      if (widget.imageUrl != null && widget.imageUrl!.isNotEmpty) {
+        print(
+            '[SearchResultsScreen] _loadItems - Performing image search with imageUrl: ${widget.imageUrl}');
+        print(
+            '[SearchResultsScreen] _loadItems - precomputedResults: ${widget.precomputedResults}');
+        print(
+            '[SearchResultsScreen] _loadItems - precomputedResults length: ${widget.precomputedResults?.length}');
+
+        // Use pre-computed results if available, otherwise fetch from API
+        List<ItemModel> itemModels;
+        if (widget.precomputedResults != null &&
+            widget.precomputedResults!.isNotEmpty) {
+          print(
+              '[SearchResultsScreen] _loadItems - ✅ Using pre-computed results: ${widget.precomputedResults!.length} items');
+          itemModels = widget.precomputedResults!;
+        } else {
+          print(
+              '[SearchResultsScreen] _loadItems - ⚠️ Fetching image search results from API (precomputedResults is ${widget.precomputedResults == null ? 'NULL' : 'EMPTY'})');
+          itemModels = await itemService.searchByImage(widget.imageUrl!);
+        }
+
+        List<ItemDto> items = itemModels.map((model) {
+          return ItemDto(
+            id: model.itemId_str ?? model.itemId.toString(),
+            name: model.name,
+            description: model.description,
+            quantity: model.quantity,
+            imageUrl: model.image,
+            expiryDate: model.expiryDate,
+            categoryId: model.categoryId_str ?? model.categoryId.toString(),
+            categoryName: model.categoryName,
+            latitude: model.latitude,
+            longitude: model.longitude,
+            price: model.price,
+            status: model.status,
+            createdAt: model.createdAt,
+            updatedAt: model.updatedAt,
+            userId: model.userId_str ?? model.userId.toString(),
+            distanceKm: model.distance,
+            isCharityItem: model.isCharityItem,
+            donationAmountFormatted: model.donationAmount,
+            interestedCount: 0,
+          );
+        }).toList();
+
+        print(
+            '[SearchResultsScreen] _loadItems - Converted ${items.length} items from image search results');
+
+        setState(() {
+          _searchResults = items;
+          _isLoading = false;
+          _totalItems = items.length;
+        });
+        return;
       }
 
       // Simplified API call with only necessary parameters

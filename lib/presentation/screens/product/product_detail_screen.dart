@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/constants/app_routes.dart';
+import '../../../core/utils/auth_token_callback_helper.dart';
 import '../../../data/models/product_model.dart';
 import '../../../data/models/item_model.dart';
 import '../../../data/providers/item_provider.dart';
@@ -75,14 +76,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       if (authProvider.accessToken != null) {
         _messageApiService.setAuthToken(authProvider.accessToken!);
         _messageApiService.setGetValidTokenCallback(
-          () async => authProvider.accessToken,
+          createTokenExpiredCallback(context),
         );
 
         // Also set up ItemApiService with token callback for related products
         final itemApiService = context.read<ItemApiService>();
         itemApiService.setAuthToken(authProvider.accessToken!);
         itemApiService.setGetValidTokenCallback(
-          () async => authProvider.accessToken,
+          createTokenExpiredCallback(context),
         );
       }
     });

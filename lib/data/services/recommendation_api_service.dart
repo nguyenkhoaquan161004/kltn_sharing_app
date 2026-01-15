@@ -53,12 +53,13 @@ class RecommendationApiService {
     );
   }
 
-  /// Set callback to get valid access token from AuthProvider
-  void setGetValidTokenCallback(Future<String?> Function() callback) {
+  /// Set callback when token refresh fails or 403 occurs
+  void setGetValidTokenCallback(
+      Future<void> Function() onTokenExpiredCallback) {
     try {
       _tokenRefreshInterceptor.setCallbacks(
         getValidTokenCallback: () async => null,
-        onTokenExpiredCallback: callback,
+        onTokenExpiredCallback: onTokenExpiredCallback,
       );
     } catch (e) {
       print('[RecommendationAPI] Error setting token refresh callback: $e');

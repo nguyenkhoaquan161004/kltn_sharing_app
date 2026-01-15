@@ -12,6 +12,7 @@ import 'package:path_provider/path_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/constants/app_routes.dart';
+import '../../../core/utils/auth_token_callback_helper.dart';
 import '../../../data/services/message_api_service.dart';
 import '../../../data/services/message_notification_service.dart';
 import '../../../data/services/websocket_service.dart';
@@ -75,7 +76,7 @@ class _ChatScreenState extends State<ChatScreen> {
     if (authProvider.accessToken != null) {
       _messageApiService.setAuthToken(authProvider.accessToken!);
       _messageApiService.setGetValidTokenCallback(
-        () async => authProvider.accessToken,
+        createTokenExpiredCallback(context),
       );
     }
 
@@ -83,7 +84,7 @@ class _ChatScreenState extends State<ChatScreen> {
     if (authProvider.accessToken != null) {
       _userApiService.setAuthToken(authProvider.accessToken!);
       _userApiService.setGetValidTokenCallback(
-        () async => authProvider.accessToken,
+        createTokenExpiredCallback(context),
       );
     }
 
@@ -91,7 +92,7 @@ class _ChatScreenState extends State<ChatScreen> {
     if (authProvider.accessToken != null) {
       _itemApiService.setAuthToken(authProvider.accessToken!);
       _itemApiService.setGetValidTokenCallback(
-        () async => authProvider.accessToken,
+        createTokenExpiredCallback(context),
       );
     }
 

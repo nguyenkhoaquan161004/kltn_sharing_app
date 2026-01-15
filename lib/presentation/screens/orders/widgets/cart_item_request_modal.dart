@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
+import '../../../../core/utils/auth_token_callback_helper.dart';
 import '../../../../data/services/transaction_api_service.dart';
 import '../../../../data/providers/auth_provider.dart';
 import '../../../../data/providers/user_provider.dart';
@@ -96,7 +97,7 @@ class _CartItemRequestModalState extends State<CartItemRequestModal> {
       if (authProvider.accessToken != null) {
         transactionApiService.setAuthToken(authProvider.accessToken!);
         transactionApiService.setGetValidTokenCallback(
-          () async => authProvider.accessToken,
+          createTokenExpiredCallback(context),
         );
       }
 

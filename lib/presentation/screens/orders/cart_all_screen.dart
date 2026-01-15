@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/constants/app_routes.dart';
+import '../../../core/utils/auth_token_callback_helper.dart';
 import '../../../data/models/transaction_model.dart';
 import '../../../data/models/transaction_status.dart';
 import '../../../data/models/product_model.dart';
@@ -75,16 +76,16 @@ class _CartAllScreenState extends State<CartAllScreen>
 
         // Set token refresh callback
         _transactionApiService.setGetValidTokenCallback(
-          () async => authProvider.accessToken,
+          createTokenExpiredCallback(context),
         );
         _cartApiService.setGetValidTokenCallback(
-          () async => authProvider.accessToken,
+          createTokenExpiredCallback(context),
         );
         _messageApiService.setGetValidTokenCallback(
-          () async => authProvider.accessToken,
+          createTokenExpiredCallback(context),
         );
         _itemApiService.setGetValidTokenCallback(
-          () async => authProvider.accessToken,
+          createTokenExpiredCallback(context),
         );
       }
 

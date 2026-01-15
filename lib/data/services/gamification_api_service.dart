@@ -112,15 +112,14 @@ class GamificationApiService {
     );
   }
 
-  /// Set callback to get valid access token from AuthProvider
-  void setGetValidTokenCallback(Future<String?> Function() callback) {
+  /// Set callback when token refresh fails or 403 occurs
+  void setGetValidTokenCallback(
+      Future<void> Function() onTokenExpiredCallback) {
     try {
-      _getValidTokenCallback = callback;
       _tokenRefreshInterceptor.setCallbacks(
-        getValidTokenCallback: callback,
-        onTokenExpiredCallback: () async {
-          print('[GamificationAPI] Token refresh failed, user session expired');
-        },
+        getValidTokenCallback: () async =>
+            null, // Not needed, interceptor handles it
+        onTokenExpiredCallback: onTokenExpiredCallback,
       );
     } catch (e) {
       print('[GamificationAPI] Error setting token refresh callback: $e');

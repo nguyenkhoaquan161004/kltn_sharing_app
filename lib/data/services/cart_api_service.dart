@@ -52,14 +52,14 @@ class CartApiService {
     );
   }
 
-  /// Set callback to get valid access token from AuthProvider
-  void setGetValidTokenCallback(Future<String?> Function() callback) {
+  /// Set callback when token refresh fails or 403 occurs
+  void setGetValidTokenCallback(
+      Future<void> Function() onTokenExpiredCallback) {
     try {
       _tokenRefreshInterceptor.setCallbacks(
-        getValidTokenCallback: callback,
-        onTokenExpiredCallback: () async {
-          print('[CartAPI] Token refresh failed, user session expired');
-        },
+        getValidTokenCallback: () async =>
+            null, // Not needed, interceptor handles it
+        onTokenExpiredCallback: onTokenExpiredCallback,
       );
     } catch (e) {
       print('[CartAPI] Error setting token refresh callback: $e');

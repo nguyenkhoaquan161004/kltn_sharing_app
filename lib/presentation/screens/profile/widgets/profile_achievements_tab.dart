@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:dio/dio.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
+import '../../../../core/utils/auth_token_callback_helper.dart';
 import '../../../../data/services/gamification_api_service.dart';
 import '../../../../data/models/gamification_response_model.dart';
 import '../../../../data/providers/auth_provider.dart';
@@ -42,7 +43,7 @@ class _ProfileAchievementsTabState extends State<ProfileAchievementsTab> {
           _gamificationApiService.setAuthToken(authProvider.accessToken!);
           // Set token refresh callback to automatically get fresh token
           _gamificationApiService.setGetValidTokenCallback(
-            () async => authProvider.accessToken,
+            createTokenExpiredCallback(context),
           );
           print(
               '[ProfileAchievementsTab] Auth token and callback set for GamificationApiService');

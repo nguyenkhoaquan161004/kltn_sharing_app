@@ -39,10 +39,11 @@ class CategoryApiService {
     );
   }
 
-  /// Set callback to get valid access token from AuthProvider
-  void setGetValidTokenCallback(Future<String?> Function() callback) {
-    // Not needed for public categories API
-    print('[CategoryAPI] setGetValidTokenCallback called (not needed)');
+  /// Set callback - not needed for public categories API
+  void setGetValidTokenCallback(
+      Future<void> Function() onTokenExpiredCallback) {
+    print(
+        '[CategoryAPI] setGetValidTokenCallback called (not needed for public API)');
   }
 
   /// Update Dio baseUrl when backend switches

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:kltn_sharing_app/data/models/item_model.dart';
 import 'package:provider/provider.dart';
 import '../presentation/screens/welcome_screen.dart';
 import '../presentation/screens/onboarding/onboarding_screen.dart';
@@ -236,14 +237,34 @@ class AppRouter {
               final keyword = state.uri.queryParameters['keyword'] ?? '';
               final categoryId = state.uri.queryParameters['categoryId'];
               final categoryName = state.uri.queryParameters['categoryName'];
+              final imageUrl = state.uri.queryParameters['imageUrl'];
               print('[Router]   Extracted keyword: "$keyword"');
               print('[Router]   Extracted categoryId: $categoryId');
               print('[Router]   Extracted categoryName: $categoryName');
+              print('[Router]   Extracted imageUrl: $imageUrl');
+
+              List<ItemModel>? precomputedResults;
+              print('[Router]   state.extra type: ${state.extra?.runtimeType}');
+              print('[Router]   state.extra value: $state.extra');
+
+              if (state.extra != null && state.extra is List) {
+                precomputedResults = (state.extra as List).cast<ItemModel>();
+                print(
+                    '[Router]   ✅ Extracted pre-computed results: ${precomputedResults.length} items');
+              } else if (state.extra != null) {
+                print(
+                    '[Router]   ⚠️ state.extra is not a List, it is ${state.extra.runtimeType}');
+              } else {
+                print('[Router]   ⚠️ state.extra is NULL');
+              }
+
               return _buildPageWithTransition(
                 child: SearchResultsScreen(
                   keyword: keyword,
                   categoryId: categoryId,
                   categoryName: categoryName,
+                  imageUrl: imageUrl,
+                  precomputedResults: precomputedResults,
                 ),
                 state: state,
                 name: 'search-results',

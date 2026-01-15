@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
+import '../../../core/utils/auth_token_callback_helper.dart';
 import '../../../data/services/message_api_service.dart';
 import '../../../data/services/item_api_service.dart';
 import '../../../data/models/message_model.dart';
@@ -48,11 +49,11 @@ class _ChatbotScreenState extends State<ChatbotScreen>
       if (authProvider.accessToken != null) {
         _messageApiService.setAuthToken(authProvider.accessToken!);
         _messageApiService.setGetValidTokenCallback(
-          () async => authProvider.accessToken,
+          createTokenExpiredCallback(context),
         );
         _itemApiService.setAuthToken(authProvider.accessToken!);
         _itemApiService.setGetValidTokenCallback(
-          () async => authProvider.accessToken,
+          createTokenExpiredCallback(context),
         );
       }
 

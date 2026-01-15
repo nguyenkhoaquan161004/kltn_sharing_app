@@ -3,6 +3,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
+import '../../../../core/utils/auth_token_callback_helper.dart';
 import '../../../../data/models/item_model.dart';
 import '../../../../data/models/transaction_model.dart';
 import '../../../../data/models/transaction_status.dart';
@@ -74,12 +75,12 @@ class _ProfileProductsTabState extends State<ProfileProductsTab>
       // Setup token for TransactionApiService
       _transactionApiService.setAuthToken(authProvider.accessToken!);
       _transactionApiService.setGetValidTokenCallback(
-        () async => authProvider.accessToken,
+        createTokenExpiredCallback(context),
       );
 
       _messageApiService.setAuthToken(authProvider.accessToken!);
       _messageApiService.setGetValidTokenCallback(
-        () async => authProvider.accessToken,
+        createTokenExpiredCallback(context),
       );
     }
 

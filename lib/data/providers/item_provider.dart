@@ -50,9 +50,10 @@ class ItemProvider extends ChangeNotifier {
   }
 
   /// Set token callback from AuthProvider
-  void setGetValidTokenCallback(Future<String?> Function() callback) {
+  void setGetValidTokenCallback(
+      Future<void> Function() onTokenExpiredCallback) {
     print('[ItemProvider] setGetValidTokenCallback called');
-    _itemApiService.setGetValidTokenCallback(callback);
+    _itemApiService.setGetValidTokenCallback(onTokenExpiredCallback);
   }
 
   /// Load items with pagination - simplified parameters
