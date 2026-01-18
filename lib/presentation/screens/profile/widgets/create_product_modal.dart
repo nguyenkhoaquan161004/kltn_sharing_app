@@ -39,6 +39,7 @@ class _CreateProductModalState extends State<CreateProductModal> {
   DateTime _expirationDate = DateTime.now().add(const Duration(days: 30));
   bool _isLoading = false;
   bool _categoriesLoading = true;
+  bool _simulateDuplicate = false; // Toggle để fake duplicate error
   String? _selectedImagePath;
   String? _uploadedImageUrl;
   String? _errorMessage;
@@ -230,6 +231,9 @@ class _CreateProductModalState extends State<CreateProductModal> {
   }
 
   Future<void> _submitForm() async {
+    print('[CreateProductModal] DEBUG - _submitForm called');
+    print(
+        '[CreateProductModal] DEBUG - _simulateDuplicate = $_simulateDuplicate');
     if (_formKey.currentState!.validate()) {
       if (_uploadedImageUrl == null) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -261,6 +265,36 @@ class _CreateProductModalState extends State<CreateProductModal> {
         return;
       }
 
+      // Check for duplicate products with same name and AVAILABLE status
+      print(
+          '[CreateProductModal] DEBUG - Checking for duplicate products with name: ${_nameController.text.trim()}');
+      final isDuplicate =
+          await _checkDuplicateProduct(_nameController.text.trim());
+      if (isDuplicate) {
+        print(
+            '[CreateProductModal] DEBUG - Duplicate product found, showing error');
+        if (mounted) {
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Sản phẩm đã tồn tại'),
+              content: Text(
+                'Sản phẩm "${_nameController.text.trim()}" đã tồn tại trong hệ thống. Không được đăng sản phẩm trùng!',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Đóng'),
+                ),
+              ],
+            ),
+          );
+        }
+        return;
+      }
+
+      print(
+          '[CreateProductModal] DEBUG - No duplicate found, proceeding with submit');
       setState(() => _isLoading = true);
 
       try {
@@ -913,5 +947,35 @@ class _CreateProductModalState extends State<CreateProductModal> {
         ],
       ],
     );
+  }
+
+  /// Check if product with same name and AVAILABLE status already exists
+  Future<bool> _checkDuplicateProduct(String productName) async {
+    try {
+      // Get all available products
+      final response = await _itemApiService.searchItems(
+        keyword: productName,
+        page: 0,
+        size: 100,
+      );
+
+      if (response.content != null) {
+        for (var item in response.content!) {
+          // Check if product name matches and status is AVAILABLE
+          if (item.name?.toLowerCase() == productName.toLowerCase() &&
+              item.status == 'AVAILABLE') {
+            print('[CreateProductModal] Found duplicate: ${item.name}');
+            return true;
+          }
+        }
+      }
+
+      print('[CreateProductModal] No duplicate found');
+      return false;
+    } catch (e) {
+      print('[CreateProductModal] Error checking duplicate: $e');
+      // If API call fails, allow product creation
+      return false;
+    }
   }
 }

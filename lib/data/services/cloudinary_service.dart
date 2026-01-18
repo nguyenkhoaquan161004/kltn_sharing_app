@@ -60,8 +60,8 @@ class CloudinaryService {
         data: formData,
         options: Options(
           contentType: 'multipart/form-data',
-          receiveTimeout: const Duration(seconds: 30),
-          sendTimeout: const Duration(seconds: 30),
+          receiveTimeout: const Duration(seconds: 60),
+          sendTimeout: const Duration(seconds: 60),
         ),
       );
 
@@ -140,8 +140,8 @@ class CloudinaryService {
         data: formData,
         options: Options(
           contentType: 'multipart/form-data',
-          receiveTimeout: const Duration(seconds: 30),
-          sendTimeout: const Duration(seconds: 30),
+          receiveTimeout: const Duration(seconds: 60),
+          sendTimeout: const Duration(seconds: 60),
         ),
       );
 
@@ -221,8 +221,8 @@ class CloudinaryService {
         data: formData,
         options: Options(
           contentType: 'multipart/form-data',
-          receiveTimeout: const Duration(seconds: 30),
-          sendTimeout: const Duration(seconds: 30),
+          receiveTimeout: const Duration(seconds: 60),
+          sendTimeout: const Duration(seconds: 60),
         ),
       );
 

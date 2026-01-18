@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
+import 'scoring_mechanism_modal.dart';
 
 class ProfileHeader extends StatelessWidget {
   final String name;
@@ -65,13 +66,50 @@ class ProfileHeader extends StatelessWidget {
               color: Colors.white,
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 12),
 
-          // Points
-          Text(
-            '${trustScore ?? 0} điểm uy tín',
-            style: AppTextStyles.bodyMedium.copyWith(
-              color: Colors.white.withOpacity(0.9),
+          // Points with info button
+          GestureDetector(
+            onTap: () {
+              showDialog(
+                context: context,
+                builder: (context) => const ScoringMechanismModal(),
+              );
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.3),
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.star,
+                    color: Colors.white,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    '${trustScore ?? 0} điểm',
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      color: Colors.white.withOpacity(0.95),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Icon(
+                    Icons.info_outline,
+                    color: Colors.white.withOpacity(0.7),
+                    size: 16,
+                  ),
+                ],
+              ),
             ),
           ),
           const SizedBox(height: 24),

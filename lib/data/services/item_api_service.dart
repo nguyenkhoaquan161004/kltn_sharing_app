@@ -158,6 +158,8 @@ class ItemApiService {
     double maxDistanceKm = 50,
     int page = 0,
     int size = 10,
+    String? keyword,
+    String? categoryId,
     String? status = 'AVAILABLE',
     String? sortBy = 'createdAt',
     String? sortDirection = 'ASC',
@@ -190,13 +192,20 @@ class ItemApiService {
         'userLat': latitude,
         'userLon': longitude,
         'maxDistanceKm': maxDistanceKm,
+        if (keyword != null && keyword.isNotEmpty) 'name': keyword,
+        if (categoryId != null && categoryId.isNotEmpty && categoryId != 'null')
+          'categoryId': categoryId,
         if (status != null && status.isNotEmpty) 'status': status,
         // TODO: Backend may not support sort + geo filter together
         // 'sortBy': sortBy,
         // 'sortOrder': sortDirection,
       };
       print('[ItemAPI] searchNearbyItems called with:');
-      print('[ItemAPI]   latitude: $latitude, longitude: $longitude, maxDistanceKm: $maxDistanceKm');
+      print(
+          '[ItemAPI]   latitude: $latitude, longitude: $longitude, maxDistanceKm: $maxDistanceKm');
+      print('[ItemAPI]   keyword: "$keyword" (isEmpty: ${keyword?.isEmpty})');
+      print(
+          '[ItemAPI]   categoryId: "$categoryId" (isEmpty: ${categoryId?.isEmpty}, isNullString: ${categoryId == 'null'})');
       print('[ItemAPI]   Final queryParams: $queryParams');
 
       final response = await _dio.get(
@@ -208,13 +217,35 @@ class ItemApiService {
 
       if (response.statusCode == 200) {
         final data = response.data;
+        print(
+            '[ItemAPI.searchNearbyItems] Response data type: ${data.runtimeType}');
+        print(
+            '[ItemAPI.searchNearbyItems] Response keys: ${data is Map ? data.keys : 'N/A'}');
+        print('[ItemAPI.searchNearbyItems] Full response: $data');
 
         if (data is Map<String, dynamic>) {
           if (data.containsKey('data')) {
             final pageData = data['data'];
+            print(
+                '[ItemAPI.searchNearbyItems] pageData type: ${pageData.runtimeType}');
+            print(
+                '[ItemAPI.searchNearbyItems] pageData keys: ${pageData is Map ? pageData.keys : 'N/A'}');
+
             if (pageData is Map<String, dynamic>) {
+              final contentLength = pageData['content']?.length ?? 0;
+              final itemsLength = pageData['items']?.length ?? 0;
+              final dataLength = pageData['data']?.length ?? 0;
+              final totalElements = pageData['totalItems'] ??
+                  pageData['totalElements'] ??
+                  pageData['total'] ??
+                  0;
               print(
-                  '[ItemAPI.searchNearbyItems] Successfully parsed response, got ${pageData['content']?.length ?? 0} items');
+                  '[ItemAPI.searchNearbyItems] Response structure - content: $contentLength, items: $itemsLength, data: $dataLength, totalItems: $totalElements');
+              final actualItemCount = dataLength > 0
+                  ? dataLength
+                  : (contentLength > 0 ? contentLength : itemsLength);
+              print(
+                  '[ItemAPI.searchNearbyItems] Successfully parsed response, got $actualItemCount items (total: $totalElements)');
               return PageResponse<ItemDto>.fromJson(
                 pageData,
                 (json) => ItemDto.fromJson(json),
@@ -222,6 +253,9 @@ class ItemApiService {
             }
           } else {
             try {
+              final contentLength = data['content']?.length ?? 0;
+              print(
+                  '[ItemAPI.searchNearbyItems] Direct parse - got $contentLength items');
               return PageResponse<ItemDto>.fromJson(
                 data,
                 (json) => ItemDto.fromJson(json),
@@ -244,7 +278,7 @@ class ItemApiService {
         print(
             '[ItemAPI.searchNearbyItems] Server error response: ${e.response?.data}');
         print('[ItemAPI.searchNearbyItems] Retrying without maxDistanceKm...');
-        
+
         // Retry without maxDistanceKm parameter to bypass server issue
         try {
           final retryQueryParams = {
@@ -253,19 +287,25 @@ class ItemApiService {
             'userLat': latitude,
             'userLon': longitude,
             // maxDistanceKm removed for retry
+            if (keyword != null && keyword.isNotEmpty) 'name': keyword,
+            if (categoryId != null &&
+                categoryId.isNotEmpty &&
+                categoryId != 'null')
+              'categoryId': categoryId,
             if (status != null && status.isNotEmpty) 'status': status,
           };
-          
+
           print('[ItemAPI] Retry queryParams: $retryQueryParams');
           final retryResponse = await _dio.get(
             '/api/v2/items',
             queryParameters: retryQueryParams,
           );
-          
+
           if (retryResponse.statusCode == 200) {
             final data = retryResponse.data;
-            print('[ItemAPI.searchNearbyItems] Retry successful! Got ${data['data']?['content']?.length ?? 0} items');
-            
+            print(
+                '[ItemAPI.searchNearbyItems] Retry successful! Got ${data['data']?['content']?.length ?? 0} items');
+
             if (data is Map<String, dynamic>) {
               if (data.containsKey('data')) {
                 final pageData = data['data'];
@@ -314,7 +354,7 @@ class ItemApiService {
         'page': page + 1, // BE expects 1-based page numbering
         'limit': size,
         if (keyword != null && keyword.isNotEmpty) 'name': keyword,
-        if (categoryId != null && categoryId.isNotEmpty)
+        if (categoryId != null && categoryId.isNotEmpty && categoryId != 'null')
           'categoryId': categoryId,
         if (status != null && status.isNotEmpty) 'status': status,
         'sortBy': sortBy,
@@ -917,6 +957,27 @@ class ItemApiService {
     } on DioException catch (e) {
       print(
           '[ItemAPI] ERROR[${e.response?.statusCode}] => Failed to delete search history');
+      print('[ItemAPI] ERROR MESSAGE: ${e.message}');
+      return false;
+    }
+  }
+
+  /// Delete an item by ID
+  /// DELETE /api/v2/items/{id}
+  Future<bool> deleteItem(String itemId) async {
+    try {
+      print('[ItemAPI] REQUEST[DELETE] => /api/v2/items/$itemId');
+
+      final response = await _dio.delete(
+        '/api/v2/items/$itemId',
+      );
+
+      print(
+          '[ItemAPI] RESPONSE[${response.statusCode}] => Item $itemId deleted');
+      return response.statusCode == 200 || response.statusCode == 204;
+    } on DioException catch (e) {
+      print(
+          '[ItemAPI] ERROR[${e.response?.statusCode}] => Failed to delete item $itemId');
       print('[ItemAPI] ERROR MESSAGE: ${e.message}');
       return false;
     }

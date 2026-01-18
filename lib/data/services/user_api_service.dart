@@ -81,7 +81,11 @@ class UserApiService {
   Future<UserDto> getCurrentUser() async {
     try {
       print('[UserAPI] Fetching current user profile');
-      final response = await _dio.get('/api/v2/users/me');
+      final response = await _dio.get('/api/v2/users/me').timeout(
+            const Duration(seconds: 15),
+            onTimeout: () =>
+                throw Exception('Get current user request timeout'),
+          );
 
       print('[UserAPI] Response status: ${response.statusCode}');
       print('[UserAPI] Response data type: ${response.data.runtimeType}');

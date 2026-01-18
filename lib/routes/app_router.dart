@@ -12,6 +12,7 @@ import '../presentation/screens/auth/email_verification_screen.dart';
 import '../presentation/screens/auth/forgot_password_screen.dart';
 import '../presentation/screens/auth/verify_password_reset_otp_screen.dart';
 import '../presentation/screens/auth/reset_password_screen.dart';
+import '../presentation/screens/auth/category_preferences_screen.dart';
 import '../presentation/screens/otp_screen.dart';
 import '../presentation/screens/home/home_screen.dart';
 import '../presentation/screens/search/search_screen.dart';
@@ -42,6 +43,7 @@ import '../presentation/screens/notifications/notifications_screen.dart';
 import '../presentation/screens/error/error_404_screen.dart';
 import '../core/constants/app_routes.dart';
 import '../data/providers/auth_provider.dart';
+import '../data/services/preferences_service.dart';
 
 class AppRouter {
   // Helper function để tạo smooth page transition
@@ -85,21 +87,14 @@ class AppRouter {
           state.matchedLocation == AppRoutes.onboarding ||
           state.matchedLocation == AppRoutes.login ||
           state.matchedLocation == AppRoutes.register ||
+          state.matchedLocation == AppRoutes.categoryPreferences ||
           state.matchedLocation.startsWith(AppRoutes.emailInput) ||
           state.matchedLocation.startsWith('/email-verification') ||
           state.matchedLocation.startsWith('/forgot-password') ||
           state.matchedLocation.startsWith('/reset-password') ||
           state.matchedLocation.startsWith('/otp');
 
-      // If logged in and trying to access auth pages, go to home
-      if (isLoggedIn &&
-          isGoingToAuth &&
-          state.matchedLocation != AppRoutes.splash) {
-        print('[Router] ✅ User is logged in, redirecting to home');
-        return AppRoutes.home;
-      }
-
-      // If not logged in and trying to access protected pages, go to login
+      // If NOT logged in and trying to access protected pages, go to login
       if (!isLoggedIn && !isGoingToAuth) {
         print('[Router] ⚠️  User not logged in, redirecting to login');
         return AppRoutes.login;
@@ -147,6 +142,14 @@ class AppRouter {
         pageBuilder: (context, state) => _buildPageWithTransition(
             child: const RegisterScreen(), state: state, name: 'register'),
         name: 'register',
+      ),
+      GoRoute(
+        path: AppRoutes.categoryPreferences,
+        pageBuilder: (context, state) => _buildPageWithTransition(
+            child: const CategoryPreferencesScreen(),
+            state: state,
+            name: 'category-preferences'),
+        name: 'category-preferences',
       ),
       GoRoute(
         path: AppRoutes.terms,

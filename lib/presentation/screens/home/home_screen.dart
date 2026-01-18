@@ -284,6 +284,11 @@ class _HomeScreenState extends State<HomeScreen>
       _isLoadingMoreNearby = true;
 
       try {
+        // Thêm delay 3 giây trước khi load
+        print('[HomeScreen] Waiting 3 seconds before loading...');
+        await Future.delayed(const Duration(seconds: 3));
+        print('[HomeScreen] Delay finished, starting load now');
+
         await itemProvider.loadNearbyItems(
           latitude: locationProvider.latitude!,
           longitude: locationProvider.longitude!,

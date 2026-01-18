@@ -2,7 +2,7 @@ import 'package:dio/dio.dart';
 import 'dart:async';
 
 /// Interceptor to handle token refresh on 401/403 responses with proper retry logic
-/// 
+///
 /// Pattern:
 /// 1. Request → 401/403
 /// 2. Interceptor chặn
@@ -93,7 +93,13 @@ class TokenRefreshInterceptor extends Interceptor {
   Future<void> _retryRequest(
       DioException err, ErrorInterceptorHandler handler) async {
     try {
-      final validToken = await getValidTokenCallback();
+      final validToken = await getValidTokenCallback().timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          print('[TokenRefresh] ⏱️  Timeout getting valid token');
+          return null;
+        },
+      );
       final requestOptions = err.requestOptions;
 
       if (validToken != null) {
@@ -102,17 +108,22 @@ class TokenRefreshInterceptor extends Interceptor {
 
       print(
           '[TokenRefresh] 🔁 Retrying request: ${requestOptions.method} ${requestOptions.path}');
-      final response = await dio.request<dynamic>(
-        requestOptions.path,
-        options: Options(
-          method: requestOptions.method,
-          headers: requestOptions.headers,
-          responseType: requestOptions.responseType,
-          contentType: requestOptions.contentType,
-        ),
-        data: requestOptions.data,
-        queryParameters: requestOptions.queryParameters,
-      );
+      final response = await dio
+          .request<dynamic>(
+            requestOptions.path,
+            options: Options(
+              method: requestOptions.method,
+              headers: requestOptions.headers,
+              responseType: requestOptions.responseType,
+              contentType: requestOptions.contentType,
+            ),
+            data: requestOptions.data,
+            queryParameters: requestOptions.queryParameters,
+          )
+          .timeout(
+            const Duration(seconds: 30),
+            onTimeout: () => throw Exception('Retry request timeout'),
+          );
 
       print('[TokenRefresh] ✅ Retry successful');
       return handler.resolve(response);

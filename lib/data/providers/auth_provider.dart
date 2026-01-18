@@ -4,6 +4,7 @@ import 'package:kltn_sharing_app/data/models/auth_request_model.dart';
 import 'package:kltn_sharing_app/data/services/auth_api_service.dart';
 import 'package:kltn_sharing_app/data/services/user_api_service.dart';
 import 'package:kltn_sharing_app/data/services/gamification_api_service.dart';
+import 'package:kltn_sharing_app/data/services/preferences_service.dart';
 
 /// Provider for managing authentication state and tokens
 class AuthProvider extends ChangeNotifier {
@@ -138,6 +139,11 @@ class AuthProvider extends ChangeNotifier {
     await _prefs.remove(_accessTokenKey);
     await _prefs.remove(_refreshTokenKey);
     await _prefs.remove(_usernameKey);
+
+    // Clear category preferences on logout so user must select again on next login
+    final prefsService = PreferencesService();
+    await prefsService.init();
+    await prefsService.clearAll();
 
     _accessToken = null;
     _refreshToken = null;
@@ -417,8 +423,8 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  /// Check if token is valid by attempting to refresh it
-  Future<bool> validateAndRefreshToken() async {
+  /// Check if token is valid by attempting to refresh it with retry logic
+  Future<bool> validateAndRefreshToken({int maxRetries = 3}) async {
     try {
       if (_refreshToken == null || _refreshToken!.isEmpty) {
         print('[AuthProvider] ⚠️  No refresh token found');
@@ -426,36 +432,59 @@ class AuthProvider extends ChangeNotifier {
         return false;
       }
 
-      print('[AuthProvider] 🔄 Validating token...');
+      print('[AuthProvider] 🔄 Validating and refreshing token...');
 
-      // Try to refresh the token
-      try {
-        final request = RefreshTokenRequest(refreshToken: _refreshToken!);
-        final tokenResponse = await _authApiService.refreshToken(request);
+      // Try to refresh the token with retry logic
+      int retryCount = 0;
+      while (retryCount < maxRetries) {
+        try {
+          final request = RefreshTokenRequest(refreshToken: _refreshToken!);
 
-        await _saveTokens(
-          tokenResponse.accessToken,
-          tokenResponse.refreshToken,
-          tokenResponse.expiresIn,
-          _username,
-          userId: _userId,
-        );
+          // Add timeout for refresh request
+          final tokenResponse =
+              await _authApiService.refreshToken(request).timeout(
+                    const Duration(seconds: 15),
+                    onTimeout: () => throw Exception('Token refresh timeout'),
+                  );
 
-        print('[AuthProvider] ✅ Token refreshed successfully');
-        return true;
-      } catch (e) {
-        print('[AuthProvider] ⚠️  Token refresh failed: $e');
-        // If refresh fails, clear tokens
-        await _clearTokens();
-        return false;
+          await _saveTokens(
+            tokenResponse.accessToken,
+            tokenResponse.refreshToken,
+            tokenResponse.expiresIn,
+            _username,
+            userId: _userId,
+          );
+
+          print(
+              '[AuthProvider] ✅ Token refreshed successfully on attempt ${retryCount + 1}');
+          return true;
+        } catch (e) {
+          retryCount++;
+          print(
+              '[AuthProvider] ⚠️  Token refresh attempt $retryCount failed: $e');
+
+          if (retryCount < maxRetries) {
+            // Wait before retrying (exponential backoff)
+            final waitTime = Duration(milliseconds: 500 * retryCount);
+            print(
+                '[AuthProvider] ⏳ Waiting ${waitTime.inMilliseconds}ms before retry...');
+            await Future.delayed(waitTime);
+          }
+        }
       }
+
+      // All retries failed
+      print('[AuthProvider] ❌ Token refresh failed after $maxRetries attempts');
+      await _clearTokens();
+      return false;
     } catch (e) {
       print('[AuthProvider] ❌ Error validating token: $e');
+      await _clearTokens();
       return false;
     }
   }
 
-  /// Restore session on app startup
+  /// Restore session on app startup with improved error handling
   Future<void> restoreSession() async {
     try {
       _isLoading = true;
@@ -470,8 +499,23 @@ class AuthProvider extends ChangeNotifier {
         return;
       }
 
-      // Try to validate and refresh token
-      final isValid = await validateAndRefreshToken();
+      print('[AuthProvider] 🔐 Starting session restoration...');
+
+      // Try to validate and refresh token with timeout
+      bool isValid = false;
+      try {
+        isValid = await validateAndRefreshToken(maxRetries: 3).timeout(
+          const Duration(seconds: 30),
+          onTimeout: () {
+            print('[AuthProvider] ⏱️  Token refresh timeout, clearing tokens');
+            return false;
+          },
+        );
+      } catch (e) {
+        print('[AuthProvider] ❌ Exception during token refresh: $e');
+        isValid = false;
+      }
+
       if (isValid) {
         // Load user data
         try {
@@ -479,16 +523,27 @@ class AuthProvider extends ChangeNotifier {
           print('[AuthProvider] ✅ Session restored: ${currentUser.fullName}');
           _userId = currentUser.id;
           await _prefs.setString(_userIdKey, currentUser.id);
+
+          // Load gamification points
+          try {
+            await _loadGamificationPoints();
+          } catch (e) {
+            print('[AuthProvider] ⚠️  Failed to load gamification points: $e');
+          }
         } catch (e) {
           print('[AuthProvider] ⚠️  Failed to load user data: $e');
           // Token is valid but can't load user data, that's okay
         }
+      } else {
+        print('[AuthProvider] ⚠️  Token validation failed, tokens cleared');
       }
 
       _isLoading = false;
       notifyListeners();
     } catch (e) {
       print('[AuthProvider] ❌ Error restoring session: $e');
+      // Clear tokens on any error
+      await _clearTokens();
       _isLoading = false;
       notifyListeners();
     }

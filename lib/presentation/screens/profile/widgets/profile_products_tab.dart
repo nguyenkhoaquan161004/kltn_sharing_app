@@ -888,6 +888,7 @@ class _ProfileProductsTabState extends State<ProfileProductsTab>
                   children: [
                     // Product info header
                     Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Container(
                           width: 80,
@@ -927,6 +928,25 @@ class _ProfileProductsTabState extends State<ProfileProductsTab>
                                 ),
                               ),
                             ],
+                          ),
+                        ),
+                        // Delete button
+                        GestureDetector(
+                          onTap: () {
+                            Navigator.pop(context); // Close sheet first
+                            _showDeleteConfirmation(product);
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: AppColors.error.withOpacity(0.1),
+                            ),
+                            child: Icon(
+                              Icons.delete_outline,
+                              color: AppColors.error,
+                              size: 20,
+                            ),
                           ),
                         ),
                       ],
@@ -1847,5 +1867,96 @@ class _ProfileProductsTabState extends State<ProfileProductsTab>
         ),
       ),
     );
+  }
+
+  /// Show delete confirmation dialog
+  void _showDeleteConfirmation(ItemModel product) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Xóa sản phẩm'),
+        content: Text(
+          'Bạn có chắc chắn muốn xóa sản phẩm "${product.name}"?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Hủy'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _deleteProduct(product);
+            },
+            child: Text(
+              'Xóa',
+              style: TextStyle(color: AppColors.error),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Delete product
+  Future<void> _deleteProduct(ItemModel product) async {
+    try {
+      // Show loading dialog
+      if (mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => const Center(
+            child: CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(
+                AppColors.primaryTeal,
+              ),
+            ),
+          ),
+        );
+      }
+
+      final productId = product.itemId_str ?? product.itemId.toString();
+      final success = await _itemApiService.deleteItem(productId);
+
+      if (mounted) {
+        Navigator.pop(context); // Close loading dialog
+      }
+
+      if (success) {
+        // Show success message
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Xóa sản phẩm thành công'),
+              backgroundColor: AppColors.primaryGreen,
+            ),
+          );
+
+          // Reload products
+          await _loadUserProducts();
+        }
+      } else {
+        // Show error message
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Không thể xóa sản phẩm'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context); // Close loading dialog
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Lỗi: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
   }
 }

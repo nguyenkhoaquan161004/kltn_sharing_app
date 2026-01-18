@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:go_router/go_router.dart';
 import 'firebase_options.dart';
 import 'data/services/fcm_service.dart'
     show FCMService, backgroundMessageHandler;
@@ -10,6 +11,7 @@ import 'data/services/message_notification_service.dart';
 import 'data/services/firebase_debug_service.dart';
 import 'core/theme/app_theme.dart';
 import 'core/config/app_config.dart';
+import 'core/constants/app_routes.dart';
 import 'routes/app_router.dart';
 import 'data/providers/auth_provider.dart';
 import 'data/providers/item_provider.dart';
@@ -236,6 +238,7 @@ class MyApp extends StatelessWidget {
           title: 'KLTN Sharing App',
           theme: AppTheme.lightTheme,
           routerConfig: AppRouter.router,
+          debugShowCheckedModeBanner: false,
         ),
       ),
     );
@@ -253,6 +256,8 @@ class _AppInitializer extends StatefulWidget {
 }
 
 class _AppInitializerState extends State<_AppInitializer> {
+  late AuthProvider _authProvider;
+
   @override
   void initState() {
     super.initState();
@@ -265,23 +270,76 @@ class _AppInitializerState extends State<_AppInitializer> {
       await Future.delayed(const Duration(milliseconds: 100));
 
       if (mounted) {
-        final authProvider = context.read<AuthProvider>();
+        _authProvider = context.read<AuthProvider>();
+
+        // Add listener to detect token expiration/logout
+        _authProvider.addListener(_onAuthStateChanged);
+
         print('[AppInitializer] 🔄 Restoring session...');
-        await authProvider.restoreSession();
-        print('[AppInitializer] ✅ Session restoration complete');
+
+        // Restore session with timeout to prevent hang
+        try {
+          await _authProvider.restoreSession().timeout(
+            const Duration(seconds: 45),
+            onTimeout: () {
+              print('[AppInitializer] ⏱️  Session restoration timeout');
+            },
+          );
+          print('[AppInitializer] ✅ Session restoration complete');
+        } catch (e) {
+          print('[AppInitializer] ⚠️  Session restoration error: $e');
+        }
 
         // Load user profile if user is logged in
-        if (authProvider.isLoggedIn && authProvider.accessToken != null) {
-          print('[AppInitializer] 🔄 Loading user profile...');
-          final userProvider = context.read<UserProvider>();
-          userProvider.setAuthToken(authProvider.accessToken!);
-          await userProvider.loadCurrentUser();
-          print('[AppInitializer] ✅ User profile loaded');
+        if (_authProvider.isLoggedIn && _authProvider.accessToken != null) {
+          try {
+            print('[AppInitializer] 🔄 Loading user profile...');
+            final userProvider = context.read<UserProvider>();
+            userProvider.setAuthToken(_authProvider.accessToken!);
+            await userProvider.loadCurrentUser().timeout(
+              const Duration(seconds: 15),
+              onTimeout: () {
+                print('[AppInitializer] ⏱️  User profile loading timeout');
+              },
+            );
+            print('[AppInitializer] ✅ User profile loaded');
+          } catch (e) {
+            print('[AppInitializer] ⚠️  Failed to load user profile: $e');
+            // Don't fail the initialization if profile fails to load
+          }
         }
       }
     } catch (e) {
       print('[AppInitializer] ❌ Error initializing app: $e');
     }
+  }
+
+  /// Listen to auth state changes and redirect to login if logged out
+  void _onAuthStateChanged() {
+    print(
+        '[AppInitializer] 🔔 Auth state changed. isLoggedIn: ${_authProvider.isLoggedIn}');
+
+    if (!_authProvider.isLoggedIn && mounted) {
+      print(
+          '[AppInitializer] ⚠️  Token expired/cleared, redirecting to login...');
+
+      // Use a small delay to ensure state update completes
+      Future.delayed(const Duration(milliseconds: 100), () {
+        if (mounted) {
+          // Force navigate to login
+          final router = GoRouter.of(context);
+          router.go(AppRoutes.login);
+        }
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    try {
+      _authProvider.removeListener(_onAuthStateChanged);
+    } catch (_) {}
+    super.dispose();
   }
 
   @override

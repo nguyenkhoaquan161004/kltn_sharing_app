@@ -50,10 +50,15 @@ class AuthApiService {
   /// Login endpoint
   Future<TokenResponse> login(LoginRequest request) async {
     try {
-      final response = await _dio.post(
-        '/login',
-        data: request.toJson(),
-      );
+      final response = await _dio
+          .post(
+            '/login',
+            data: request.toJson(),
+          )
+          .timeout(
+            const Duration(seconds: 30),
+            onTimeout: () => throw Exception('Login request timeout'),
+          );
 
       if (response.statusCode == 200) {
         if (response.data is Map<String, dynamic>) {
@@ -188,10 +193,15 @@ class AuthApiService {
   /// Refresh access token
   Future<TokenResponse> refreshToken(RefreshTokenRequest request) async {
     try {
-      final response = await _dio.post(
-        '/refresh-token',
-        data: request.toJson(),
-      );
+      final response = await _dio
+          .post(
+            '/refresh-token',
+            data: request.toJson(),
+          )
+          .timeout(
+            const Duration(seconds: 20),
+            onTimeout: () => throw Exception('Token refresh request timeout'),
+          );
 
       if (response.statusCode == 200) {
         if (response.data is Map<String, dynamic>) {

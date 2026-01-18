@@ -10,6 +10,7 @@ class AppRoutes {
   static const String forgotPassword = '/forgot-password';
   static const String verifyPasswordResetOtp = '/verify-password-reset-otp';
   static const String resetPassword = '/reset-password';
+  static const String categoryPreferences = '/category-preferences';
 
   // Main routes
   static const String home = '/home';

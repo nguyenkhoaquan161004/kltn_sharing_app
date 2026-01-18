@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:kltn_sharing_app/core/constants/app_text_styles.dart';
+import 'package:kltn_sharing_app/data/services/preferences_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/constants/app_routes.dart';
 import '../../widgets/custom_text_field.dart';
@@ -38,7 +39,10 @@ class _LoginScreenState extends State<LoginScreen> {
       final authProvider = context.read<AuthProvider>();
       final userProvider = context.read<UserProvider>();
 
-      // Sign in with Google
+      // Sign out first to allow user to choose account
+      await _googleSignIn.signOut();
+
+      // Sign in with Google with force account picker
       final googleUser = await _googleSignIn.signIn();
       if (googleUser == null) {
         // User cancelled the sign-in
@@ -87,7 +91,14 @@ class _LoginScreenState extends State<LoginScreen> {
             print('[LoginScreen] ⚠️  Failed to update FCM token: $e');
           }
 
-          context.go(AppRoutes.home);
+          // Reset category preferences on each login to ensure user always sees category selection
+          final prefsService = PreferencesService();
+          await prefsService.init();
+          await prefsService.setCategoryPreferencesSetup(false);
+
+          if (mounted) {
+            context.go(AppRoutes.categoryPreferences);
+          }
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -131,7 +142,6 @@ class _LoginScreenState extends State<LoginScreen> {
             // Don't prevent navigation even if user data load fails
           }
 
-          context.go(AppRoutes.home);
           // Update FCM token on backend
           // TODO: Enable FCM token update later
           try {
@@ -147,15 +157,18 @@ class _LoginScreenState extends State<LoginScreen> {
                 fcmToken: fcmToken,
               );
               print('[LoginScreen] ✅ FCM token updated successfully');
-            } else {
-              print('[LoginScreen] ⚠️  FCM token or user ID is null');
-              print(
-                  '[LoginScreen] - FCM Token: ${fcmToken?.substring(0, 20) ?? 'null'}');
-              print('[LoginScreen] - User ID: ${currentUser?.id ?? 'null'}');
             }
           } catch (e) {
             print('[LoginScreen] ⚠️  Failed to update FCM token: $e');
-            // Don't prevent navigation even if FCM token update fails
+          }
+
+          // Reset category preferences on each login to ensure user always sees category selection
+          final prefsService = PreferencesService();
+          await prefsService.init();
+          await prefsService.setCategoryPreferencesSetup(false);
+
+          if (mounted) {
+            context.go(AppRoutes.categoryPreferences);
           }
         } else {
           ScaffoldMessenger.of(context).showSnackBar(

@@ -11,188 +11,260 @@ class ScoringMechanismModal extends StatelessWidget {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
       ),
-      child: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header
-              Row(
+      backgroundColor: Colors.white,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.8,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                gradient: AppColors.primaryGradient,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(20),
+                ),
+              ),
+              child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const Text(
                     'Cơ chế tính điểm',
-                    style: AppTextStyles.h3,
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
                   ),
                   GestureDetector(
                     onTap: () => Navigator.pop(context),
-                    child: const Icon(
-                      Icons.close,
-                      color: AppColors.textSecondary,
+                    child: Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white.withOpacity(0.2),
+                      ),
+                      child: const Icon(
+                        Icons.close,
+                        color: Colors.white,
+                        size: 20,
+                      ),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 24),
+            ),
 
-              // Description
-              Text(
-                'Điểm uy tín được tính dựa trên các hoạt động của bạn:',
-                style: AppTextStyles.bodyMedium.copyWith(
-                  color: AppColors.textSecondary,
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              // Scoring items
-              _buildScoringItem(
-                icon: Icons.share,
-                title: 'Chia sẻ sản phẩm',
-                points: '+10 điểm',
-                description: 'Mỗi lần chia sẻ sản phẩm',
-              ),
-              const SizedBox(height: 16),
-
-              _buildScoringItem(
-                icon: Icons.star,
-                title: 'Đánh giá tích cực',
-                points: '+5 điểm',
-                description: 'Mỗi lần nhận được đánh giá ⭐⭐⭐⭐⭐',
-              ),
-              const SizedBox(height: 16),
-
-              _buildScoringItem(
-                icon: Icons.done_all,
-                title: 'Hoàn thành giao dịch',
-                points: '+20 điểm',
-                description: 'Mỗi giao dịch được xác nhận thành công',
-              ),
-              const SizedBox(height: 16),
-
-              _buildScoringItem(
-                icon: Icons.access_time,
-                title: 'Phản hồi nhanh',
-                points: '+3 điểm',
-                description: 'Phản hồi trong 1 giờ',
-              ),
-              const SizedBox(height: 16),
-
-              _buildScoringItem(
-                icon: Icons.warning,
-                title: 'Vi phạm quy tắc',
-                points: '-10 điểm',
-                description: 'Mỗi lần vi phạm hoặc báo cáo',
-                isNegative: true,
-              ),
-              const SizedBox(height: 24),
-
-              // Note
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppColors.primaryTeal.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  'Lưu ý: Điểm uy tín cao hơn = Được người khác tin tưởng nhiều hơn',
-                  style: AppTextStyles.caption.copyWith(
-                    color: AppColors.primaryTeal,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              // Close button
-              SizedBox(
-                width: double.infinity,
-                height: 44,
-                child: ElevatedButton(
-                  onPressed: () => Navigator.pop(context),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primaryTeal,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  child: Text(
-                    'Đã hiểu',
-                    style: AppTextStyles.bodyLarge.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
+            // Content
+            Expanded(
+              child: _buildPointsTab(),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildScoringItem({
-    required IconData icon,
-    required String title,
-    required String points,
-    required String description,
-    bool isNegative = false,
-  }) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: isNegative
-                ? AppColors.warning.withOpacity(0.1)
-                : AppColors.primaryTeal.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(8),
+  Widget _buildPointsTab() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Cách kiếm điểm',
+            style: AppTextStyles.h4.copyWith(fontWeight: FontWeight.bold),
           ),
-          child: Icon(
-            icon,
-            color: isNegative ? AppColors.warning : AppColors.primaryTeal,
-            size: 20,
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    title,
-                    style: AppTextStyles.bodyMedium.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  Text(
-                    points,
-                    style: AppTextStyles.bodyMedium.copyWith(
-                      color: isNegative
-                          ? AppColors.warning
-                          : AppColors.primaryTeal,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
+          const SizedBox(height: 16),
+
+          // Main actions
+          _buildPointSection(
+            title: 'Giao dịch chính',
+            items: [
+              _PointItem(
+                icon: Icons.send,
+                title: 'Chia sẻ sản phẩm',
+                points: '+10',
+                description: 'Khi tạo một sản phẩm mới',
+                color: Colors.blue,
               ),
-              const SizedBox(height: 4),
-              Text(
-                description,
-                style: AppTextStyles.caption.copyWith(
-                  color: AppColors.textSecondary,
-                ),
+              _PointItem(
+                icon: Icons.check_circle,
+                title: 'Người bán hoàn thành giao dịch',
+                points: '+50',
+                description: 'Khi giao dịch được xác nhận',
+                color: Colors.green,
+              ),
+              _PointItem(
+                icon: Icons.shopping_bag,
+                title: 'Người nhận hoàn thành giao dịch',
+                points: '+20',
+                description: 'Khi nhận được sản phẩm',
+                color: Colors.orange,
               ),
             ],
+          ),
+          const SizedBox(height: 24),
+
+          // Interaction actions
+          _buildPointSection(
+            title: 'Tương tác (Hàng ngày)',
+            items: [
+              _PointItem(
+                icon: Icons.visibility,
+                title: 'Xem sản phẩm',
+                points: '+1',
+                description: 'Mỗi lần xem (tối đa 10 lần/ngày = 10 điểm)',
+                color: Colors.purple,
+              ),
+              _PointItem(
+                icon: Icons.message,
+                title: 'Gửi tin nhắn',
+                points: '+5',
+                description: 'Mỗi tin nhắn (tối đa 2 tin/ngày = 10 điểm)',
+                color: Colors.pink,
+              ),
+              _PointItem(
+                icon: Icons.shopping_cart,
+                title: 'Thêm vào giỏ hàng',
+                points: '+2',
+                description: 'Mỗi lần thêm (tối đa 10 lần/ngày = 20 điểm)',
+                color: Colors.red,
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+
+          // Info box
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.primaryTeal.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppColors.primaryTeal, width: 0.5),
+            ),
+            child: Text(
+              '💡 Lưu ý: Điểm tương tác hàng ngày có giới hạn để ngăn chặn spam',
+              style: AppTextStyles.caption.copyWith(
+                color: AppColors.primaryTeal,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPointSection({
+    required String title,
+    required List<_PointItem> items,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: AppTextStyles.bodyLarge.copyWith(
+            fontWeight: FontWeight.w600,
+            color: AppColors.primaryTeal,
+          ),
+        ),
+        const SizedBox(height: 12),
+        ...List.generate(
+          items.length,
+          (index) => Padding(
+            padding: EdgeInsets.only(bottom: index < items.length - 1 ? 12 : 0),
+            child: _buildPointItemWidget(items[index]),
           ),
         ),
       ],
     );
   }
+
+  Widget _buildPointItemWidget(_PointItem item) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        border: Border.all(color: AppColors.borderLight),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: item.color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              item.icon,
+              color: item.color,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        item.title,
+                        style: AppTextStyles.bodyMedium.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                        overflow: TextOverflow.visible,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      item.points,
+                      style: AppTextStyles.bodyMedium.copyWith(
+                        color: item.color,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.right,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  item.description,
+                  style: AppTextStyles.caption.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PointItem {
+  final IconData icon;
+  final String title;
+  final String points;
+  final String description;
+  final Color color;
+
+  _PointItem({
+    required this.icon,
+    required this.title,
+    required this.points,
+    required this.description,
+    required this.color,
+  });
 }

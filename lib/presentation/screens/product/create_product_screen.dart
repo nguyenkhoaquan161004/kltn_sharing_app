@@ -35,6 +35,7 @@ class _CreateProductScreenState extends State<CreateProductScreen> {
   bool _categoriesLoading = true;
   bool _userLoading = true;
   List<String> _selectedImages = [];
+  bool _simulateDuplicate = true; // Toggle này để fake duplicate error
 
   List<Map<String, dynamic>> _categories = [];
   String? _categoryError;
@@ -183,8 +184,10 @@ class _CreateProductScreenState extends State<CreateProductScreen> {
     });
   }
 
-  void _submit() async {
-    if (!_formKey.currentState!.validate()) return;
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
 
     if (_selectedImages.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -216,6 +219,38 @@ class _CreateProductScreenState extends State<CreateProductScreen> {
       return;
     }
 
+    // Check for duplicate products with same name and AVAILABLE status
+    print(
+        '[CreateProduct] DEBUG - Checking for duplicate products with name: ${_nameController.text.trim()}');
+    final isDuplicate =
+        await _checkDuplicateProduct(_nameController.text.trim());
+    if (isDuplicate) {
+      print('[CreateProduct] DEBUG - Duplicate product found, showing error');
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Sản phẩm đã tồn tại'),
+            content: Text(
+              'Sản phẩm "${_nameController.text.trim()}" đã tồn tại trong hệ thống. Không được đăng sản phẩm trùng!',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Đóng'),
+              ),
+            ],
+          ),
+        );
+      }
+      return;
+    }
+
+    print('[CreateProduct] DEBUG - No duplicate found, proceeding with submit');
+    _submitProduct();
+  }
+
+  Future<void> _submitProduct() async {
     setState(() => _isLoading = true);
 
     try {
@@ -441,27 +476,26 @@ class _CreateProductScreenState extends State<CreateProductScreen> {
                         ),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          onTap: _isLoading ? null : _submit,
-                          borderRadius: BorderRadius.circular(12),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            alignment: Alignment.center,
-                            child: _isLoading
-                                ? const SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Colors.white,
-                                    ),
-                                  )
-                                : const Text('Chia sẻ',
-                                    style: AppTextStyles.button),
+                      child: ElevatedButton(
+                        onPressed: _isLoading ? null : _submit,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFFFA726),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
                           ),
                         ),
+                        child: _isLoading
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text('Chia sẻ',
+                                style: AppTextStyles.button),
                       ),
                     ),
                   ),
@@ -762,5 +796,36 @@ class _CreateProductScreenState extends State<CreateProductScreen> {
         ],
       ],
     );
+  }
+
+  /// Check if product with same name and AVAILABLE status already exists
+  Future<bool> _checkDuplicateProduct(String productName) async {
+    try {
+      final itemService = context.read<ItemApiService>();
+      // Get all available products
+      final response = await itemService.searchProducts(
+        keyword: productName,
+        page: 0,
+        pageSize: 100,
+      );
+
+      if (response.content != null) {
+        for (var item in response.content!) {
+          // Check if product name matches and status is AVAILABLE
+          if (item.name?.toLowerCase() == productName.toLowerCase() &&
+              item.status == 'AVAILABLE') {
+            print('[CreateProduct] Found duplicate: ${item.name}');
+            return true;
+          }
+        }
+      }
+
+      print('[CreateProduct] No duplicate found');
+      return false;
+    } catch (e) {
+      print('[CreateProduct] Error checking duplicate: $e');
+      // If API call fails, allow product creation
+      return false;
+    }
   }
 }
